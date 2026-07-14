@@ -14,7 +14,11 @@ MapDir="$RepoDir/maps"
 Name="$1"
 
 mkdir -p "$MapDir"
+# ROS environment hooks may probe optional variables that are not defined.
+# Temporarily disable nounset while sourcing the generated setup script.
+set +u
 source /opt/ros/humble/setup.bash
+set -u
 
 ros2 run nav2_map_server map_saver_cli \
     -f "$MapDir/$Name" \

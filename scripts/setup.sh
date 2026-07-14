@@ -22,7 +22,10 @@ git -C "$RepoDir" submodule update --init --recursive
 ApplyPatch "$YdlidarSrc" "$RepoDir/patches/ydlidar_ros2_driver.patch"
 ApplyPatch "$Rf2oSrc" "$RepoDir/patches/rf2o_laser_odometry.patch"
 
+# ROS environment hooks may probe optional variables that are not defined.
+set +u
 source /opt/ros/humble/setup.bash
+set -u
 colcon --log-base "$RepoDir/MAPPER/YdlidarRos2Ws/log" build \
     --base-paths "$YdlidarSrc" \
     --build-base "$RepoDir/MAPPER/YdlidarRos2Ws/build" \

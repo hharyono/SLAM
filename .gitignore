@@ -9,6 +9,7 @@
 *.pgm
 !LUCKFOX_LOCALIZER/tests/data/*.pgm
 *.posegraph
+/maps/
 
 # Editor / OS metadata
 *Zone.Identifier
