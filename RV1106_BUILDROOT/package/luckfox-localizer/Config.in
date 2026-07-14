@@ -1,0 +1,9 @@
+config BR2_PACKAGE_LUCKFOX_LOCALIZER
+	bool "luckfox-localizer"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Lightweight occupancy-grid scan localizer for Luckfox Pico RV1106.
+	  Installs map_inspect and localize_scan in /usr/bin.
+
+comment "luckfox-localizer needs C++ support"
+	depends on !BR2_INSTALL_LIBSTDCPP

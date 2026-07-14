@@ -11,6 +11,10 @@
 *.posegraph
 /maps/
 
+# Luckfox vendor SDK and generated firmware (fetched/built locally)
+/RV1106_BUILDROOT/luckfox-pico/
+/RV1106_BUILDROOT/artifacts/
+
 # Editor / OS metadata
 *Zone.Identifier
 *Zone.Identifier:*
