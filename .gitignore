@@ -1,0 +1,17 @@
+# ROS 2 / colcon outputs
+**/build/
+**/install/
+**/log/
+
+# Runtime and generated maps
+*.log
+*.db3
+*.pgm
+*.posegraph
+
+# Editor / OS metadata
+*Zone.Identifier
+*Zone.Identifier:*
+.DS_Store
+*.swp
+*~

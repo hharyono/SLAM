@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -u
+
+RuntimeDir="/tmp/MapperStack"
+PidDir="$RuntimeDir/Pids"
+LogDir="$RuntimeDir/Logs"
+
+ScriptDir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MapperDir="$(dirname "$ScriptDir")"
+
+RosSetup="/opt/ros/humble/setup.bash"
+YdlidarSetup="$MapperDir/YdlidarRos2Ws/install/setup.bash"
+Rf2oSetup="$MapperDir/Rf2oWs/install/setup.bash"
+YdlidarParams="$MapperDir/YdlidarRos2Ws/src/ydlidar_ros2_driver/params/Tmini-Plus-SH.yaml"
+Rf2oParams="$MapperDir/Rf2oWs/Config/Rf2o.yaml"
+MapperParams="$MapperDir/Config/Mapper.yaml"
+
+EnsureRoot() {
+    if [[ "$EUID" -ne 0 ]]; then
+        echo "Jalankan sebagai root: sudo -E mapper start"
+        exit 1
+    fi
+}
+
+EnsurePaths() {
+    local path
+    for path in "$RosSetup" "$YdlidarSetup" "$Rf2oSetup" "$YdlidarParams" "$Rf2oParams" "$MapperParams"; do
+        if [[ ! -e "$path" ]]; then
+            echo "Tidak ditemukan: $path"
+            exit 1
+        fi
+    done
+}
+
+PrepareRuntime() {
+    mkdir -p "$PidDir" "$LogDir"
+}
+
+IsRunning() {
+    local name="$1"
+    local pidFile="$PidDir/$name.pid"
+    local pid
+
+    [[ -f "$pidFile" ]] || return 1
+    pid="$(cat "$pidFile" 2>/dev/null || true)"
+
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+
+    rm -f "$pidFile"
+    return 1
+}
+
+StartProcess() {
+    local name="$1"
+    local command="$2"
+    local pid
+
+    if IsRunning "$name"; then
+        echo "$name sudah berjalan, PID $(cat "$PidDir/$name.pid")."
+        return 0
+    fi
+
+    nohup setsid bash -lc "$command" >"$LogDir/$name.log" 2>&1 < /dev/null &
+    pid="$!"
+    echo "$pid" >"$PidDir/$name.pid"
+    sleep 1
+
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "$name berjalan, PID $pid."
+        return 0
+    fi
+
+    echo "$name gagal berjalan. Log:"
+    tail -n 30 "$LogDir/$name.log" 2>/dev/null || true
+    rm -f "$PidDir/$name.pid"
+    return 1
+}
+
+StopProcess() {
+    local name="$1"
+    local pidFile="$PidDir/$name.pid"
+    local pid
+    local count
+
+    if ! IsRunning "$name"; then
+        echo "$name tidak berjalan."
+        return 0
+    fi
+
+    pid="$(cat "$pidFile")"
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+
+    for count in {1..30}; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            break
+        fi
+        sleep 0.2
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+    fi
+
+    rm -f "$pidFile"
+    echo "$name dihentikan."
+}
+
+StartAll() {
+    EnsureRoot
+    EnsurePaths
+    PrepareRuntime
+
+    StartProcess "Ydlidar" "source '$RosSetup'; source '$YdlidarSetup'; exec ros2 run ydlidar_ros2_driver ydlidar_ros2_driver_node --ros-args --params-file '$YdlidarParams'" || { StopAll; exit 1; }
+    sleep 2
+    StartProcess "StaticTf" "source '$RosSetup'; exec ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 base_link laser_frame" || { StopAll; exit 1; }
+    sleep 1
+    StartProcess "Rf2o" "source '$RosSetup'; source '$Rf2oSetup'; exec ros2 run rf2o_laser_odometry rf2o_laser_odometry_node --ros-args --params-file '$Rf2oParams'" || { StopAll; exit 1; }
+    sleep 2
+    StartProcess "SlamToolbox" "source '$RosSetup'; source '$YdlidarSetup'; source '$Rf2oSetup'; exec ros2 launch slam_toolbox online_async_launch.py slam_params_file:='$MapperParams'" || { StopAll; exit 1; }
+    sleep 3
+    StartProcess "Rviz2" "source '$RosSetup'; export DISPLAY=:0; export WAYLAND_DISPLAY=wayland-0; export XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir; export QT_QPA_PLATFORM=xcb; exec rviz2" || { StopAll; exit 1; }
+
+    echo
+    echo "Semua proses sudah dijalankan."
+    echo "Status: mapper status"
+    echo "Log: mapper logs"
+    echo "Stop: mapper stop"
+}
+
+StopAll() {
+    EnsureRoot
+    PrepareRuntime
+    StopProcess "Rviz2"
+    StopProcess "SlamToolbox"
+    StopProcess "Rf2o"
+    StopProcess "StaticTf"
+    StopProcess "Ydlidar"
+    echo "Semua proses sudah dihentikan."
+}
+
+StatusAll() {
+    PrepareRuntime
+    local name
+    for name in Ydlidar StaticTf Rf2o SlamToolbox Rviz2; do
+        if IsRunning "$name"; then
+            echo "$name: RUNNING, PID $(cat "$PidDir/$name.pid")"
+        else
+            echo "$name: STOPPED"
+        fi
+    done
+}
+
+ShowLogs() {
+    PrepareRuntime
+    tail -n 100 -F "$LogDir/Ydlidar.log" "$LogDir/StaticTf.log" "$LogDir/Rf2o.log" "$LogDir/SlamToolbox.log" "$LogDir/Rviz2.log"
+}
+
+ShowUsage() {
+    echo "Penggunaan: mapper {start|stop|restart|status|logs}"
+}
+
+case "${1:-}" in
+    start)
+        StartAll
+        ;;
+    stop)
+        StopAll
+        ;;
+    restart)
+        StopAll
+        StartAll
+        ;;
+    status)
+        StatusAll
+        ;;
+    logs)
+        ShowLogs
+        ;;
+    *)
+        ShowUsage
+        exit 1
+        ;;
+esac

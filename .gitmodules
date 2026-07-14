@@ -1,0 +1,11 @@
+[submodule "MAPPER/YDLidar-SDK"]
+	path = MAPPER/YDLidar-SDK
+	url = https://github.com/YDLIDAR/YDLidar-SDK.git
+[submodule "MAPPER/YdlidarRos2Ws/src/ydlidar_ros2_driver"]
+	path = MAPPER/YdlidarRos2Ws/src/ydlidar_ros2_driver
+	url = https://github.com/YDLIDAR/ydlidar_ros2_driver.git
+	branch = humble
+[submodule "MAPPER/Rf2oWs/src/rf2o_laser_odometry"]
+	path = MAPPER/Rf2oWs/src/rf2o_laser_odometry
+	url = https://github.com/Adlink-ROS/rf2o_laser_odometry.git
+	branch = humble-devel
