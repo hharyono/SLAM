@@ -54,3 +54,8 @@ Konfigurasi utama:
 Static transform pada launcher saat ini menganggap `base_link` dan
 `laser_frame` berimpit. Sesuaikan enam nilai transform jika posisi fisik LiDAR
 terhadap pusat robot tidak nol.
+
+## Map untuk Luckfox Pico RV1106
+
+Converter `map.bin`, loader CRC, dan core scan-to-map localization standalone
+tersedia di [`LUCKFOX_LOCALIZER`](LUCKFOX_LOCALIZER/README.md).

@@ -7,6 +7,7 @@
 *.log
 *.db3
 *.pgm
+!LUCKFOX_LOCALIZER/tests/data/*.pgm
 *.posegraph
 
 # Editor / OS metadata
