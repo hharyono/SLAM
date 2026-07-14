@@ -25,8 +25,15 @@ Paket Buildroot memasang:
 
 - `/usr/bin/map_inspect`
 - `/usr/bin/localize_scan`
+- `/usr/bin/localize_uart`
 - `/etc/slam/ruang_utama.bin` bila `maps/ruang_utama.bin` tersedia saat build
 
-`localize_scan` saat ini menerima scan CSV (`angle_radian,range_meter`). Driver
-LiDAR realtime perlu memberikan data scan dalam format tersebut atau dihubungkan
-ke API localizer.
+Untuk membaca YDLidar langsung dari UART tanpa CSV:
+
+```sh
+localize_uart /etc/slam/ruang_utama.bin /dev/ttyUSB0 0 0 0 230400
+```
+
+Nilai pose terakhir yang valid otomatis menjadi tebakan awal frame berikutnya.
+Default SDK mengikuti konfigurasi mapper: triangular lidar, sample rate 9 dan
+frekuensi scan 10 Hz.

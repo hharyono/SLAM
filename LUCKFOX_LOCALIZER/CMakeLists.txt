@@ -21,6 +21,26 @@ target_link_libraries(map_inspect PRIVATE slam_map)
 add_executable(localize_scan tools/localize_scan.cpp)
 target_link_libraries(localize_scan PRIVATE slam_map)
 
+set(YDLIDAR_SDK_ROOT "" CACHE PATH "YDLidar SDK source/install prefix")
+if(YDLIDAR_SDK_ROOT)
+  find_path(YDLIDAR_INCLUDE_DIR CYdLidar.h
+    PATHS "${YDLIDAR_SDK_ROOT}" "${YDLIDAR_SDK_ROOT}/src" NO_DEFAULT_PATH)
+  find_library(YDLIDAR_LIBRARY ydlidar_sdk
+    PATHS "${YDLIDAR_SDK_ROOT}" "${YDLIDAR_SDK_ROOT}/lib"
+          "${YDLIDAR_SDK_ROOT}/build" NO_DEFAULT_PATH)
+  if(NOT YDLIDAR_INCLUDE_DIR OR NOT YDLIDAR_LIBRARY)
+    message(FATAL_ERROR "YDLidar headers/library not found under YDLIDAR_SDK_ROOT")
+  endif()
+  add_library(uart_localizer src/uart_localizer.cpp)
+  target_include_directories(uart_localizer PUBLIC include PRIVATE
+    ${YDLIDAR_INCLUDE_DIR} ${YDLIDAR_SDK_ROOT})
+  target_link_libraries(uart_localizer PUBLIC slam_map PRIVATE ${YDLIDAR_LIBRARY} pthread)
+  add_executable(localize_uart tools/localize_uart.cpp)
+  target_include_directories(localize_uart PRIVATE
+    ${YDLIDAR_INCLUDE_DIR} ${YDLIDAR_SDK_ROOT})
+  target_link_libraries(localize_uart PRIVATE uart_localizer ${YDLIDAR_LIBRARY} pthread)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
   add_executable(map_tests tests/map_tests.cpp)

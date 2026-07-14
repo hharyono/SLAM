@@ -1,0 +1,5 @@
+config BR2_PACKAGE_YDLIDAR_SDK
+	bool "ydlidar-sdk"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  YDLidar serial/network device SDK used by the realtime localizer.

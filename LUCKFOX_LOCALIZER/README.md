@@ -17,6 +17,7 @@ Sudah tersedia:
 - loader tanpa dependency eksternal;
 - multi-resolution correlative scan matcher;
 - CLI untuk converter, inspect, dan pengujian scan CSV.
+- Input YDLidar realtime dari UART langsung ke localizer tanpa file CSV.
 
 Belum termasuk driver LiDAR realtime. Core localizer menerima titik Cartesian,
 sehingga output YDLidar-SDK dapat langsung dikonversi menjadi `Point2f`.
@@ -69,6 +70,16 @@ Jalankan dengan tebakan pose awal:
 ```bash
 ./build/localize_scan map.bin scan.csv INITIAL_X INITIAL_Y INITIAL_YAW
 ```
+
+Untuk YDLidar realtime (default sesuai konfigurasi mapper: 230400 baud):
+
+```bash
+./build-uart/localize_uart map.bin /dev/ttyUSB0 INITIAL_X INITIAL_Y INITIAL_YAW 230400
+```
+
+Di firmware Luckfox, executable terpasang sebagai `/usr/bin/localize_uart` dan
+map sebagai `/etc/slam/ruang_utama.bin`. Port dapat diganti menjadi device UART
+board seperti `/dev/ttyS3` bila LiDAR tidak memakai adaptor USB.
 
 Output:
 
