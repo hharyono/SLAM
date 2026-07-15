@@ -471,8 +471,9 @@ Kontrol FE:
 - map `/map` diperbarui langsung pada canvas FE.
 
 Tombol transfer aktif setelah `SAVE MAP` berhasil dan robot berstatus online.
-Restart `localize_uart` setelah transfer agar proses localization memuat map
-baru dari disk.
+Board otomatis melakukan hot reload setelah validasi berhasil, mereset pose,
+dan memakai global localization pada scan berikutnya tanpa restart proses atau
+LiDAR.
 
 Verifikasi manual:
 

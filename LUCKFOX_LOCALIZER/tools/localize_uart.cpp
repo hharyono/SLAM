@@ -44,6 +44,16 @@ int main(int argc, char** argv) try {
       std::cerr << "mission_command="
                 << (command == luckfox::MissionCommand::Start ? "START" : "STOP") << '\n';
     });
+    backend->SetMapInstalledCallback([&localizer](const std::string& path) {
+      try {
+        localizer.ReloadMap(luckfox::LoadMap(path));
+        std::cerr << "map_reloaded=" << path << " next_mode=global\n";
+        return true;
+      } catch (const std::exception& error) {
+        std::cerr << "map_reload_failed=" << error.what() << '\n';
+        return false;
+      }
+    });
     if (const char* power = std::getenv("LUCKFOX_POWER_PERCENT"))
       backend->UpdatePower(std::stof(power));
     backend->Start();

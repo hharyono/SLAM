@@ -3,6 +3,7 @@
 #include "CYdLidar.h"
 
 #include <cmath>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -21,6 +22,7 @@ struct UartLocalizer::Impl {
   bool has_pose = false;
   unsigned invalid_tracking_frames = 0;
   bool running = false;
+  std::mutex localization_mutex;
 };
 
 namespace {
@@ -91,6 +93,14 @@ void UartLocalizer::Stop() noexcept {
 
 bool UartLocalizer::IsRunning() const noexcept { return impl_->running; }
 
+void UartLocalizer::ReloadMap(SlamMap map) {
+  std::lock_guard<std::mutex> lock(impl_->localization_mutex);
+  impl_->map = std::move(map);
+  impl_->last_pose = {};
+  impl_->has_pose = false;
+  impl_->invalid_tracking_frames = 0;
+}
+
 LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial,
                                                CapturedScan* captured_scan) {
   if (!impl_->running) throw std::runtime_error("UART localizer is not started");
@@ -128,6 +138,7 @@ LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial,
   if (points.size() < 3) throw std::runtime_error("YDLidar scan has too few valid points");
 
   (void)fallback_initial;
+  std::lock_guard<std::mutex> lock(impl_->localization_mutex);
   auto result = impl_->has_pose
       ? Localize(impl_->map, points, impl_->last_pose, impl_->search)
       : GlobalLocalize(impl_->map, points, impl_->search);

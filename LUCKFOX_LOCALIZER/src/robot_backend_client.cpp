@@ -56,7 +56,8 @@ bool SendAll(int fd, const std::vector<std::uint8_t>& data) {
   return true;
 }
 
-bool InstallMap(const std::uint8_t* payload, std::uint32_t length) {
+bool InstallMap(const std::uint8_t* payload, std::uint32_t length,
+                std::string* installed_path) {
   if (length < 36) return false;
   char raw_name[33]{};
   std::memcpy(raw_name, payload + 4, 32);
@@ -75,6 +76,7 @@ bool InstallMap(const std::uint8_t* payload, std::uint32_t length) {
     std::remove(backup.c_str());
     std::rename(target.c_str(), backup.c_str());
     if (std::rename(temporary.c_str(), target.c_str()) != 0) return false;
+    if (installed_path) *installed_path = target;
     return true;
   } catch (...) {
     std::remove(temporary.c_str());
@@ -89,6 +91,7 @@ struct RobotBackendClient::Impl {
   LocalizationResult pose; float power = -1.0F, voltage = 0.0F;
   bool mission_running = false;
   std::function<void(MissionCommand)> callback; std::atomic<bool> running{false};
+  std::function<bool(const std::string&)> map_installed_callback;
   std::uint32_t sequence = 0; std::vector<std::uint8_t> incoming;
 };
 
@@ -125,7 +128,7 @@ void RobotBackendClient::Start() {
       frame.push_back(mission_running ? 1 : 0); frame.insert(frame.end(), 3, 0);
       if (!SendAll(impl_->fd, frame)) { close(impl_->fd); impl_->fd=-1; continue; }
 
-      std::uint8_t chunk[256]; const auto count = recv(impl_->fd, chunk, sizeof(chunk), 0);
+      std::uint8_t chunk[4096]; const auto count = recv(impl_->fd, chunk, sizeof(chunk), 0);
       if (count > 0) impl_->incoming.insert(impl_->incoming.end(), chunk, chunk + count);
       else if (count == 0) { close(impl_->fd); impl_->fd=-1; continue; }
       while (impl_->incoming.size() >= kHeaderSize) {
@@ -144,7 +147,13 @@ void RobotBackendClient::Start() {
           auto ack=Header(kAck,kCommandSize,seq); ack.insert(ack.end(),impl_->incoming.begin()+kHeaderSize,
             impl_->incoming.begin()+kHeaderSize+kCommandSize); SendAll(impl_->fd,ack);
         } else if (type == kMapFile && length >= 36) {
-          const bool success = InstallMap(impl_->incoming.data() + kHeaderSize, length);
+          std::string installed_path;
+          bool success = InstallMap(impl_->incoming.data() + kHeaderSize, length,
+                                    &installed_path);
+          std::function<bool(const std::string&)> callback;
+          { std::lock_guard<std::mutex> lock(impl_->mutex);
+            callback = impl_->map_installed_callback; }
+          if (success && callback) success = callback(installed_path);
           auto ack = Header(kMapAck, 8, seq);
           ack.insert(ack.end(), impl_->incoming.begin() + kHeaderSize,
                      impl_->incoming.begin() + kHeaderSize + 4);
@@ -169,4 +178,9 @@ void RobotBackendClient::UpdatePose(const LocalizationResult& value){std::lock_g
 void RobotBackendClient::UpdatePower(float percent,float voltage){std::lock_guard<std::mutex>l(impl_->mutex);impl_->power=percent;impl_->voltage=voltage;}
 void RobotBackendClient::UpdateMissionRunning(bool running){std::lock_guard<std::mutex>l(impl_->mutex);impl_->mission_running=running;}
 void RobotBackendClient::SetMissionCallback(std::function<void(MissionCommand)> value){std::lock_guard<std::mutex>l(impl_->mutex);impl_->callback=std::move(value);}
+void RobotBackendClient::SetMapInstalledCallback(
+    std::function<bool(const std::string&)> value) {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  impl_->map_installed_callback = std::move(value);
+}
 }  // namespace luckfox

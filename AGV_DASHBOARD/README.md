@@ -23,7 +23,9 @@ mengirim BIN lewat koneksi TCP binary yang sama. Board memvalidasi map sebelum
 memasang ke `/etc/slam` dan menyimpan versi sebelumnya sebagai `.bak`.
 `STOP MAPPING` mematikan LiDAR dan ROS mapping.
 
-Setelah transfer sukses, restart `localize_uart` agar map baru dimuat ke memori.
+Setelah transfer sukses, board langsung melakukan hot reload dan mereset pose;
+scan berikutnya menjalankan global localization pada map baru. Proses
+`localize_uart` dan LiDAR tidak perlu direstart.
 
 ## Jalankan
 

@@ -61,6 +61,10 @@ class UartLocalizer {
   void Stop() noexcept;
   bool IsRunning() const noexcept;
 
+  // Replaces the active map safely and clears the tracked pose. The next scan
+  // performs global localization against the new map.
+  void ReloadMap(SlamMap map);
+
   // Blocks until the SDK supplies one complete scan, then localizes it.
   // Globally searches when no pose is known, then tracks from the last pose.
   LocalizationResult LocalizeNext(const Pose2f& fallback_initial,

@@ -28,8 +28,9 @@ magic, ukuran, dan CRC melalui parser localizer, lalu mengganti map aktif secara
 atomik. Map lama disimpan sebagai `.bak`. Map ACK berisi transfer ID u32,
 success u8, dan reserved[3]. Batas payload map adalah 1 MiB.
 
-Map yang baru dipasang akan dibaca pada start `localize_uart` berikutnya. Jadi
-restart localizer diperlukan bila proses sedang berjalan saat transfer.
+Setelah file terpasang, board melakukan hot reload ke localizer aktif dan
+mereset pose agar scan berikutnya memakai global localization. ACK sukses baru
+dikirim setelah reload berhasil; proses dan LiDAR tidak perlu direstart.
 
 ## ScanFrame TCP 42010
 
