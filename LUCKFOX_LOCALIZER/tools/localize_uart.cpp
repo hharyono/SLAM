@@ -8,17 +8,18 @@
 #include <stdexcept>
 
 int main(int argc, char** argv) try {
-  if (argc != 6 && argc != 7) {
-    std::cerr << "Usage: localize_uart MAP.bin UART INITIAL_X INITIAL_Y INITIAL_YAW [BAUD]\n"
-                 "Example: localize_uart /etc/slam/ruang_utama.bin /dev/ttyUSB0 0 0 0 230400\n";
+  if (argc != 3 && argc != 4 && argc != 6 && argc != 7) {
+    std::cerr << "Usage: localize_uart MAP.bin UART [BAUD]\n"
+                 "       localize_uart MAP.bin UART INITIAL_X INITIAL_Y INITIAL_YAW [BAUD]\n"
+                 "Example: localize_uart /etc/slam/ruang_utama.bin /dev/ttyS3 230400\n";
     return 2;
   }
 
   luckfox::UartLidarConfig config;
   config.port = argv[2];
+  if (argc == 4) config.baudrate = std::stoi(argv[3]);
   if (argc == 7) config.baudrate = std::stoi(argv[6]);
-  const luckfox::Pose2f initial{std::stof(argv[3]), std::stof(argv[4]),
-                                std::stof(argv[5])};
+  const luckfox::Pose2f initial{};
 
   luckfox::UartLocalizer localizer(luckfox::LoadMap(argv[1]), config);
   localizer.Start();
@@ -27,6 +28,7 @@ int main(int argc, char** argv) try {
     std::cout << "x=" << result.pose.x << " y=" << result.pose.y
               << " yaw=" << result.pose.yaw << " score=" << result.score
               << " valid=" << (result.valid ? 1 : 0)
+              << " mode=" << (result.global_search ? "global" : "tracking")
               << " evaluated=" << result.evaluated << '\n';
   }
   return 0;

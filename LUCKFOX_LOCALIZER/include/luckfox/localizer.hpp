@@ -22,11 +22,16 @@ struct LocalizationResult {
   float score = 0.0F;
   bool valid = false;
   std::uint32_t evaluated = 0;
+  bool global_search = false;
 };
 
 LocalizationResult Localize(const SlamMap& map,
                             const std::vector<Point2f>& scan,
                             const Pose2f& initial,
                             const SearchOptions& options = {});
+
+LocalizationResult GlobalLocalize(const SlamMap& map,
+                                  const std::vector<Point2f>& scan,
+                                  const SearchOptions& options = {});
 
 }  // namespace luckfox

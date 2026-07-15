@@ -43,7 +43,7 @@ class UartLocalizer {
   bool IsRunning() const noexcept;
 
   // Blocks until the SDK supplies one complete scan, then localizes it.
-  // A valid result becomes the initial pose for the following scan.
+  // Globally searches when no pose is known, then tracks from the last pose.
   LocalizationResult LocalizeNext(const Pose2f& fallback_initial);
 
  private:

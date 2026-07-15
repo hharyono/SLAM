@@ -19,6 +19,7 @@ struct UartLocalizer::Impl {
   CYdLidar laser;
   Pose2f last_pose{};
   bool has_pose = false;
+  unsigned invalid_tracking_frames = 0;
   bool running = false;
 };
 
@@ -110,11 +111,17 @@ LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial) {
   }
   if (points.size() < 3) throw std::runtime_error("YDLidar scan has too few valid points");
 
-  const Pose2f initial = impl_->has_pose ? impl_->last_pose : fallback_initial;
-  auto result = Localize(impl_->map, points, initial, impl_->search);
+  (void)fallback_initial;
+  auto result = impl_->has_pose
+      ? Localize(impl_->map, points, impl_->last_pose, impl_->search)
+      : GlobalLocalize(impl_->map, points, impl_->search);
   if (result.valid) {
     impl_->last_pose = result.pose;
     impl_->has_pose = true;
+    impl_->invalid_tracking_frames = 0;
+  } else if (impl_->has_pose && ++impl_->invalid_tracking_frames >= 3) {
+    impl_->has_pose = false;
+    impl_->invalid_tracking_frames = 0;
   }
   return result;
 }
