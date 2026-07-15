@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "scripts": { "start": "node src/server.js", "check": "node --check src/server.js" },
-  "dependencies": { "express": "^5.1.0", "ws": "^8.18.3" }
+  "scripts": { "start": "tsx src/server.ts", "build": "tsc", "check": "tsc --noEmit" },
+  "dependencies": { "express": "^5.1.0", "ws": "^8.18.3" },
+  "devDependencies": { "@types/express": "^5.0.3", "@types/node": "^22.15.30", "@types/ws": "^8.18.1", "tsx": "^4.20.3", "typescript": "^5.8.3" }
 }
