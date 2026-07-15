@@ -54,24 +54,23 @@ void UartLocalizer::Start() {
   SetOption(laser, LidarPropLidarType, cfg.lidar_type, "lidar type");
   SetOption(laser, LidarPropDeviceType, cfg.device_type, "device type");
   SetOption(laser, LidarPropSampleRate, cfg.sample_rate, "sample rate");
+  SetOption(laser, LidarPropIntenstiyBit, cfg.intensity_bit, "intensity bit");
+  SetOption(laser, LidarPropAbnormalCheckCount, cfg.abnormal_check_count,
+            "abnormal checks");
   SetOption(laser, LidarPropScanFrequency, cfg.scan_frequency, "frequency");
   SetOption(laser, LidarPropMinRange, cfg.minimum_range, "minimum range");
   SetOption(laser, LidarPropMaxRange, cfg.maximum_range, "maximum range");
   SetOption(laser, LidarPropSingleChannel, cfg.single_channel, "single channel");
+  SetOption(laser, LidarPropIntenstiy, cfg.intensity, "intensity");
   SetOption(laser, LidarPropSupportMotorDtrCtrl, cfg.motor_dtr, "motor DTR");
   SetOption(laser, LidarPropAutoReconnect, cfg.auto_reconnect, "auto reconnect");
 
-  const bool disabled = false;
-  const bool fixed_resolution = true;
-  const int abnormal_checks = 4;
-  const float minimum_angle = -180.0F, maximum_angle = 180.0F;
-  SetOption(laser, LidarPropFixedResolution, fixed_resolution, "fixed resolution");
-  SetOption(laser, LidarPropReversion, disabled, "reversion");
-  SetOption(laser, LidarPropInverted, disabled, "inverted");
-  SetOption(laser, LidarPropIntenstiy, disabled, "intensity");
-  SetOption(laser, LidarPropAbnormalCheckCount, abnormal_checks, "abnormal checks");
-  SetOption(laser, LidarPropMinAngle, minimum_angle, "minimum angle");
-  SetOption(laser, LidarPropMaxAngle, maximum_angle, "maximum angle");
+  SetOption(laser, LidarPropFixedResolution, cfg.fixed_resolution,
+            "fixed resolution");
+  SetOption(laser, LidarPropReversion, cfg.reversion, "reversion");
+  SetOption(laser, LidarPropInverted, cfg.inverted, "inverted");
+  SetOption(laser, LidarPropMinAngle, cfg.minimum_angle, "minimum angle");
+  SetOption(laser, LidarPropMaxAngle, cfg.maximum_angle, "maximum angle");
 
   if (!laser.initialize())
     throw std::runtime_error(std::string("YDLidar initialize failed: ") + laser.DescribeError());

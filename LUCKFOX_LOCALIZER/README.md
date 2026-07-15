@@ -71,7 +71,7 @@ Jalankan dengan tebakan pose awal:
 ./build/localize_scan map.bin scan.csv INITIAL_X INITIAL_Y INITIAL_YAW
 ```
 
-Untuk YDLidar realtime (default sesuai konfigurasi mapper: 230400 baud):
+Untuk YDLidar realtime (default sesuai profil mapper `Tmini-Plus-SH.yaml`):
 
 ```bash
 ./build-uart/localize_uart map.bin /dev/ttyUSB0 INITIAL_X INITIAL_Y INITIAL_YAW 230400

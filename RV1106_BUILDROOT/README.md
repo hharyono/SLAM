@@ -41,5 +41,6 @@ localize_uart /etc/slam/ruang_utama.bin /dev/ttyUSB0 0 0 0 230400
 ```
 
 Nilai pose terakhir yang valid otomatis menjadi tebakan awal frame berikutnya.
-Default SDK mengikuti konfigurasi mapper: triangular lidar, sample rate 9 dan
-frekuensi scan 10 Hz.
+Default SDK mengikuti profil mapper `Tmini-Plus-SH.yaml`: baud 230400,
+triangular lidar, sample rate 4, intensity 8-bit, reversion/inverted aktif,
+range 0.05–12 meter, dan frekuensi scan 10 Hz.
