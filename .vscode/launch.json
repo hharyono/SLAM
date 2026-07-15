@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AGV: Backend (TypeScript)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "args": ["src/server.ts"],
+      "cwd": "${workspaceFolder}/AGV_DASHBOARD/backend",
+      "env": {
+        "HTTP_PORT": "8080",
+        "ROBOT_TCP_PORT": "42000",
+        "MAP_DIR": "${workspaceFolder}/maps",
+        "MAP_NAME": "ruang_utama"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/**/node_modules/**"]
+    },
+    {
+      "name": "AGV: Frontend (React)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0"],
+      "cwd": "${workspaceFolder}/AGV_DASHBOARD/frontend",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/**/node_modules/**"],
+      "serverReadyAction": {
+        "pattern": "Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "AGV: Debug FE + BE",
+      "configurations": ["AGV: Backend (TypeScript)", "AGV: Frontend (React)"],
+      "stopAll": true
+    }
+  ]
+}
