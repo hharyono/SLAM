@@ -8,5 +8,7 @@ BOARD=project/cfg/BoardConfig_IPC/BoardConfig-SPI_NAND-Buildroot-RV1106_Luckfox_
 
 cd "$SDK_DIR"
 ln -sfn "$BOARD" .BoardConfig.mk
+"$WORK_DIR/scripts/enable_uart3.sh"
+env PATH="$CLEAN_PATH" ./build.sh kernel
 env PATH="$CLEAN_PATH" ./build.sh rootfs
 env PATH="$CLEAN_PATH" ./build.sh firmware

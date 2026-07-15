@@ -16,6 +16,12 @@ SDK berada di `RV1106_BUILDROOT/luckfox-pico`. Dari root repository:
 ./RV1106_BUILDROOT/scripts/build_spi_nand.sh
 ```
 
+Skrip build juga mengaktifkan `UART3_M1` pada header board:
+
+- pin 19: UART3 TX
+- pin 20: UART3 RX
+- device Linux: `/dev/ttyS3`
+
 Image hasil build berada di:
 
 - `RV1106_BUILDROOT/luckfox-pico/output/image/rootfs.img`
