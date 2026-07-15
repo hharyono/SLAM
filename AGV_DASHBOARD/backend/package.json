@@ -1,0 +1,8 @@
+{
+  "name": "luckfox-agv-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "start": "node src/server.js", "check": "node --check src/server.js" },
+  "dependencies": { "express": "^5.1.0", "ws": "^8.18.3" }
+}

@@ -12,6 +12,11 @@ add_library(slam_map
 target_include_directories(slam_map PUBLIC include)
 target_compile_options(slam_map PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(robot_backend_client src/robot_backend_client.cpp)
+target_include_directories(robot_backend_client PUBLIC include)
+target_link_libraries(robot_backend_client PUBLIC slam_map pthread)
+target_compile_options(robot_backend_client PRIVATE -Wall -Wextra -Wpedantic)
+
 add_executable(map_converter tools/map_converter.cpp)
 target_link_libraries(map_converter PRIVATE slam_map)
 
@@ -38,7 +43,7 @@ if(YDLIDAR_SDK_ROOT)
   add_executable(localize_uart tools/localize_uart.cpp)
   target_include_directories(localize_uart PRIVATE
     ${YDLIDAR_INCLUDE_DIR} ${YDLIDAR_SDK_ROOT})
-  target_link_libraries(localize_uart PRIVATE uart_localizer ${YDLIDAR_LIBRARY} pthread)
+  target_link_libraries(localize_uart PRIVATE uart_localizer robot_backend_client ${YDLIDAR_LIBRARY} pthread)
 endif()
 
 include(CTest)

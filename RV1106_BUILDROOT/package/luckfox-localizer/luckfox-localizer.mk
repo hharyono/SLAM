@@ -20,7 +20,8 @@ define LUCKFOX_LOCALIZER_BUILD_CMDS
 		-I$(@D)/include -I$(STAGING_DIR)/usr/include/src \
 		-I$(STAGING_DIR)/usr/include \
 		$(@D)/src/crc32.cpp $(@D)/src/map_io.cpp $(@D)/src/localizer.cpp \
-		$(@D)/src/uart_localizer.cpp $(@D)/tools/localize_uart.cpp \
+		$(@D)/src/uart_localizer.cpp $(@D)/src/robot_backend_client.cpp \
+		$(@D)/tools/localize_uart.cpp \
 		$(STAGING_DIR)/usr/lib/libydlidar_sdk.a -lpthread \
 		-o $(@D)/localize_uart
 endef

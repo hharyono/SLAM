@@ -21,7 +21,8 @@ cp "$WORK_DIR/package/luckfox-localizer/Config.in" "$PKG_DIR/Config.in"
 cp "$WORK_DIR/package/luckfox-localizer/luckfox-localizer.mk" "$PKG_DIR/luckfox-localizer.mk"
 cp -a "$SOURCE_DIR/include/." "$PKG_DIR/src/include/"
 cp "$SOURCE_DIR/src/crc32.cpp" "$SOURCE_DIR/src/map_io.cpp" \
-  "$SOURCE_DIR/src/localizer.cpp" "$SOURCE_DIR/src/uart_localizer.cpp" "$PKG_DIR/src/src/"
+  "$SOURCE_DIR/src/localizer.cpp" "$SOURCE_DIR/src/uart_localizer.cpp" \
+  "$SOURCE_DIR/src/robot_backend_client.cpp" "$PKG_DIR/src/src/"
 cp "$SOURCE_DIR/tools/map_inspect.cpp" "$SOURCE_DIR/tools/localize_scan.cpp" \
   "$SOURCE_DIR/tools/localize_uart.cpp" "$PKG_DIR/src/tools/"
 

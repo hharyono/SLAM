@@ -87,6 +87,18 @@ Output:
 x=... y=... yaw=... score=... valid=1 evaluated=...
 ```
 
+Kirim pose dan status power setiap 250 ms ke backend TCP binary:
+
+```bash
+LUCKFOX_BACKEND_HOST=172.32.0.10 \
+LUCKFOX_BACKEND_PORT=42000 \
+LUCKFOX_ROBOT_ID=AGV-001 \
+/usr/bin/localize_uart /etc/slam/ruang_utama.bin /dev/ttyS3 230400
+```
+
+Jika `LUCKFOX_BACKEND_HOST` tidak diatur, localizer berjalan tanpa koneksi
+backend. Format frame binary didokumentasikan di `AGV_DASHBOARD/PROTOCOL.md`.
+
 Tebakan awal harus berada dalam default search window sekitar 0,5 m dan 20°.
 Untuk kidnapped-robot/global localization diperlukan search window atau metode
 global terpisah.
