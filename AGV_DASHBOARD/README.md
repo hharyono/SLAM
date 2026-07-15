@@ -29,6 +29,8 @@ hardware yang fail-safe.
 
 1. Buka folder repository `/root/DATA/SLAM` di VS Code (gunakan **Remote - WSL**
    jika project berada di WSL).
+   Konfigurasi debug sengaja memakai Node Linux `/usr/local/bin/node`, bukan
+   instalasi Node Windows.
 2. Pastikan `npm install` sudah dijalankan pada folder `frontend` dan `backend`.
 3. Buka panel **Run and Debug** dan pilih `AGV: Debug FE + BE`.
 4. Tekan **F5**.
