@@ -21,3 +21,21 @@ mission_running u8, reserved[3].
 Command dan ACK payload (8 byte): command u8 (`1=start`, `2=stop`), reserved[3],
 command ID u32. Batas payload parser adalah 1024 byte untuk mencegah frame rusak
 menghabiskan memori.
+
+## ScanFrame TCP 42010
+
+Board membuka koneksi terpisah ke ROS bridge menggunakan magic `SCN1`. Header
+16 byte berisi magic, version u16, type u16, payload length u32, dan sequence
+u32. Payload scan berisi timestamp u64, tujuh float metadata LaserScan, jumlah
+titik u32, lalu setiap titik sebagai angle/range/intensity float32.
+
+YDLidar SDK tetap berjalan pada board untuk decoding UART dan checksum. Backend
+tidak menjalankan `ydlidar_ros2_driver_node`; `scan_tcp_bridge_node` mengubah
+ScanFrame menjadi topic ROS `/scan` reliable.
+
+## Live map TCP 42020
+
+ROS bridge berlangganan `/map` dan mengirim occupancy grid lokal ke Node backend
+dengan magic `MAP1`. Port ini hanya listen pada `127.0.0.1`. Backend membalik
+sumbu baris OccupancyGrid menjadi koordinat gambar dan mengirim `mapping_map`
+ke frontend melalui WebSocket.

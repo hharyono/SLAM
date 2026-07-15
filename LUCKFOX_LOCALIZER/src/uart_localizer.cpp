@@ -91,13 +91,29 @@ void UartLocalizer::Stop() noexcept {
 
 bool UartLocalizer::IsRunning() const noexcept { return impl_->running; }
 
-LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial) {
+LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial,
+                                               CapturedScan* captured_scan) {
   if (!impl_->running) throw std::runtime_error("UART localizer is not started");
 
   LaserScan scan;
   if (!impl_->laser.doProcessSimple(scan))
     throw std::runtime_error(std::string("failed to read YDLidar scan: ") +
                              impl_->laser.DescribeError());
+
+  if (captured_scan) {
+    captured_scan->stamp_ns = scan.stamp;
+    captured_scan->angle_min = scan.config.min_angle;
+    captured_scan->angle_max = scan.config.max_angle;
+    captured_scan->angle_increment = scan.config.angle_increment;
+    captured_scan->time_increment = scan.config.time_increment;
+    captured_scan->scan_time = scan.config.scan_time;
+    captured_scan->range_min = scan.config.min_range;
+    captured_scan->range_max = scan.config.max_range;
+    captured_scan->samples.clear();
+    captured_scan->samples.reserve(scan.points.size());
+    for (const auto& point : scan.points)
+      captured_scan->samples.push_back({point.angle, point.range, point.intensity});
+  }
 
   std::vector<Point2f> points;
   points.reserve(scan.points.size());

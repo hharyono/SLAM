@@ -9,6 +9,17 @@ frame binary command mission pada koneksi TCP yang sama.
 - `mission_running` menampilkan state aktual yang sudah diterapkan oleh board,
   bukan hanya status command telah dikirim.
 
+Mode mapping remote menggunakan alur:
+
+```text
+Luckfox YDLidar SDK → TCP 42010 → ROS /scan → RF2O → SLAM Toolbox → /map
+                                                        │
+React FE ← WebSocket ← Node BE ← TCP localhost 42020 ───┘
+```
+
+`START MAPPING` menjalankan ROS remote mapper dan menyalakan LiDAR. `SAVE MAP`
+menghasilkan PGM/YAML/BIN. `STOP MAPPING` mematikan LiDAR dan ROS mapping.
+
 ## Jalankan
 
 ```bash
@@ -55,5 +66,5 @@ powershell -ExecutionPolicy Bypass -File \
 ```
 
 Script mendeteksi IP WSL dan adapter Windows `172.32.x.x`, kemudian membuat
-port forwarding TCP `42000` dan firewall rule. Gunakan IP Windows yang dicetak
-script sebagai `LUCKFOX_BACKEND_HOST` pada robot.
+port forwarding TCP `42000` (status/command) dan `42010` (ScanFrame). Gunakan IP
+Windows yang dicetak script sebagai `LUCKFOX_BACKEND_HOST` pada robot.

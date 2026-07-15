@@ -29,7 +29,11 @@ type ServerMessage =
   | { type: 'snapshot'; data: RobotStatus[] }
   | { type: 'robot_status'; data: RobotStatus }
   | { type: 'command_ack'; data: { command: string } }
+  | { type: 'mapping_status'; data: { state: MappingState } }
+  | { type: 'mapping_map'; data: MapData }
   | { type: string; data?: unknown };
+
+type MappingState = 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error';
 
 type MapViewProps = {
   map?: MapData;
@@ -102,11 +106,18 @@ function App() {
   const [map, setMap] = useState<MapData>();
   const [robots, setRobots] = useState<Record<string, RobotStatus>>({});
   const [notice, setNotice] = useState('');
+  const [mappingState, setMappingState] = useState<MappingState>('stopped');
   useEffect(() => {
     fetch('/api/map')
       .then((r) => r.json() as Promise<MapData>)
       .then(setMap)
       .catch((e) => setNotice(String(e)));
+  }, []);
+  useEffect(() => {
+    fetch('/api/mapping/status')
+      .then((response) => response.json() as Promise<{ state: MappingState }>)
+      .then((status) => setMappingState(status.state))
+      .catch((error) => setNotice(String(error)));
   }, []);
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -123,6 +134,9 @@ function App() {
       }
       if (msg.type === 'command_ack')
         setNotice(`${(msg.data as { command: string }).command} diterima robot`);
+      if (msg.type === 'mapping_status')
+        setMappingState((msg.data as { state: MappingState }).state);
+      if (msg.type === 'mapping_map') setMap(msg.data as MapData);
     };
     return () => socket.close();
   }, []);
@@ -134,6 +148,17 @@ function App() {
       method: 'POST',
     });
     if (!response.ok) setNotice(((await response.json()) as { error: string }).error);
+  };
+  const mappingAction = async (action: 'start' | 'stop' | 'save') => {
+    setNotice(`Mapping ${action}...`);
+    const response = await fetch(`/api/mapping/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: action === 'save' ? JSON.stringify({ name: 'ruang_utama' }) : undefined,
+    });
+    const result = (await response.json()) as { error?: string; state?: MappingState };
+    if (!response.ok) setNotice(result.error ?? 'Mapping command gagal');
+    else setNotice(`Mapping ${result.state}`);
   };
   return (
     <main>
@@ -154,6 +179,11 @@ function App() {
             <span>Mission</span>
             <strong>{robot?.mission_running ? 'RUNNING' : 'STOPPED'}</strong>
             <small>{robot?.mission_running ? 'LiDAR aktif' : 'LiDAR berhenti'}</small>
+          </div>
+          <div className="card">
+            <span>Mapping</span>
+            <strong>{mappingState.toUpperCase()}</strong>
+            <small>Scan TCP → RF2O → SLAM Toolbox</small>
           </div>
           <div className="card">
             <span>Robot</span>
@@ -198,6 +228,22 @@ function App() {
             onClick={() => mission('start')}
           >
             START MISSION
+          </button>
+          <button
+            disabled={!robot?.online || mappingState !== 'stopped'}
+            onClick={() => mappingAction('start')}
+          >
+            START MAPPING
+          </button>
+          <button disabled={mappingState !== 'running'} onClick={() => mappingAction('save')}>
+            SAVE MAP
+          </button>
+          <button
+            className="stop"
+            disabled={mappingState === 'stopped' || mappingState === 'stopping'}
+            onClick={() => mappingAction('stop')}
+          >
+            STOP MAPPING
           </button>
           <button
             className="stop"

@@ -1,5 +1,6 @@
 #include "luckfox/map.hpp"
 #include "luckfox/robot_backend_client.hpp"
+#include "luckfox/scan_tcp_client.hpp"
 #include "luckfox/uart_localizer.hpp"
 
 #include "CYdLidar.h"
@@ -28,6 +29,7 @@ int main(int argc, char** argv) try {
 
   luckfox::UartLocalizer localizer(luckfox::LoadMap(argv[1]), config);
   std::unique_ptr<luckfox::RobotBackendClient> backend;
+  std::unique_ptr<luckfox::ScanTcpClient> scan_stream;
   std::atomic<bool> mission_requested{true};
   if (const char* host = std::getenv("LUCKFOX_BACKEND_HOST")) {
     mission_requested = false;
@@ -45,6 +47,14 @@ int main(int argc, char** argv) try {
     if (const char* power = std::getenv("LUCKFOX_POWER_PERCENT"))
       backend->UpdatePower(std::stof(power));
     backend->Start();
+
+    luckfox::ScanTcpConfig scan_config;
+    scan_config.host = std::getenv("LUCKFOX_SCAN_STREAM_HOST")
+        ? std::getenv("LUCKFOX_SCAN_STREAM_HOST") : host;
+    if (const char* port = std::getenv("LUCKFOX_SCAN_STREAM_PORT"))
+      scan_config.port = static_cast<std::uint16_t>(std::stoi(port));
+    scan_stream.reset(new luckfox::ScanTcpClient(std::move(scan_config)));
+    scan_stream->Start();
   }
 
   while (ydlidar::os_isOk()) {
@@ -64,7 +74,9 @@ int main(int argc, char** argv) try {
       std::cerr << "lidar_state=RUNNING\n";
     }
 
-    const auto result = localizer.LocalizeNext(initial);
+    luckfox::CapturedScan scan;
+    const auto result = localizer.LocalizeNext(initial, scan_stream ? &scan : nullptr);
+    if (scan_stream) scan_stream->UpdateScan(scan);
     if (backend) backend->UpdatePose(result);
     std::cout << "x=" << result.pose.x << " y=" << result.pose.y
               << " yaw=" << result.pose.yaw << " score=" << result.score

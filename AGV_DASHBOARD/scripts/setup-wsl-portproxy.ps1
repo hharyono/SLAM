@@ -3,8 +3,8 @@
 
 $ErrorActionPreference = 'Stop'
 
-$ListenPort = 42000
-$FirewallRuleName = 'Luckfox AGV TCP 42000'
+$ListenPorts = @(42000, 42010)
+$FirewallRuleName = 'Luckfox AGV TCP'
 
 $WslAddress = (wsl.exe hostname -I).Trim().Split(' ')[0]
 $LuckfoxHostAddress = Get-NetIPAddress -AddressFamily IPv4 |
@@ -20,12 +20,14 @@ if (-not $LuckfoxHostAddress) {
 }
 
 # Remove a stale rule first because the WSL NAT address can change after restart.
-netsh interface portproxy delete v4tov4 `
-    listenaddress=$LuckfoxHostAddress listenport=$ListenPort | Out-Null
+foreach ($ListenPort in $ListenPorts) {
+    netsh interface portproxy delete v4tov4 `
+        listenaddress=$LuckfoxHostAddress listenport=$ListenPort | Out-Null
 
-netsh interface portproxy add v4tov4 `
-    listenaddress=$LuckfoxHostAddress listenport=$ListenPort `
-    connectaddress=$WslAddress connectport=$ListenPort
+    netsh interface portproxy add v4tov4 `
+        listenaddress=$LuckfoxHostAddress listenport=$ListenPort `
+        connectaddress=$WslAddress connectport=$ListenPort
+}
 
 if (-not (Get-NetFirewallRule -DisplayName $FirewallRuleName -ErrorAction SilentlyContinue)) {
     New-NetFirewallRule `
@@ -33,10 +35,10 @@ if (-not (Get-NetFirewallRule -DisplayName $FirewallRuleName -ErrorAction Silent
         -Direction Inbound `
         -Action Allow `
         -Protocol TCP `
-        -LocalPort $ListenPort | Out-Null
+        -LocalPort $ListenPorts | Out-Null
 }
 
-Write-Host "Luckfox endpoint : $LuckfoxHostAddress`:$ListenPort"
-Write-Host "Forwarded to     : $WslAddress`:$ListenPort"
+Write-Host "Luckfox endpoint : $LuckfoxHostAddress ports $($ListenPorts -join ', ')"
+Write-Host "Forwarded to     : $WslAddress"
 Write-Host 'Portproxy aktif:'
 netsh interface portproxy show v4tov4

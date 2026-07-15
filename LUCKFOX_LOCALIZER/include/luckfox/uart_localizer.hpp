@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace luckfox {
 
@@ -29,6 +30,24 @@ struct UartLidarConfig {
   bool auto_reconnect = true;
 };
 
+struct LidarSample {
+  float angle = 0.0F;
+  float range = 0.0F;
+  float intensity = 0.0F;
+};
+
+struct CapturedScan {
+  std::uint64_t stamp_ns = 0;
+  float angle_min = 0.0F;
+  float angle_max = 0.0F;
+  float angle_increment = 0.0F;
+  float time_increment = 0.0F;
+  float scan_time = 0.0F;
+  float range_min = 0.0F;
+  float range_max = 0.0F;
+  std::vector<LidarSample> samples;
+};
+
 class UartLocalizer {
  public:
   UartLocalizer(SlamMap map, UartLidarConfig lidar,
@@ -44,7 +63,8 @@ class UartLocalizer {
 
   // Blocks until the SDK supplies one complete scan, then localizes it.
   // Globally searches when no pose is known, then tracks from the last pose.
-  LocalizationResult LocalizeNext(const Pose2f& fallback_initial);
+  LocalizationResult LocalizeNext(const Pose2f& fallback_initial,
+                                  CapturedScan* captured_scan = nullptr);
 
  private:
   struct Impl;

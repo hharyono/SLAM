@@ -387,6 +387,8 @@ http://localhost:8080
 Port yang digunakan:
 
 - `42000/TCP`: koneksi binary robot ↔ backend;
+- `42010/TCP`: ScanFrame LiDAR board → ROS scan bridge;
+- `42020/TCP`: occupancy grid ROS → Node backend, localhost saja;
 - `8080/TCP`: REST, WebSocket, dan frontend production;
 - `5173/TCP`: Vite dev server ketika debugging.
 
@@ -418,8 +420,8 @@ Sesuaikan nama distro/path jika berbeda. Script mencetak endpoint Windows,
 misalnya:
 
 ```text
-Luckfox endpoint : 172.32.0.100:42000
-Forwarded to     : 172.26.x.x:42000
+Luckfox endpoint : 172.32.0.100 ports 42000, 42010
+Forwarded to     : 172.26.x.x
 ```
 
 Gunakan `Luckfox endpoint` sebagai backend host pada board:
@@ -427,6 +429,8 @@ Gunakan `Luckfox endpoint` sebagai backend host pada board:
 ```sh
 LUCKFOX_BACKEND_HOST=172.32.0.100 \
 LUCKFOX_BACKEND_PORT=42000 \
+LUCKFOX_SCAN_STREAM_HOST=172.32.0.100 \
+LUCKFOX_SCAN_STREAM_PORT=42010 \
 LUCKFOX_ROBOT_ID=AGV-001 \
 nohup /usr/bin/localize_uart \
   /etc/slam/ruang_utama.bin /dev/ttyS3 230400 \
@@ -440,7 +444,41 @@ ps | grep '[l]ocalize_uart'
 tail -f /tmp/localize_backend.log
 ```
 
-## 13. Verifikasi end-to-end
+## 13. Mapping remote melalui FE/BE
+
+YDLidar SDK tetap berjalan di board untuk decoding UART dan checksum. Backend
+tidak menjalankan driver serial YDLidar. Scan terstruktur dikirim melalui TCP
+dan diterbitkan `scan_tcp_bridge_node` sebagai `/scan`.
+
+Pipeline tombol `START MAPPING`:
+
+```text
+Board YDLidar SDK → TCP 42010 → /scan
+                                ├── RF2O → /odom_rf2o
+                                └── SLAM Toolbox → /map
+                                                     │
+React FE ← WebSocket ← Node BE ← map bridge 42020 ───┘
+```
+
+Kontrol FE:
+
+- `START MAPPING`: menjalankan `mapper start-remote`, lalu menyalakan LiDAR;
+- `SAVE MAP`: menjalankan map saver dan converter PGM/YAML/BIN;
+- `STOP MAPPING`: mematikan LiDAR lalu menghentikan ROS stack;
+- map `/map` diperbarui langsung pada canvas FE.
+
+Verifikasi manual:
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic hz /scan
+ros2 topic echo /odom_rf2o --once
+ros2 topic echo /map --once --field info
+```
+
+Frekuensi scan Tmini Plus SH yang diharapkan sekitar 10 Hz.
+
+## 14. Verifikasi end-to-end
 
 Pada host backend:
 
@@ -484,7 +522,7 @@ menghentikan scan/motor LiDAR, dan mempertahankan koneksi status ke backend.
 STOP LiDAR ini bukan pengganti emergency stop motor penggerak robot yang
 fail-safe.
 
-## 14. Troubleshooting singkat
+## 15. Troubleshooting singkat
 
 ### `/odom` tidak ada
 

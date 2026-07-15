@@ -23,6 +23,7 @@ cp -a "$SOURCE_DIR/include/." "$PKG_DIR/src/include/"
 cp "$SOURCE_DIR/src/crc32.cpp" "$SOURCE_DIR/src/map_io.cpp" \
   "$SOURCE_DIR/src/localizer.cpp" "$SOURCE_DIR/src/uart_localizer.cpp" \
   "$SOURCE_DIR/src/robot_backend_client.cpp" "$PKG_DIR/src/src/"
+cp "$SOURCE_DIR/src/scan_tcp_client.cpp" "$PKG_DIR/src/src/"
 cp "$SOURCE_DIR/tools/map_inspect.cpp" "$SOURCE_DIR/tools/localize_scan.cpp" \
   "$SOURCE_DIR/tools/localize_uart.cpp" "$PKG_DIR/src/tools/"
 

@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import net, { type Socket } from 'node:net';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -44,6 +46,7 @@ const root = path.resolve(here, '../../..');
 const mapDir = process.env.MAP_DIR || path.join(root, 'maps');
 const mapName = process.env.MAP_NAME || 'ruang_utama';
 const robotPort = Number(process.env.ROBOT_TCP_PORT || 42000);
+const mapBridgePort = Number(process.env.MAP_BRIDGE_TCP_PORT || 42020);
 const httpPort = Number(process.env.HTTP_PORT || 8080);
 const offlineMs = Number(process.env.ROBOT_OFFLINE_MS || 1500);
 const PROTOCOL_MAGIC = 0x41475631; // ASCII: AGV1
@@ -65,6 +68,11 @@ enum MissionCommand {
 }
 let commandSequence = 0;
 const robots = new Map<string, RobotConnection>();
+const execFileAsync = promisify(execFile);
+const mapperScript = path.join(root, 'MAPPER/Config/mapper');
+const saveMapScript = path.join(root, 'LUCKFOX_LOCALIZER/scripts/save_and_convert_map.sh');
+let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
+let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 const app = express();
 app.use(express.json());
 const server = http.createServer(app);
@@ -133,6 +141,24 @@ function createMissionFrame(command: MissionCommand, commandId: number): Buffer 
   return frame;
 }
 
+function sendMissionCommand(robot: RobotConnection, command: MissionCommand): number {
+  const commandId = ++commandSequence;
+  robot.socket.write(createMissionFrame(command, commandId));
+  return commandId;
+}
+
+async function runRootCommand(file: string, args: string[]): Promise<string> {
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  const command = isRoot ? file : 'sudo';
+  const commandArgs = isRoot ? args : ['-n', file, ...args];
+  const result = await execFileAsync(command, commandArgs, {
+    cwd: root,
+    timeout: 30_000,
+    maxBuffer: 1024 * 1024,
+  });
+  return `${result.stdout}${result.stderr}`.trim();
+}
+
 function decodeRobotStatus(payload: Buffer, sequence: number): RobotStatus {
   const robotId = payload.subarray(0, 32).toString('utf8').replace(/\0.*$/, '');
 
@@ -161,7 +187,7 @@ function decodeRobotStatus(payload: Buffer, sequence: number): RobotStatus {
 
 app.get('/api/map', (_req, res) => {
   try {
-    res.json({ ...parseYamlMap(), ...parsePgm() });
+    res.json(liveMap ?? { ...parseYamlMap(), ...parsePgm() });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -176,11 +202,67 @@ app.post('/api/robots/:id/mission/:action', (req, res) => {
   }
 
   const commandName = command === MissionCommand.Start ? 'START_MISSION' : 'STOP_MISSION';
-  const commandId = ++commandSequence;
-  const frame = createMissionFrame(command, commandId);
-  robot.socket.write(frame);
+  const commandId = sendMissionCommand(robot, command);
   broadcastToDashboards({ type: 'command_sent', robot_id: req.params.id, command: commandName });
   return res.status(202).json({ accepted: true, command: commandName, command_id: commandId });
+});
+
+app.get('/api/mapping/status', (_req, res) => {
+  res.json({ state: mappingState });
+});
+
+app.post('/api/mapping/start', async (_req, res) => {
+  if (mappingState !== 'stopped' && mappingState !== 'error') {
+    return res.status(409).json({ error: `mapping is ${mappingState}` });
+  }
+  const robot = robots.values().next().value as RobotConnection | undefined;
+  if (!robot) return res.status(409).json({ error: 'robot not connected' });
+  mappingState = 'starting';
+  broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+  try {
+    const output = await runRootCommand(mapperScript, ['start-remote']);
+    sendMissionCommand(robot, MissionCommand.Start);
+    mappingState = 'running';
+    broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+    return res.json({ state: mappingState, output });
+  } catch (error) {
+    mappingState = 'error';
+    return res.status(500).json({ error: (error as Error).message, state: mappingState });
+  }
+});
+
+app.post('/api/mapping/stop', async (_req, res) => {
+  mappingState = 'stopping';
+  broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+  const robot = robots.values().next().value as RobotConnection | undefined;
+  if (robot) sendMissionCommand(robot, MissionCommand.Stop);
+  try {
+    const output = await runRootCommand(mapperScript, ['stop']);
+    mappingState = 'stopped';
+    broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+    return res.json({ state: mappingState, output });
+  } catch (error) {
+    mappingState = 'error';
+    return res.status(500).json({ error: (error as Error).message, state: mappingState });
+  }
+});
+
+app.post('/api/mapping/save', async (req, res) => {
+  const mapName = typeof req.body?.name === 'string' ? req.body.name : 'ruang_utama';
+  if (!/^[a-zA-Z0-9_-]+$/.test(mapName)) {
+    return res.status(400).json({ error: 'invalid map name' });
+  }
+  mappingState = 'saving';
+  broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+  try {
+    const output = await runRootCommand(saveMapScript, [mapName]);
+    mappingState = 'running';
+    broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+    return res.json({ state: mappingState, name: mapName, output });
+  } catch (error) {
+    mappingState = 'error';
+    return res.status(500).json({ error: (error as Error).message, state: mappingState });
+  }
 });
 
 const frontend = path.resolve(here, '../../frontend/dist');
@@ -241,6 +323,46 @@ const robotServer = net.createServer((socket) => {
   });
   socket.on('error', (error: Error) => console.warn('Robot TCP:', error.message));
 });
+
+const mapServer = net.createServer((socket) => {
+  let incoming = Buffer.alloc(0);
+  socket.on('data', (chunk: Buffer) => {
+    incoming = Buffer.concat([incoming, chunk]);
+  });
+  socket.on('end', () => {
+    if (incoming.length < 40 || incoming.readUInt32BE(0) !== 0x4d415031) return;
+    const payloadLength = incoming.readUInt32BE(8);
+    if (incoming.length !== 16 + payloadLength || payloadLength < 24) return;
+    const payload = incoming.subarray(16);
+    const width = payload.readUInt32BE(0);
+    const height = payload.readUInt32BE(4);
+    if (payloadLength !== 24 + width * height) return;
+
+    // OccupancyGrid starts at lower-left; browser image rows start at top-left.
+    const pixels = Buffer.alloc(width * height);
+    for (let mapY = 0; mapY < height; mapY++) {
+      const imageY = height - 1 - mapY;
+      for (let x = 0; x < width; x++) {
+        const occupancy = payload.readInt8(24 + mapY * width + x);
+        pixels[imageY * width + x] = occupancy < 0 ? 205 : occupancy >= 50 ? 0 : 254;
+      }
+    }
+    liveMap = {
+      map_id: `${mapName}-live`,
+      width,
+      height,
+      resolution: payload.readFloatBE(8),
+      origin: {
+        x: payload.readFloatBE(12),
+        y: payload.readFloatBE(16),
+        yaw: payload.readFloatBE(20),
+      },
+      pixels: pixels.toString('base64'),
+    };
+    broadcastToDashboards({ type: 'mapping_map', data: liveMap });
+  });
+  socket.on('error', (error: Error) => console.warn('Map bridge TCP:', error.message));
+});
 wss.on('connection', (socket) =>
   socket.send(
     JSON.stringify({ type: 'snapshot', data: [...robots.values()].map((r) => r.status) }),
@@ -256,5 +378,8 @@ setInterval(() => {
 }, 500);
 robotServer.listen(robotPort, '0.0.0.0', () =>
   console.log(`Robot TCP binary listening on :${robotPort}`),
+);
+mapServer.listen(mapBridgePort, '127.0.0.1', () =>
+  console.log(`ROS map bridge listening on 127.0.0.1:${mapBridgePort}`),
 );
 server.listen(httpPort, '0.0.0.0', () => console.log(`Dashboard http://0.0.0.0:${httpPort}`));
