@@ -1,9 +1,12 @@
 #include "luckfox/robot_backend_client.hpp"
+#include "luckfox/map.hpp"
 
 #include <arpa/inet.h>
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <cstdio>
+#include <fstream>
 #include <mutex>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
@@ -16,6 +19,7 @@ namespace {
 constexpr std::uint32_t kMagic = 0x41475631;  // AGV1
 constexpr std::uint16_t kVersion = 1;
 constexpr std::uint16_t kStatus = 1, kCommand = 2, kAck = 3;
+constexpr std::uint16_t kMapFile = 4, kMapAck = 5;
 constexpr std::size_t kHeaderSize = 16, kStatusSize = 70, kCommandSize = 8;
 
 void Put16(std::vector<std::uint8_t>& out, std::uint16_t value) {
@@ -50,6 +54,32 @@ bool SendAll(int fd, const std::vector<std::uint8_t>& data) {
     sent += static_cast<std::size_t>(count);
   }
   return true;
+}
+
+bool InstallMap(const std::uint8_t* payload, std::uint32_t length) {
+  if (length < 36) return false;
+  char raw_name[33]{};
+  std::memcpy(raw_name, payload + 4, 32);
+  const std::string name(raw_name);
+  if (name.empty() || name.find_first_not_of(
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string::npos) return false;
+  const std::string target = "/etc/slam/" + name + ".bin";
+  const std::string temporary = target + ".new";
+  const std::string backup = target + ".bak";
+  try {
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(payload + 36), length - 36);
+    output.close();
+    if (!output) return false;
+    (void)LoadMap(temporary);
+    std::remove(backup.c_str());
+    std::rename(target.c_str(), backup.c_str());
+    if (std::rename(temporary.c_str(), target.c_str()) != 0) return false;
+    return true;
+  } catch (...) {
+    std::remove(temporary.c_str());
+    return false;
+  }
 }
 }  // namespace
 
@@ -104,7 +134,7 @@ void RobotBackendClient::Start() {
         const auto type = Get16(p + 6);
         const auto length = Get32(p + 8);
         const auto seq = Get32(p + 12);
-        if (length > 1024) { close(impl_->fd); impl_->fd=-1; impl_->incoming.clear(); break; }
+        if (length > 1024 * 1024) { close(impl_->fd); impl_->fd=-1; impl_->incoming.clear(); break; }
         if (impl_->incoming.size() < kHeaderSize + length) break;
         if (type == kCommand && length == kCommandSize) {
           const auto command = impl_->incoming[kHeaderSize] == 1 ? MissionCommand::Start : MissionCommand::Stop;
@@ -113,6 +143,14 @@ void RobotBackendClient::Start() {
           if (callback) callback(command);
           auto ack=Header(kAck,kCommandSize,seq); ack.insert(ack.end(),impl_->incoming.begin()+kHeaderSize,
             impl_->incoming.begin()+kHeaderSize+kCommandSize); SendAll(impl_->fd,ack);
+        } else if (type == kMapFile && length >= 36) {
+          const bool success = InstallMap(impl_->incoming.data() + kHeaderSize, length);
+          auto ack = Header(kMapAck, 8, seq);
+          ack.insert(ack.end(), impl_->incoming.begin() + kHeaderSize,
+                     impl_->incoming.begin() + kHeaderSize + 4);
+          ack.push_back(success ? 1 : 0);
+          ack.insert(ack.end(), 3, 0);
+          SendAll(impl_->fd, ack);
         }
         impl_->incoming.erase(impl_->incoming.begin(), impl_->incoming.begin()+kHeaderSize+length);
       }

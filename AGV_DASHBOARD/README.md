@@ -18,7 +18,12 @@ React FE ← WebSocket ← Node BE ← TCP localhost 42020 ───┘
 ```
 
 `START MAPPING` menjalankan ROS remote mapper dan menyalakan LiDAR. `SAVE MAP`
-menghasilkan PGM/YAML/BIN. `STOP MAPPING` mematikan LiDAR dan ROS mapping.
+menghasilkan PGM/YAML/BIN. Setelah save sukses, tombol `TRANSFER MAP TO ROBOT`
+mengirim BIN lewat koneksi TCP binary yang sama. Board memvalidasi map sebelum
+memasang ke `/etc/slam` dan menyimpan versi sebelumnya sebagai `.bak`.
+`STOP MAPPING` mematikan LiDAR dan ROS mapping.
+
+Setelah transfer sukses, restart `localize_uart` agar map baru dimuat ke memori.
 
 ## Jalankan
 

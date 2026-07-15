@@ -10,7 +10,7 @@ Header setiap frame (16 byte):
 |---:|---|---|
 | 0 | u32 | Magic `0x41475631` (`AGV1`) |
 | 4 | u16 | Version `1` |
-| 6 | u16 | Type: status=1, command=2, ACK=3 |
+| 6 | u16 | Type: status=1, command=2, ACK=3, map=4, map ACK=5 |
 | 8 | u32 | Payload length |
 | 12 | u32 | Sequence/command ID |
 
@@ -21,6 +21,15 @@ mission_running u8, reserved[3].
 Command dan ACK payload (8 byte): command u8 (`1=start`, `2=stop`), reserved[3],
 command ID u32. Batas payload parser adalah 1024 byte untuk mencegah frame rusak
 menghabiskan memori.
+
+Map payload terdiri dari transfer ID u32, nama map UTF-8 dalam field 32 byte,
+kemudian seluruh isi `map.bin`. Board menulisnya sebagai file `.new`, memeriksa
+magic, ukuran, dan CRC melalui parser localizer, lalu mengganti map aktif secara
+atomik. Map lama disimpan sebagai `.bak`. Map ACK berisi transfer ID u32,
+success u8, dan reserved[3]. Batas payload map adalah 1 MiB.
+
+Map yang baru dipasang akan dibaca pada start `localize_uart` berikutnya. Jadi
+restart localizer diperlukan bila proses sedang berjalan saat transfer.
 
 ## ScanFrame TCP 42010
 

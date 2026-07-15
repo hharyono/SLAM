@@ -31,6 +31,9 @@ type ServerMessage =
   | { type: 'command_ack'; data: { command: string } }
   | { type: 'mapping_status'; data: { state: MappingState } }
   | { type: 'mapping_map'; data: MapData }
+  | { type: 'map_saved'; data: { name: string } }
+  | { type: 'map_transfer_started'; data: { name: string } }
+  | { type: 'map_transfer_ack'; data: { success: boolean; transfer_id: number } }
   | { type: string; data?: unknown };
 
 type MappingState = 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error';
@@ -107,6 +110,7 @@ function App() {
   const [robots, setRobots] = useState<Record<string, RobotStatus>>({});
   const [notice, setNotice] = useState('');
   const [mappingState, setMappingState] = useState<MappingState>('stopped');
+  const [savedMap, setSavedMap] = useState<string>();
   useEffect(() => {
     fetch('/api/map')
       .then((r) => r.json() as Promise<MapData>)
@@ -115,8 +119,13 @@ function App() {
   }, []);
   useEffect(() => {
     fetch('/api/mapping/status')
-      .then((response) => response.json() as Promise<{ state: MappingState }>)
-      .then((status) => setMappingState(status.state))
+      .then(
+        (response) => response.json() as Promise<{ state: MappingState; last_saved_map?: string }>,
+      )
+      .then((status) => {
+        setMappingState(status.state);
+        setSavedMap(status.last_saved_map);
+      })
       .catch((error) => setNotice(String(error)));
   }, []);
   useEffect(() => {
@@ -137,6 +146,15 @@ function App() {
       if (msg.type === 'mapping_status')
         setMappingState((msg.data as { state: MappingState }).state);
       if (msg.type === 'mapping_map') setMap(msg.data as MapData);
+      if (msg.type === 'map_saved') setSavedMap((msg.data as { name: string }).name);
+      if (msg.type === 'map_transfer_started')
+        setNotice(`Mengirim map ${(msg.data as { name: string }).name}...`);
+      if (msg.type === 'map_transfer_ack')
+        setNotice(
+          (msg.data as { success: boolean }).success
+            ? 'Map berhasil dipasang di robot'
+            : 'Robot menolak map: validasi gagal',
+        );
     };
     return () => socket.close();
   }, []);
@@ -159,6 +177,17 @@ function App() {
     const result = (await response.json()) as { error?: string; state?: MappingState };
     if (!response.ok) setNotice(result.error ?? 'Mapping command gagal');
     else setNotice(`Mapping ${result.state}`);
+  };
+  const transferMap = async () => {
+    if (!robot || !savedMap) return;
+    setNotice(`Menyiapkan transfer ${savedMap}...`);
+    const response = await fetch(`/api/maps/${savedMap}/transfer/${robot.robot_id}`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const result = (await response.json()) as { error: string };
+      setNotice(result.error);
+    }
   };
   return (
     <main>
@@ -237,6 +266,9 @@ function App() {
           </button>
           <button disabled={mappingState !== 'running'} onClick={() => mappingAction('save')}>
             SAVE MAP
+          </button>
+          <button disabled={!robot?.online || !savedMap} onClick={transferMap}>
+            TRANSFER MAP TO ROBOT
           </button>
           <button
             className="stop"

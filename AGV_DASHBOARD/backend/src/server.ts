@@ -60,6 +60,8 @@ enum FrameType {
   Status = 1,
   Command = 2,
   Acknowledgement = 3,
+  MapFile = 4,
+  MapAcknowledgement = 5,
 }
 
 enum MissionCommand {
@@ -73,6 +75,7 @@ const mapperScript = path.join(root, 'MAPPER/Config/mapper');
 const saveMapScript = path.join(root, 'LUCKFOX_LOCALIZER/scripts/save_and_convert_map.sh');
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
+let lastSavedMap: string | undefined;
 const app = express();
 app.use(express.json());
 const server = http.createServer(app);
@@ -147,6 +150,20 @@ function sendMissionCommand(robot: RobotConnection, command: MissionCommand): nu
   return commandId;
 }
 
+function createMapTransferFrame(name: string, data: Buffer, transferId: number): Buffer {
+  const payloadLength = 36 + data.length;
+  const frame = Buffer.alloc(FRAME_HEADER_BYTES + payloadLength);
+  frame.writeUInt32BE(PROTOCOL_MAGIC, 0);
+  frame.writeUInt16BE(PROTOCOL_VERSION, 4);
+  frame.writeUInt16BE(FrameType.MapFile, 6);
+  frame.writeUInt32BE(payloadLength, 8);
+  frame.writeUInt32BE(transferId, 12);
+  frame.writeUInt32BE(transferId, 16);
+  frame.write(name, 20, 32, 'utf8');
+  data.copy(frame, 52);
+  return frame;
+}
+
 async function runRootCommand(file: string, args: string[]): Promise<string> {
   const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
   const command = isRoot ? file : 'sudo';
@@ -208,7 +225,7 @@ app.post('/api/robots/:id/mission/:action', (req, res) => {
 });
 
 app.get('/api/mapping/status', (_req, res) => {
-  res.json({ state: mappingState });
+  res.json({ state: mappingState, last_saved_map: lastSavedMap });
 });
 
 app.post('/api/mapping/start', async (_req, res) => {
@@ -229,6 +246,25 @@ app.post('/api/mapping/start', async (_req, res) => {
     mappingState = 'error';
     return res.status(500).json({ error: (error as Error).message, state: mappingState });
   }
+});
+
+app.post('/api/maps/:name/transfer/:robotId', (req, res) => {
+  const { name, robotId } = req.params;
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) return res.status(400).json({ error: 'invalid map name' });
+  const robot = robots.get(robotId);
+  if (!robot) return res.status(404).json({ error: 'robot not connected' });
+  const mapPath = path.join(mapDir, `${name}.bin`);
+  if (!fs.existsSync(mapPath)) return res.status(404).json({ error: 'map file not found' });
+  const data = fs.readFileSync(mapPath);
+  const transferId = ++commandSequence;
+  robot.socket.write(createMapTransferFrame(name, data, transferId));
+  broadcastToDashboards({
+    type: 'map_transfer_started',
+    data: { name, robot_id: robotId, transfer_id: transferId },
+  });
+  return res
+    .status(202)
+    .json({ accepted: true, name, robot_id: robotId, transfer_id: transferId, bytes: data.length });
 });
 
 app.post('/api/mapping/stop', async (_req, res) => {
@@ -257,7 +293,9 @@ app.post('/api/mapping/save', async (req, res) => {
   try {
     const output = await runRootCommand(saveMapScript, [mapName]);
     mappingState = 'running';
+    lastSavedMap = mapName;
     broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+    broadcastToDashboards({ type: 'map_saved', data: { name: mapName } });
     return res.json({ state: mappingState, name: mapName, output });
   } catch (error) {
     mappingState = 'error';
@@ -308,6 +346,15 @@ const robotServer = net.createServer((socket) => {
               payload.readUInt8(0) === MissionCommand.Start ? 'START_MISSION' : 'STOP_MISSION',
             command_id: payload.readUInt32BE(4),
             sequence,
+          },
+        });
+      } else if (type === FrameType.MapAcknowledgement && payloadLength === 8) {
+        broadcastToDashboards({
+          type: 'map_transfer_ack',
+          data: {
+            robot_id: robotId,
+            transfer_id: payload.readUInt32BE(0),
+            success: payload.readUInt8(4) === 1,
           },
         });
       }

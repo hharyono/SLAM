@@ -464,8 +464,15 @@ Kontrol FE:
 
 - `START MAPPING`: menjalankan `mapper start-remote`, lalu menyalakan LiDAR;
 - `SAVE MAP`: menjalankan map saver dan converter PGM/YAML/BIN;
+- `TRANSFER MAP TO ROBOT`: mengirim BIN hasil save melalui TCP, memvalidasi
+  format/CRC di board, memasangnya ke `/etc/slam`, dan menyimpan map lama
+  sebagai `.bak`;
 - `STOP MAPPING`: mematikan LiDAR lalu menghentikan ROS stack;
 - map `/map` diperbarui langsung pada canvas FE.
+
+Tombol transfer aktif setelah `SAVE MAP` berhasil dan robot berstatus online.
+Restart `localize_uart` setelah transfer agar proses localization memuat map
+baru dari disk.
 
 Verifikasi manual:
 
