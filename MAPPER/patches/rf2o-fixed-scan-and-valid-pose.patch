@@ -1,0 +1,57 @@
+diff --git a/include/rf2o_laser_odometry/CLaserOdometry2DNode.h b/include/rf2o_laser_odometry/CLaserOdometry2DNode.h
+index 85bd6bf..18918c9 100644
+--- a/include/rf2o_laser_odometry/CLaserOdometry2DNode.h
++++ b/include/rf2o_laser_odometry/CLaserOdometry2DNode.h
+@@ -91,7 +91,9 @@ CLaserOdometry2DNode::CLaserOdometry2DNode(): Node("CLaserOdometry2DNode")
+     initial_robot_pose.pose.pose.position.x = 0;
+     initial_robot_pose.pose.pose.position.y = 0;
+     initial_robot_pose.pose.pose.position.z = 0;
+-    initial_robot_pose.pose.pose.orientation.w = 0;
++    // Identity quaternion. A zero quaternion is invalid and can propagate NaNs
++    // when the initial pose is converted to an Eigen transform.
++    initial_robot_pose.pose.pose.orientation.w = 1;
+     initial_robot_pose.pose.pose.orientation.x = 0;
+     initial_robot_pose.pose.pose.orientation.y = 0;
+     initial_robot_pose.pose.pose.orientation.z = 0;
+diff --git a/src/CLaserOdometry2DNode.cpp b/src/CLaserOdometry2DNode.cpp
+index e50b356..781bb0b 100644
+--- a/src/CLaserOdometry2DNode.cpp
++++ b/src/CLaserOdometry2DNode.cpp
+@@ -74,9 +74,10 @@ void CLaserOdometry2DNode::process()
+     publish();
+     new_scan_available = false; //avoids the possibility to run twice on the same laser scan
+   }
+-  else
++  else if (!rf2o_ref.is_initialized())
+   {
+-    RCLCPP_WARN(get_logger(), "Waiting for laser_scans....") ;
++    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
++      "Waiting for laser_scans....");
+   }
+ }
+ 
+@@ -86,6 +87,24 @@ void CLaserOdometry2DNode::process()
+ 
+ void CLaserOdometry2DNode::LaserCallBack(const sensor_msgs::msg::LaserScan::SharedPtr new_scan)
+ {
++  if (new_scan->ranges.empty())
++  {
++    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
++      "Ignoring an empty LaserScan");
++    return;
++  }
++
++  // RF2O allocates its pyramids from the first scan and requires every later
++  // scan to have exactly the same angular resolution and sample count.
++  if (!rf2o_ref.first_laser_scan && new_scan->ranges.size() != rf2o_ref.width)
++  {
++    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
++      "Ignoring LaserScan with changing sample count: got %zu, expected %u. "
++      "Enable fixed_resolution in the lidar driver.",
++      new_scan->ranges.size(), rf2o_ref.width);
++    return;
++  }
++
+   if (GT_pose_initialized)
+   {
+     //Keep in memory the last received laser_scan

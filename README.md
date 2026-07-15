@@ -59,3 +59,10 @@ terhadap pusat robot tidak nol.
 
 Converter `map.bin`, loader CRC, dan core scan-to-map localization standalone
 tersedia di [`LUCKFOX_LOCALIZER`](LUCKFOX_LOCALIZER/README.md).
+
+Modifikasi terhadap submodule mapper vendor disimpan sebagai patch reproducible
+di `MAPPER/patches`. Terapkan setelah `git submodule update --init --recursive`:
+
+```bash
+./MAPPER/scripts/apply_mapper_patches.sh
+```

@@ -1,0 +1,26 @@
+diff --git a/params/Tmini-Plus-SH.yaml b/params/Tmini-Plus-SH.yaml
+index e1eec8e..fadb913 100644
+--- a/params/Tmini-Plus-SH.yaml
++++ b/params/Tmini-Plus-SH.yaml
+@@ -4,10 +4,10 @@ ydlidar_ros2_driver_node:
+     frame_id: laser_frame
+     ignore_array: ""
+     baudrate: 230400
+-    lidar_type: 0
++    lidar_type: 1
+     device_type: 0
+     intensity: true
+-    intensity_bit: 16
++    intensity_bit: 8
+     isSingleChannel: false
+     frequency: 10.0
+     sample_rate: 4
+@@ -20,6 +20,6 @@ ydlidar_ros2_driver_node:
+     angle_max: 180.0
+     angle_min: -180.0
+     range_max: 12.0
+-    range_min: 0.03
+-    invalid_range_is_inf: false
++    range_min: 0.05
++    invalid_range_is_inf: true
+     debug: false
