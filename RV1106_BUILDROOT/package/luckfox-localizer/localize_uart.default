@@ -1,0 +1,13 @@
+# Set to 0 to disable automatic startup.
+ENABLED=1
+
+MAP=/etc/slam/ruang_utama.bin
+UART=/dev/ttyS3
+BAUD=230400
+
+# Dashboard endpoint on the Windows side of the Luckfox USB network.
+export LUCKFOX_BACKEND_HOST=172.32.0.100
+export LUCKFOX_BACKEND_PORT=42000
+export LUCKFOX_SCAN_STREAM_HOST=172.32.0.100
+export LUCKFOX_SCAN_STREAM_PORT=42010
+export LUCKFOX_ROBOT_ID=AGV-001

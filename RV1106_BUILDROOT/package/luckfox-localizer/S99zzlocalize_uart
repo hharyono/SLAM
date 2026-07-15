@@ -1,0 +1,84 @@
+#!/bin/sh
+
+# The zz suffix intentionally places this after the vendor S99usb0config script.
+
+DAEMON=/usr/bin/localize_uart
+CONFIG=/etc/default/localize_uart
+PIDFILE=/var/run/localize_uart.pid
+LOGFILE=/tmp/localize_uart.log
+
+ENABLED=1
+MAP=/etc/slam/ruang_utama.bin
+UART=/dev/ttyS3
+BAUD=230400
+
+[ -r "$CONFIG" ] && . "$CONFIG"
+
+start() {
+	[ "$ENABLED" = "1" ] || {
+		echo "localize_uart disabled in $CONFIG"
+		return 0
+	}
+
+	if [ ! -x "$DAEMON" ]; then
+		echo "localize_uart executable not found: $DAEMON"
+		return 1
+	fi
+	if [ ! -r "$MAP" ]; then
+		echo "localize_uart map not found: $MAP"
+		return 1
+	fi
+
+	# UART may appear shortly after rcS begins on some board revisions.
+	wait_count=0
+	while [ ! -e "$UART" ] && [ "$wait_count" -lt 10 ]; do
+		sleep 1
+		wait_count=$((wait_count + 1))
+	done
+	if [ ! -e "$UART" ]; then
+		echo "localize_uart UART not found: $UART"
+		return 1
+	fi
+
+	printf "Starting localize_uart: "
+	start-stop-daemon -S -q -b -m -p "$PIDFILE" -x "$DAEMON" -- \
+		"$MAP" "$UART" "$BAUD" >>"$LOGFILE" 2>&1
+	status=$?
+	[ "$status" -eq 0 ] && echo "OK" || echo "FAIL"
+	return "$status"
+}
+
+stop() {
+	printf "Stopping localize_uart: "
+	start-stop-daemon -K -q -p "$PIDFILE" -x "$DAEMON" -o
+	status=$?
+	rm -f "$PIDFILE"
+	[ "$status" -eq 0 ] && echo "OK" || echo "FAIL"
+	return "$status"
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		stop
+		sleep 1
+		start
+		;;
+	status)
+		if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+			echo "localize_uart is running (pid $(cat "$PIDFILE"))"
+		else
+			echo "localize_uart is not running"
+			exit 1
+		fi
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|status}"
+		exit 1
+		;;
+esac

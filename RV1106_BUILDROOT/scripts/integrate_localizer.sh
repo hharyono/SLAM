@@ -19,6 +19,9 @@ rm -rf "$PKG_DIR"
 mkdir -p "$PKG_DIR/src/include" "$PKG_DIR/src/src" "$PKG_DIR/src/tools" "$PKG_DIR/src/maps"
 cp "$WORK_DIR/package/luckfox-localizer/Config.in" "$PKG_DIR/Config.in"
 cp "$WORK_DIR/package/luckfox-localizer/luckfox-localizer.mk" "$PKG_DIR/luckfox-localizer.mk"
+cp "$WORK_DIR/package/luckfox-localizer/S99zzlocalize_uart" "$PKG_DIR/S99zzlocalize_uart"
+cp "$WORK_DIR/package/luckfox-localizer/localize_uart.default" \
+  "$PKG_DIR/localize_uart.default"
 cp -a "$SOURCE_DIR/include/." "$PKG_DIR/src/include/"
 cp "$SOURCE_DIR/src/crc32.cpp" "$SOURCE_DIR/src/map_io.cpp" \
   "$SOURCE_DIR/src/localizer.cpp" "$SOURCE_DIR/src/uart_localizer.cpp" \

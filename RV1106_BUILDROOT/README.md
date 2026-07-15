@@ -33,6 +33,24 @@ Paket Buildroot memasang:
 - `/usr/bin/localize_scan`
 - `/usr/bin/localize_uart`
 - `/etc/slam/ruang_utama.bin` bila `maps/ruang_utama.bin` tersedia saat build
+- `/etc/init.d/S99zzlocalize_uart` untuk menjalankan localizer otomatis setelah
+  konfigurasi jaringan USB selesai saat boot
+- `/etc/default/localize_uart` untuk konfigurasi map, UART, baud, dan backend
+
+Localizer otomatis dijalankan oleh BusyBox `rcS` dengan map
+`/etc/slam/ruang_utama.bin`, UART `/dev/ttyS3`, dan baud 230400. Kontrol dan
+periksa proses dengan:
+
+```sh
+/etc/init.d/S99zzlocalize_uart restart
+/etc/init.d/S99zzlocalize_uart status
+tail -f /tmp/localize_uart.log
+```
+
+Set `ENABLED=0` di `/etc/default/localize_uart` untuk mematikan autostart.
+Default endpoint dashboard adalah host Windows `172.32.0.100`, TCP 42000 untuk
+status/kontrol robot dan TCP 42010 untuk stream scan. Ubah nilai
+`LUCKFOX_BACKEND_*` di file tersebut bila alamat adapter Windows berbeda.
 
 Untuk membaca YDLidar langsung dari UART tanpa CSV:
 

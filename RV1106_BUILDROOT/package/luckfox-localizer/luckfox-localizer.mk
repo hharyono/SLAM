@@ -28,9 +28,14 @@ define LUCKFOX_LOCALIZER_BUILD_CMDS
 endef
 
 define LUCKFOX_LOCALIZER_INSTALL_TARGET_CMDS
+	rm -f $(TARGET_DIR)/etc/init.d/S95localize_uart
 	$(INSTALL) -D -m 0755 $(@D)/map_inspect $(TARGET_DIR)/usr/bin/map_inspect
 	$(INSTALL) -D -m 0755 $(@D)/localize_scan $(TARGET_DIR)/usr/bin/localize_scan
 	$(INSTALL) -D -m 0755 $(@D)/localize_uart $(TARGET_DIR)/usr/bin/localize_uart
+	$(INSTALL) -D -m 0755 $(LUCKFOX_LOCALIZER_PKGDIR)/S99zzlocalize_uart \
+		$(TARGET_DIR)/etc/init.d/S99zzlocalize_uart
+	$(INSTALL) -D -m 0644 $(LUCKFOX_LOCALIZER_PKGDIR)/localize_uart.default \
+		$(TARGET_DIR)/etc/default/localize_uart
 	@if [ -f "$(@D)/maps/ruang_utama.bin" ]; then \
 		$(INSTALL) -D -m 0644 "$(@D)/maps/ruang_utama.bin" \
 			"$(TARGET_DIR)/etc/slam/ruang_utama.bin"; \
