@@ -38,3 +38,17 @@ hardware yang fail-safe.
 VS Code akan menjalankan backend pada `http://localhost:8080`, frontend Vite
 pada `http://localhost:5173`, lalu membuka Chrome Debugger. Breakpoint dapat
 dipasang langsung pada `backend/src/server.ts` dan `frontend/src/main.tsx`.
+
+## Koneksi Luckfox ke backend WSL
+
+Board tidak dapat mengakses IP NAT WSL secara langsung. Jalankan script berikut
+dari **Windows PowerShell as Administrator**, terutama setelah WSL restart:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File \
+  "\\wsl.localhost\Ubuntu2204ArduP\root\DATA\SLAM\AGV_DASHBOARD\scripts\setup-wsl-portproxy.ps1"
+```
+
+Script mendeteksi IP WSL dan adapter Windows `172.32.x.x`, kemudian membuat
+port forwarding TCP `42000` dan firewall rule. Gunakan IP Windows yang dicetak
+script sebagai `LUCKFOX_BACKEND_HOST` pada robot.
