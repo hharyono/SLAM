@@ -3,7 +3,23 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build" },
-  "dependencies": { "react": "latest", "react-dom": "latest" },
-  "devDependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "typescript": "latest", "@types/react": "latest", "@types/react-dom": "latest" }
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "format": "prettier --write src vite.config.ts tsconfig.json package.json",
+    "format:check": "prettier --check src vite.config.ts tsconfig.json package.json"
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "prettier": "^3.9.5",
+    "typescript": "latest",
+    "vite": "latest"
+  }
 }
