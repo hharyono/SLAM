@@ -15,6 +15,7 @@ type RobotStatus = {
   online: boolean;
   pose: Pose;
   power: { percent: number; voltage: number };
+  mission_running: boolean;
 };
 type MapData = {
   map_id: string;
@@ -138,8 +139,7 @@ function App() {
     <main>
       <header>
         <div>
-          <p className="eyebrow">LUCKFOX · AGV CONTROL</p>
-          <h1>Ruang Utama</h1>
+          <p className="eyebrow">AGV CONTROL</p>
         </div>
         <span className={`connection ${robot?.online ? 'online' : ''}`}>
           {robot?.online ? 'ONLINE' : 'OFFLINE'}
@@ -150,6 +150,11 @@ function App() {
           <MapView map={map} robot={robot} />
         </div>
         <aside>
+          <div className="card">
+            <span>Mission</span>
+            <strong>{robot?.mission_running ? 'RUNNING' : 'STOPPED'}</strong>
+            <small>{robot?.mission_running ? 'LiDAR aktif' : 'LiDAR berhenti'}</small>
+          </div>
           <div className="card">
             <span>Robot</span>
             <strong>{robot?.robot_id || 'Menunggu...'}</strong>
@@ -188,10 +193,17 @@ function App() {
                 : 'Sensor belum terhubung'}
             </small>
           </div>
-          <button disabled={!robot?.online} onClick={() => mission('start')}>
+          <button
+            disabled={!robot?.online || robot?.mission_running}
+            onClick={() => mission('start')}
+          >
             START MISSION
           </button>
-          <button className="stop" disabled={!robot?.online} onClick={() => mission('stop')}>
+          <button
+            className="stop"
+            disabled={!robot?.online || !robot?.mission_running}
+            onClick={() => mission('stop')}
+          >
             STOP MISSION
           </button>
           <p className="notice">{notice}</p>

@@ -479,8 +479,10 @@ mission_command=START
 mission_command=STOP
 ```
 
-Saat ini callback START/STOP sudah diterima dan di-ACK, tetapi belum mengontrol
-motor. STOP software bukan pengganti emergency stop hardware yang fail-safe.
+START mengaktifkan motor/scan LiDAR dan localization. STOP memanggil `turnOff`,
+menghentikan scan/motor LiDAR, dan mempertahankan koneksi status ke backend.
+STOP LiDAR ini bukan pengganti emergency stop motor penggerak robot yang
+fail-safe.
 
 ## 14. Troubleshooting singkat
 

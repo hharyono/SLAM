@@ -25,6 +25,7 @@ type RobotStatus = {
   timestamp_ms: number;
   pose: Pose;
   power: Power;
+  mission_running: boolean;
   online: boolean;
   received_ms: number;
 };
@@ -152,6 +153,7 @@ function decodeRobotStatus(payload: Buffer, sequence: number): RobotStatus {
       percent: payload.readFloatBE(56),
       voltage: payload.readFloatBE(60),
     },
+    mission_running: payload.readUInt8(66) === 1,
     online: true,
     received_ms: Date.now(),
   };

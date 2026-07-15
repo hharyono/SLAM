@@ -31,6 +31,7 @@ class RobotBackendClient {
   void Stop() noexcept;
   void UpdatePose(const LocalizationResult& result);
   void UpdatePower(float percent, float voltage = 0.0F);
+  void UpdateMissionRunning(bool running);
   void SetMissionCallback(std::function<void(MissionCommand)> callback);
 
  private:

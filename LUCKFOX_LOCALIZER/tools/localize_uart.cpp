@@ -5,8 +5,11 @@
 #include "CYdLidar.h"
 
 #include <cstdlib>
+#include <atomic>
+#include <chrono>
 #include <iostream>
 #include <memory>
+#include <thread>
 #include <stdexcept>
 
 int main(int argc, char** argv) try {
@@ -25,14 +28,17 @@ int main(int argc, char** argv) try {
 
   luckfox::UartLocalizer localizer(luckfox::LoadMap(argv[1]), config);
   std::unique_ptr<luckfox::RobotBackendClient> backend;
+  std::atomic<bool> mission_requested{true};
   if (const char* host = std::getenv("LUCKFOX_BACKEND_HOST")) {
+    mission_requested = false;
     luckfox::RobotBackendConfig backend_config;
     backend_config.backend_host = host;
     if (const char* id = std::getenv("LUCKFOX_ROBOT_ID")) backend_config.robot_id = id;
     if (const char* port = std::getenv("LUCKFOX_BACKEND_PORT"))
       backend_config.backend_port = static_cast<std::uint16_t>(std::stoi(port));
     backend.reset(new luckfox::RobotBackendClient(std::move(backend_config)));
-    backend->SetMissionCallback([](luckfox::MissionCommand command) {
+    backend->SetMissionCallback([&mission_requested](luckfox::MissionCommand command) {
+      mission_requested = command == luckfox::MissionCommand::Start;
       std::cerr << "mission_command="
                 << (command == luckfox::MissionCommand::Start ? "START" : "STOP") << '\n';
     });
@@ -40,8 +46,24 @@ int main(int argc, char** argv) try {
       backend->UpdatePower(std::stof(power));
     backend->Start();
   }
-  localizer.Start();
+
   while (ydlidar::os_isOk()) {
+    if (!mission_requested) {
+      if (localizer.IsRunning()) {
+        localizer.Stop();
+        if (backend) backend->UpdateMissionRunning(false);
+        std::cerr << "lidar_state=STOPPED\n";
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      continue;
+    }
+
+    if (!localizer.IsRunning()) {
+      localizer.Start();
+      if (backend) backend->UpdateMissionRunning(true);
+      std::cerr << "lidar_state=RUNNING\n";
+    }
+
     const auto result = localizer.LocalizeNext(initial);
     if (backend) backend->UpdatePose(result);
     std::cout << "x=" << result.pose.x << " y=" << result.pose.y
