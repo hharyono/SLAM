@@ -9,18 +9,23 @@
 body {
   margin: 0;
   background: radial-gradient(circle at 20% 0, #14213a 0, #070b13 45%);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 main {
   max-width: 1400px;
+  height: 100vh;
   margin: auto;
-  padding: 28px;
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
 }
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 22px;
+  flex: 0 0 auto;
+  margin-bottom: 12px;
 }
 h1 {
   margin: 3px 0;
@@ -49,33 +54,92 @@ h1 {
 }
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
 }
 .map {
+  position: relative;
   background: #101722;
   border: 1px solid #263244;
   border-radius: 16px;
   overflow: hidden;
   display: grid;
   place-items: center;
-  min-height: 650px;
+  min-height: 0;
 }
 .map canvas {
-  max-width: 100%;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.map canvas.measuring {
+  cursor: crosshair;
+}
+.measurement-tools {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #07111fe6;
+  backdrop-filter: blur(6px);
+}
+.measurement-tools button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  background: #172033;
+  font-size: 10px;
+}
+.measurement-tools button.active {
+  border-color: #38bdf8;
+  background: #0369a1;
+}
+.measurement-hint {
+  position: absolute;
+  z-index: 2;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 12px;
+  border: 1px solid #38bdf866;
+  border-radius: 999px;
+  color: #e0f2fe;
+  background: #07111fe6;
+  font:
+    700 11px ui-monospace,
+    monospace;
+  white-space: nowrap;
+  pointer-events: none;
 }
 aside {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  min-height: 0;
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 .card,
 .metrics {
   background: #111827cc;
   border: 1px solid #263244;
   border-radius: 14px;
-  padding: 18px;
+  padding: 12px;
+}
+.compact-card {
+  min-width: 0;
+  padding: 10px;
 }
 .card span,
 .metrics span {
@@ -88,17 +152,20 @@ aside {
 .card strong {
   display: block;
   font:
-    700 24px ui-monospace,
+    700 20px ui-monospace,
     monospace;
-  margin-top: 8px;
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .card small {
   color: #8190a5;
+  font-size: 11px;
 }
 .metrics {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 8px 16px;
 }
 .metrics b {
   font:
@@ -110,11 +177,17 @@ aside {
 button {
   border: 0;
   border-radius: 10px;
-  padding: 16px;
+  min-height: 42px;
+  padding: 10px 8px;
   background: #0ea5e9;
   color: white;
   font-weight: 700;
   cursor: pointer;
+}
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 button.stop {
   background: #ef4444;
@@ -124,19 +197,45 @@ button:disabled {
   cursor: not-allowed;
 }
 .notice {
-  min-height: 20px;
+  min-height: 18px;
+  margin: 0;
   color: #94a3b8;
   text-align: center;
   font-size: 13px;
 }
 @media (max-width: 900px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
   main {
     padding: 15px;
+    height: auto;
+    min-height: 100vh;
   }
   .layout {
     grid-template-columns: 1fr;
   }
   .map {
     min-height: 400px;
+  }
+}
+@media (max-height: 720px) and (min-width: 901px) {
+  main {
+    padding-block: 10px;
+  }
+  header {
+    margin-bottom: 8px;
+  }
+  .card,
+  .metrics {
+    padding: 9px;
+  }
+  .card strong {
+    font-size: 17px;
+  }
+  button {
+    min-height: 36px;
+    padding: 7px;
   }
 }

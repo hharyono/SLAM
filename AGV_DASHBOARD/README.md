@@ -64,6 +64,12 @@ dipasang langsung pada `backend/src/server.ts` dan `frontend/src/main.tsx`.
 
 ## Koneksi Luckfox ke backend WSL
 
+Saat backend dimulai di WSL, backend otomatis memeriksa portproxy Windows dan
+menjalankan helper untuk distro pada `WSL_DISTRO_NAME` (default
+`Ubuntu2204ArduP`) jika forwarding belum sehat. Windows menampilkan prompt UAC
+hanya ketika rule perlu dibuat atau diperbaiki. Set `AUTO_WSL_PORTPROXY=0`
+untuk menonaktifkan pemeriksaan otomatis.
+
 Board tidak dapat mengakses IP NAT WSL secara langsung. Jalankan script berikut
 dari **Windows PowerShell as Administrator**, terutama setelah WSL restart:
 

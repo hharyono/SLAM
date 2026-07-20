@@ -73,6 +73,7 @@ const robots = new Map<string, RobotConnection>();
 const execFileAsync = promisify(execFile);
 const mapperScript = path.join(root, 'MAPPER/Config/mapper');
 const saveMapScript = path.join(root, 'LUCKFOX_LOCALIZER/scripts/save_and_convert_map.sh');
+const portProxyScript = path.join(root, 'AGV_DASHBOARD/scripts/setup-wsl-portproxy.ps1');
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 let lastSavedMap: string | undefined;
@@ -80,6 +81,40 @@ const app = express();
 app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
+
+function ensureWslPortProxy(): void {
+  if (process.env.AUTO_WSL_PORTPROXY === '0') return;
+
+  let isWsl = false;
+  try {
+    isWsl = fs
+      .readFileSync('/proc/sys/kernel/osrelease', 'utf8')
+      .toLowerCase()
+      .includes('microsoft');
+  } catch {
+    return;
+  }
+  if (!isWsl) return;
+
+  const distro = process.env.WSL_DISTRO_NAME || 'Ubuntu2204ArduP';
+  const powershell = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
+  if (!fs.existsSync(powershell) || !fs.existsSync(portProxyScript)) {
+    console.warn('WSL portproxy helper tidak ditemukan; board mungkin tidak dapat terhubung.');
+    return;
+  }
+
+  const windowsScript = `\\\\wsl.localhost\\${distro}${portProxyScript.replaceAll('/', '\\')}`;
+  execFile(
+    powershell,
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', windowsScript, '-WslDistro', distro],
+    { timeout: 60_000 },
+    (error, stdout, stderr) => {
+      const output = `${stdout}${stderr}`.trim();
+      if (output) console.log(`WSL portproxy: ${output}`);
+      if (error) console.warn(`WSL portproxy gagal: ${error.message}`);
+    },
+  );
+}
 
 function broadcastToDashboards(message: unknown): void {
   const data = JSON.stringify(message);
@@ -423,9 +458,10 @@ setInterval(() => {
       broadcastToDashboards({ type: 'robot_status', data: robot.status });
     }
 }, 500);
-robotServer.listen(robotPort, '0.0.0.0', () =>
-  console.log(`Robot TCP binary listening on :${robotPort}`),
-);
+robotServer.listen(robotPort, '0.0.0.0', () => {
+  console.log(`Robot TCP binary listening on :${robotPort}`);
+  ensureWslPortProxy();
+});
 mapServer.listen(mapBridgePort, '127.0.0.1', () =>
   console.log(`ROS map bridge listening on 127.0.0.1:${mapBridgePort}`),
 );
