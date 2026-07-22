@@ -17,11 +17,15 @@ define LUCKFOX_LOCALIZER_BUILD_CMDS
 		$(@D)/src/crc32.cpp $(@D)/src/map_io.cpp $(@D)/src/localizer.cpp \
 		$(@D)/tools/localize_scan.cpp -o $(@D)/localize_scan
 	$(TARGET_CXX) $(TARGET_CXXFLAGS) -std=c++17 -Wall -Wextra \
+		-I$(@D)/include \
+		$(@D)/src/crc32.cpp $(@D)/src/map_io.cpp $(@D)/src/localizer.cpp \
+		$(@D)/tools/localize_replay.cpp -o $(@D)/localize_replay
+	$(TARGET_CXX) $(TARGET_CXXFLAGS) -std=c++17 -Wall -Wextra \
 		-I$(@D)/include -I$(STAGING_DIR)/usr/include/src \
 		-I$(STAGING_DIR)/usr/include \
 		$(@D)/src/crc32.cpp $(@D)/src/map_io.cpp $(@D)/src/localizer.cpp \
 		$(@D)/src/uart_localizer.cpp $(@D)/src/robot_backend_client.cpp \
-		$(@D)/src/scan_tcp_client.cpp \
+		$(@D)/src/scan_tcp_client.cpp $(@D)/src/telemetry.cpp \
 		$(@D)/tools/localize_uart.cpp \
 		$(STAGING_DIR)/usr/lib/libydlidar_sdk.a -lpthread \
 		-o $(@D)/localize_uart
@@ -31,6 +35,7 @@ define LUCKFOX_LOCALIZER_INSTALL_TARGET_CMDS
 	rm -f $(TARGET_DIR)/etc/init.d/S95localize_uart
 	$(INSTALL) -D -m 0755 $(@D)/map_inspect $(TARGET_DIR)/usr/bin/map_inspect
 	$(INSTALL) -D -m 0755 $(@D)/localize_scan $(TARGET_DIR)/usr/bin/localize_scan
+	$(INSTALL) -D -m 0755 $(@D)/localize_replay $(TARGET_DIR)/usr/bin/localize_replay
 	$(INSTALL) -D -m 0755 $(@D)/localize_uart $(TARGET_DIR)/usr/bin/localize_uart
 	$(INSTALL) -D -m 0755 $(LUCKFOX_LOCALIZER_PKGDIR)/S30rtl8188eus_wifi \
 		$(TARGET_DIR)/etc/init.d/S30rtl8188eus_wifi

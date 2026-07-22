@@ -14,8 +14,8 @@ Header setiap frame (16 byte):
 | 8 | u32 | Payload length |
 | 12 | u32 | Sequence/command ID |
 
-Status payload (70 byte): `robot_id[32]`, timestamp u64, x/y/yaw/score/power
-percent/voltage float32, valid u8, mode u8 (`0=tracking`, `1=global`),
+Status payload (70 byte): `robot_id[32]`, timestamp u64, x/y/yaw/score float32,
+legacy_reserved_float32[2] (selalu nol dan diabaikan), valid u8, mode u8 (`0=tracking`, `1=global`),
 mission_running u8, reserved[3].
 
 Command dan ACK payload (8 byte): command u8 (`1=start`, `2=stop`), reserved[3],

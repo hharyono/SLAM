@@ -1,6 +1,7 @@
 #include "luckfox/localizer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 
@@ -40,6 +41,17 @@ void KeepBest(std::vector<Candidate>* candidates, std::size_t count) {
 
 }  // namespace
 
+const char* LocalizationStateName(LocalizationState state) noexcept {
+  switch (state) {
+    case LocalizationState::GlobalSearch: return "GLOBAL_SEARCH";
+    case LocalizationState::Tracking: return "TRACKING";
+    case LocalizationState::Degraded: return "DEGRADED";
+    case LocalizationState::Lost: return "LOST";
+    case LocalizationState::Recovered: return "RECOVERED";
+  }
+  return "UNKNOWN";
+}
+
 LocalizationResult Localize(const SlamMap& map, const std::vector<Point2f>& scan,
                             const Pose2f& initial, const SearchOptions& options) {
   LocalizationResult result;
@@ -49,7 +61,9 @@ LocalizationResult Localize(const SlamMap& map, const std::vector<Point2f>& scan
   Pose2f center = initial;
   float window_xy = options.linear_window;
   float window_yaw = options.angular_window;
-  for (std::size_t reverse = map.levels.size(); reverse-- > 0;) {
+  const std::size_t first_level = options.use_multi_resolution
+      ? map.levels.size() - 1 : 0;
+  for (std::size_t reverse = first_level + 1; reverse-- > 0;) {
     const auto& level = map.levels[reverse];
     const float step_xy = std::max(options.linear_step, level.resolution);
     const float step_yaw = std::max(options.angular_step,
@@ -83,7 +97,8 @@ LocalizationResult GlobalLocalize(const SlamMap& map,
 
   constexpr float kPi = 3.14159265358979323846F;
   constexpr std::size_t kKeep = 12;
-  const std::size_t coarse_index = map.levels.size() - 1;
+  const std::size_t coarse_index = options.use_multi_resolution
+      ? map.levels.size() - 1 : 0;
   const auto& coarse = map.levels[coarse_index];
   const float coarse_yaw_step = 10.0F * kPi / 180.0F;
   const float co = std::cos(map.origin_yaw), so = std::sin(map.origin_yaw);
@@ -136,6 +151,93 @@ LocalizationResult GlobalLocalize(const SlamMap& map,
     result.valid = result.score >= options.minimum_score;
   }
   return result;
+}
+
+PoseTracker::PoseTracker(SearchOptions search, StateOptions state)
+    : search_(search), options_(state) {
+  options_.lost_after_rejections = std::max(1U, options_.lost_after_rejections);
+  options_.recovery_confirmations = std::max(1U, options_.recovery_confirmations);
+}
+
+LocalizationResult PoseTracker::Update(const SlamMap& map,
+                                       const std::vector<Point2f>& scan) {
+  const auto previous_state = state_;
+  const bool use_global_search = !has_pose_;
+  const auto started = std::chrono::steady_clock::now();
+  auto result = use_global_search
+      ? GlobalLocalize(map, scan, search_)
+      : Localize(map, scan, last_pose_, search_);
+  result.execution_time_us = static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now() - started).count());
+  result.previous_state = previous_state;
+  result.valid_scan_points = static_cast<std::uint32_t>(scan.size());
+
+  if (use_global_search) {
+    if (result.valid) {
+      last_pose_ = result.pose;
+      has_pose_ = true;
+      state_ = LocalizationState::Recovered;
+      consecutive_rejections_ = 0;
+      recovery_confirmations_ = 0;
+      result.transition_reason = ever_had_pose_
+          ? "global_relocalization_accepted"
+          : "initial_global_pose_accepted";
+      ever_had_pose_ = true;
+    } else {
+      state_ = ever_had_pose_ ? LocalizationState::Lost
+                              : LocalizationState::GlobalSearch;
+      result.transition_reason = reset_reason_ == "initial_state"
+          ? "global_score_below_threshold"
+          : reset_reason_;
+      reset_reason_ = "global_score_below_threshold";
+    }
+  } else if (result.valid) {
+    last_pose_ = result.pose;
+    consecutive_rejections_ = 0;
+    if (previous_state == LocalizationState::Recovered) {
+      ++recovery_confirmations_;
+      if (recovery_confirmations_ >= options_.recovery_confirmations) {
+        state_ = LocalizationState::Tracking;
+        result.transition_reason = "recovery_confirmed";
+      } else {
+        state_ = LocalizationState::Recovered;
+        result.transition_reason = "recovery_confirmation_pending";
+      }
+    } else {
+      recovery_confirmations_ = 0;
+      state_ = LocalizationState::Tracking;
+      result.transition_reason = previous_state == LocalizationState::Degraded
+          ? "tracking_quality_restored"
+          : "tracking_pose_accepted";
+    }
+  } else {
+    ++consecutive_rejections_;
+    recovery_confirmations_ = 0;
+    if (consecutive_rejections_ >= options_.lost_after_rejections) {
+      if (options_.enable_global_relocalization) has_pose_ = false;
+      state_ = LocalizationState::Lost;
+      result.transition_reason = "rejection_limit_reached";
+    } else {
+      state_ = LocalizationState::Degraded;
+      result.transition_reason = "tracking_score_below_threshold";
+    }
+  }
+
+  result.state = state_;
+  result.consecutive_rejections = consecutive_rejections_;
+  result.recovery_confirmations = recovery_confirmations_;
+  return result;
+}
+
+void PoseTracker::Reset(const char* reason) {
+  last_pose_ = {};
+  state_ = LocalizationState::GlobalSearch;
+  has_pose_ = false;
+  ever_had_pose_ = false;
+  consecutive_rejections_ = 0;
+  recovery_confirmations_ = 0;
+  reset_reason_ = reason ? reason : "tracker_reset";
 }
 
 }  // namespace luckfox

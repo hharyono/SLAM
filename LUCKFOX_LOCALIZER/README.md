@@ -39,6 +39,18 @@ Pastikan mapper masih berjalan dan map di RViz sudah stabil:
 ./LUCKFOX_LOCALIZER/scripts/save_and_convert_map.sh ruang_utama
 ```
 
+Setiap map yang berhasil disimpan diproses otomatis dalam urutan berikut:
+
+1. `map_saver_cli` menulis PGM dan YAML mentah.
+2. `map_align` mendeteksi arah dinding dominan/terpanjang dengan Hough transform,
+   membuatnya sejajar sumbu X (0 derajat), lalu menetapkan origin X/Y non-negatif.
+3. Metadata audit ditulis ke `maps/<nama>.alignment.json`.
+4. `map_converter` membuat BIN yang memakai origin dan yaw hasil alignment.
+5. `map_inspect` memvalidasi BIN sebelum map dinyatakan berhasil disimpan.
+
+PGM tidak di-resample sehingga bentuk occupancy grid tetap utuh; rotasi disimpan
+sebagai transform koordinat pada YAML/BIN.
+
 Output utama:
 
 ```text
@@ -87,7 +99,66 @@ Output:
 x=... y=... yaw=... score=... valid=1 evaluated=...
 ```
 
-Kirim pose dan status power setiap 250 ms ke backend TCP binary:
+Runtime sekarang mengekspos state quality gate yang eksplisit:
+
+```text
+GLOBAL_SEARCH -> RECOVERED -> TRACKING -> DEGRADED -> LOST
+                      ^                         |         |
+                      +------ global search ---+---------+
+```
+
+Default yang dipertahankan adalah score minimum `0.35`, `LOST` setelah tiga
+tracking scan ditolak, dan `TRACKING` setelah tiga konfirmasi pasca-recovery.
+Semua threshold dapat dikonfigurasi melalui environment:
+
+```text
+LUCKFOX_LINEAR_WINDOW_M
+LUCKFOX_ANGULAR_WINDOW_RAD
+LUCKFOX_LINEAR_STEP_M
+LUCKFOX_ANGULAR_STEP_RAD
+LUCKFOX_MINIMUM_SCORE
+LUCKFOX_LOST_AFTER_REJECTIONS
+LUCKFOX_RECOVERY_CONFIRMATIONS
+LUCKFOX_MULTI_RESOLUTION
+LUCKFOX_ENABLE_GLOBAL_RELOCALIZATION
+```
+
+Setiap scan ditulis sebagai JSONL append-only ke `LUCKFOX_TELEMETRY_LOG`
+(default `/tmp/localize_scans.jsonl`) dengan pose, score, mode/state,
+accepted/rejected, candidate count, matcher/cycle time, transition reason, CPU,
+dan RSS. Setiap record juga membawa `LUCKFOX_EXPERIMENT_CONDITION`,
+`LUCKFOX_EXPERIMENT_RUN_TYPE`, dan `LUCKFOX_EXPERIMENT_ROUTE_ID`, sehingga data
+`dynamic_occluded` tetap dapat ditelusuri langsung dari telemetry board. Raw
+scan CSV bersifat opt-in melalui `LUCKFOX_RAW_SCAN_LOG`.
+
+Aplikasi board memvalidasi enam run type campaign: `ground_truth`, `route`,
+`kidnapped`, `dynamic_occluded`, `ablation`, dan `resource`. Run type
+`dynamic_occluded` wajib memakai condition dengan nama yang sama; kombinasi
+metadata yang tidak didukung ditolak sebelum capture dimulai.
+
+Replay raw scan memakai state tracker dan matcher yang sama:
+
+```bash
+./build/localize_replay map.bin raw_scans.csv > replay.jsonl
+```
+
+Untuk ablation, pilih salah satu mode berikut:
+
+```bash
+./build/localize_replay map.bin raw_scans.csv --mode local_only
+./build/localize_replay map.bin raw_scans.csv --mode local_global
+./build/localize_replay map.bin raw_scans.csv --mode single_resolution
+./build/localize_replay map.bin raw_scans.csv --mode multi_resolution
+```
+
+Saat mission berhenti, aplikasi menulis heartbeat resource satu kali per detik
+dengan schema `luckfox.localization.resource.v1`. Heartbeat ini menyediakan
+CPU dan RSS untuk interval idle tanpa menyalakan LiDAR.
+
+Framework capture, ground truth, analisis, plot, dan manifest tersedia di
+`EXPERIMENTS/`.
+
+Kirim pose dan status misi setiap 250 ms ke backend TCP binary:
 
 ```bash
 LUCKFOX_BACKEND_HOST=172.32.0.10 \

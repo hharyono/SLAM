@@ -11,16 +11,15 @@
 namespace luckfox {
 
 struct UartLocalizer::Impl {
-  Impl(SlamMap input_map, UartLidarConfig input_lidar, SearchOptions input_search)
-      : map(std::move(input_map)), config(std::move(input_lidar)), search(input_search) {}
+  Impl(SlamMap input_map, UartLidarConfig input_lidar,
+       SearchOptions input_search, StateOptions input_state)
+      : map(std::move(input_map)), config(std::move(input_lidar)),
+        tracker(input_search, input_state) {}
 
   SlamMap map;
   UartLidarConfig config;
-  SearchOptions search;
+  PoseTracker tracker;
   CYdLidar laser;
-  Pose2f last_pose{};
-  bool has_pose = false;
-  unsigned invalid_tracking_frames = 0;
   bool running = false;
   std::mutex localization_mutex;
 };
@@ -37,8 +36,8 @@ void SetOption(CYdLidar& laser, int property, const T& value,
 }  // namespace
 
 UartLocalizer::UartLocalizer(SlamMap map, UartLidarConfig lidar,
-                             SearchOptions search)
-    : impl_(new Impl(std::move(map), std::move(lidar), search)) {}
+                             SearchOptions search, StateOptions state)
+    : impl_(new Impl(std::move(map), std::move(lidar), search, state)) {}
 
 UartLocalizer::~UartLocalizer() { Stop(); }
 
@@ -96,9 +95,7 @@ bool UartLocalizer::IsRunning() const noexcept { return impl_->running; }
 void UartLocalizer::ReloadMap(SlamMap map) {
   std::lock_guard<std::mutex> lock(impl_->localization_mutex);
   impl_->map = std::move(map);
-  impl_->last_pose = {};
-  impl_->has_pose = false;
-  impl_->invalid_tracking_frames = 0;
+  impl_->tracker.Reset("map_reloaded");
 }
 
 LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial,
@@ -135,22 +132,9 @@ LocalizationResult UartLocalizer::LocalizeNext(const Pose2f& fallback_initial,
     points.push_back({sample.range * std::cos(sample.angle),
                       sample.range * std::sin(sample.angle)});
   }
-  if (points.size() < 3) throw std::runtime_error("YDLidar scan has too few valid points");
-
   (void)fallback_initial;
   std::lock_guard<std::mutex> lock(impl_->localization_mutex);
-  auto result = impl_->has_pose
-      ? Localize(impl_->map, points, impl_->last_pose, impl_->search)
-      : GlobalLocalize(impl_->map, points, impl_->search);
-  if (result.valid) {
-    impl_->last_pose = result.pose;
-    impl_->has_pose = true;
-    impl_->invalid_tracking_frames = 0;
-  } else if (impl_->has_pose && ++impl_->invalid_tracking_frames >= 3) {
-    impl_->has_pose = false;
-    impl_->invalid_tracking_frames = 0;
-  }
-  return result;
+  return impl_->tracker.Update(impl_->map, points);
 }
 
 }  // namespace luckfox

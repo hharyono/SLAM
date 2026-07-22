@@ -10,7 +10,13 @@
 *.pgm
 !LUCKFOX_LOCALIZER/tests/data/*.pgm
 *.posegraph
+__pycache__/
+*.pyc
 /maps/
+/EXPERIMENTS/results/*
+!/EXPERIMENTS/results/.gitkeep
+/EXPERIMENTS/Ouputs/*
+!/EXPERIMENTS/Ouputs/.gitkeep
 
 # Luckfox vendor SDK and generated firmware (fetched/built locally)
 /RV1106_BUILDROOT/luckfox-pico/

@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Luckfox AGV — Test Planning</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: #e5edf8;
+        background: #07101c;
+        --panel: #0d1928;
+        --panel-soft: #101f31;
+        --border: #263b54;
+        --muted: #99a9bd;
+        --blue: #38bdf8;
+        --green: #4ade80;
+        --amber: #fbbf24;
+        --red: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 20% 0%, #15345a 0, transparent 32rem),
+          linear-gradient(180deg, #07101c 0%, #050b13 100%);
+      }
+
+      main {
+        width: min(1500px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 64px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        box-shadow: 0 18px 50px #0005;
+      }
+
+      header {
+        padding: 28px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--blue);
+        font:
+          700 12px ui-monospace,
+          monospace;
+        letter-spacing: 0.18em;
+      }
+
+      .language-switch {
+        display: flex;
+        gap: 7px;
+        margin-top: 12px;
+      }
+
+      .language-switch a {
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--muted);
+        background: #07111f;
+        font-size: 11px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .language-switch a.active {
+        color: #dff5ff;
+        border-color: #38bdf888;
+        background: #07598588;
+      }
+
+      h1 {
+        margin: 8px 0 10px;
+        font-size: clamp(28px, 4vw, 46px);
+        line-height: 1.08;
+      }
+
+      .lead {
+        max-width: 920px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(120px, 1fr));
+        gap: 9px;
+        margin-top: 22px;
+      }
+
+      .summary a {
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        color: #d9e8f8;
+        background: var(--panel-soft);
+        text-decoration: none;
+      }
+
+      .summary small,
+      .summary b {
+        display: block;
+      }
+
+      .summary small {
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .summary b {
+        font-size: 13px;
+      }
+
+      .workflow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 7px;
+        margin-top: 18px;
+        color: var(--muted);
+        font:
+          700 11px ui-monospace,
+          monospace;
+      }
+
+      .workflow span {
+        padding: 7px 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: #dbeafe;
+        background: #07111f;
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+        scroll-margin-top: 14px;
+      }
+
+      .section-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+      }
+
+      .section-heading h2 {
+        margin: 0 0 5px;
+        font-size: 22px;
+      }
+
+      .section-heading p {
+        max-width: 850px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .count {
+        flex: 0 0 auto;
+        padding: 7px 10px;
+        border: 1px solid #38bdf866;
+        border-radius: 999px;
+        color: #bdeaff;
+        background: #07598555;
+        font:
+          700 11px ui-monospace,
+          monospace;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 1180px;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      col.scenario {
+        width: 15%;
+      }
+
+      col.purpose {
+        width: 18%;
+      }
+
+      col.setup {
+        width: 22%;
+      }
+
+      col.steps {
+        width: 28%;
+      }
+
+      col.results {
+        width: 17%;
+      }
+
+      th,
+      td {
+        padding: 13px;
+        vertical-align: top;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }
+
+      th:last-child,
+      td:last-child {
+        border-right: 0;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        color: #cdeeff;
+        background: #10263b;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: #d3deeb;
+        background: #0a1523;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      tbody tr:nth-child(even) td {
+        background: #0d1928;
+      }
+
+      td strong,
+      td code {
+        overflow-wrap: anywhere;
+      }
+
+      td strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #f2f7ff;
+      }
+
+      code {
+        padding: 2px 5px;
+        border: 1px solid #334b66;
+        border-radius: 5px;
+        color: #7dd3fc;
+        background: #07111f;
+        font-size: 0.9em;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 4px;
+      }
+
+      .pass {
+        color: var(--green);
+      }
+
+      .warning {
+        color: var(--amber);
+      }
+
+      .danger {
+        color: var(--red);
+      }
+
+      .note {
+        margin: 13px 0 0;
+        padding: 10px 12px;
+        border-left: 3px solid var(--amber);
+        border-radius: 7px;
+        color: #d7e1ec;
+        background: #42200655;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      footer {
+        padding: 22px 4px 0;
+        color: var(--muted);
+        text-align: center;
+        font-size: 11px;
+      }
+
+      @media (max-width: 1000px) {
+        .summary {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (max-width: 620px) {
+        main {
+          width: min(100% - 18px, 1500px);
+          padding-top: 10px;
+        }
+
+        header,
+        section {
+          padding: 16px;
+          border-radius: 13px;
+        }
+
+        .summary {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .section-heading {
+          display: block;
+        }
+
+        .count {
+          display: inline-block;
+          margin-top: 9px;
+        }
+      }
+
+      @media print {
+        :root {
+          color-scheme: light;
+        }
+
+        body,
+        header,
+        section,
+        td,
+        tbody tr:nth-child(even) td {
+          color: #111827;
+          background: white;
+        }
+
+        main {
+          width: 100%;
+          padding: 0;
+        }
+
+        header,
+        section {
+          break-inside: avoid;
+          box-shadow: none;
+        }
+
+        .summary {
+          display: none;
+        }
+
+        th {
+          color: #111827;
+          background: #e5e7eb;
+        }
+
+        td,
+        th,
+        .table-wrap,
+        header,
+        section {
+          border-color: #9ca3af;
+        }
+
+        code {
+          color: #075985;
+          background: #f3f4f6;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">LUCKFOX AGV · PUBLICATION CAMPAIGN</p>
+        <div class="language-switch" aria-label="Language">
+          <a class="active" href="TestPlanning.html" lang="en">ENGLISH</a>
+          <a href="TestPlanning-ID.html" lang="id">INDONESIA</a>
+        </div>
+        <h1>Test Planning</h1>
+        <p class="lead">
+          Operator-facing plan for the Scopus Q3 experiment campaign. Every
+          table has the same five-column structure so the purpose, controlled
+          setup, execution steps, and required evidence can be checked before a
+          trial is finalized.
+        </p>
+
+        <nav class="summary" aria-label="Test sections">
+          <a href="#ground-truth"
+            ><small>01 · 10 placements</small><b>GROUND TRUTH</b></a
+          >
+          <a href="#route"><small>02 · 30 trials</small><b>ROUTE</b></a>
+          <a href="#kidnapped"><small>03 · 20 trials</small><b>KIDNAPPED</b></a>
+          <a href="#dynamic-occluded"
+            ><small>04 · 10 trials</small><b>DYNAMIC OCCLUDED</b></a
+          >
+          <a href="#ablation"
+            ><small>05 · ≥10 recordings</small><b>ABLATION</b></a
+          >
+          <a href="#resource"
+            ><small>06 · 15 intervals</small><b>RESOURCE</b></a
+          >
+        </nav>
+
+        <div class="workflow" aria-label="General workflow">
+          <span>0 PREFLIGHT</span> → <span>1 CREATE SESSION</span> →
+          <span>2 START CAPTURE</span> → <span>3 START MISSION</span> →
+          <span>4 EXECUTE TEST</span> → <span>5 STOP MISSION</span> →
+          <span>6 STOP CAPTURE</span> → <span>7 ANALYZE</span> →
+          <span>8 FINALIZE</span>
+        </div>
+      </header>
+
+      <section id="ground-truth">
+        <div class="section-heading">
+          <div>
+            <h2>01 — GROUND TRUTH</h2>
+            <p>
+              Quantifies placement repeatability so checkpoint error is not
+              reported as more precise than the physical reference permits.
+            </p>
+          </div>
+          <span class="count">1 SESSION · 10 PLACEMENTS</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Scenario / ID</th>
+                <th>Purpose</th>
+                <th>Setup &amp; Controls</th>
+                <th>Step-by-step Procedure</th>
+                <th>Evidence, Metrics &amp; Pass Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Ground-truth repeatability</strong>
+                  <code>GROUND_TRUTH_REPEAT</code><br />Condition:
+                  <code>nominal</code>
+                </td>
+                <td>
+                  Measure the uncertainty introduced when the robot is
+                  repeatedly placed on one surveyed floor marker.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      Eight surveyed markers remain fixed across both rooms.
+                    </li>
+                    <li>Select one marker for all ten placements.</li>
+                    <li>Do not change its X, Y, or yaw reference.</li>
+                    <li>
+                      Keep map, firmware, and localizer parameters frozen.
+                    </li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>
+                      Run preflight and create a
+                      <code>ground_truth</code> session.
+                    </li>
+                    <li>
+                      Start capture and mission; wait for a valid stable pose.
+                    </li>
+                    <li>
+                      Place the robot on the selected marker and record the
+                      placement.
+                    </li>
+                    <li>Remove the robot completely from the marker.</li>
+                    <li>Reposition it independently and record again.</li>
+                    <li>Repeat until exactly ten placements are stored.</li>
+                    <li>Stop, analyze, review, and finalize.</li>
+                  </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li>Exactly 10 valid placement records.</li>
+                    <li>Position spread.</li>
+                    <li>Heading spread.</li>
+                    <li>Declared ground-truth uncertainty.</li>
+                    <li class="pass">
+                      Pass: one unchanged marker reference is used throughout.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="route">
+        <div class="section-heading">
+          <div>
+            <h2>02 — ROUTE</h2>
+            <p>
+              Measures checkpoint localization accuracy on two frozen cross-room
+              routes. Dynamic occlusion is separated into its own controlled
+              test below.
+            </p>
+          </div>
+          <span class="count">30 TRIALS · 8 CHECKPOINTS/TRIAL</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Scenario / ID</th>
+                <th>Purpose</th>
+                <th>Setup &amp; Controls</th>
+                <th>Step-by-step Procedure</th>
+                <th>Evidence, Metrics &amp; Pass Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Nominal baseline</strong><code>nominal</code><br />5×
+                  R1 + 5× R2
+                </td>
+                <td>
+                  Establish baseline checkpoint localization accuracy in the
+                  unchanged rooms.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      <code>R1_ROOM_1_TO_2</code> and
+                      <code>R2_ROOM_2_TO_1</code>.
+                    </li>
+                    <li>
+                      Normal LiDAR view and original furniture arrangement.
+                    </li>
+                    <li>
+                      Same robot speed, map, parameters, and eight markers.
+                    </li>
+                  </ul>
+                </td>
+                <td rowspan="3">
+                  <ol>
+                    <li>Select the condition, route, and next trial number.</li>
+                    <li>
+                      Run preflight; create the session and start capture.
+                    </li>
+                    <li>
+                      Start mission and wait for stable <code>TRACKING</code>.
+                    </li>
+                    <li>Press <b>ROUTE START</b> at the starting marker.</li>
+                    <li>Drive the frozen route and stop at every marker.</li>
+                    <li>
+                      Select the correct reference and press
+                      <b>RECORD CHECKPOINT</b>.
+                    </li>
+                    <li>After all eight markers, press <b>ROUTE END</b>.</li>
+                    <li>
+                      Stop mission/capture, analyze, review, and finalize.
+                    </li>
+                    <li>Repeat five times per route for each condition.</li>
+                  </ol>
+                </td>
+                <td rowspan="3">
+                  <ul>
+                    <li>Position RMSE and heading RMSE.</li>
+                    <li>Median, P95, and maximum error.</li>
+                    <li>Checkpoint success rate.</li>
+                    <li>95% confidence interval.</li>
+                    <li>Raw scan and board telemetry.</li>
+                    <li class="pass">Pass: all 8 checkpoint records exist.</li>
+                    <li class="warning">
+                      Claim checkpoint accuracy, not trajectory accuracy.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Static LiDAR occlusion</strong
+                  ><code>lidar_occluded_90</code><br />5× R1 + 5× R2
+                </td>
+                <td>
+                  Measure degradation when a repeatable 90-degree LiDAR sector
+                  is blocked.
+                </td>
+                <td>
+                  <ul>
+                    <li>Use the same opaque, non-reflective cover.</li>
+                    <li>Block the same 90-degree sector in every trial.</li>
+                    <li>Do not move the cover during a trial.</li>
+                    <li>Keep the walking route and speed unchanged.</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Furniture changed</strong
+                  ><code>furniture_changed</code><br />5× R1 + 5× R2
+                </td>
+                <td>
+                  Measure robustness when visible room geometry differs from the
+                  frozen map.
+                </td>
+                <td>
+                  <ul>
+                    <li>Select one reproducible furniture arrangement.</li>
+                    <li>Mark the changed object positions on the floor.</li>
+                    <li>Use the same arrangement for all ten trials.</li>
+                    <li>Keep the route and marker references unchanged.</li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="kidnapped">
+        <div class="section-heading">
+          <div>
+            <h2>03 — KIDNAPPED</h2>
+            <p>
+              Measures global relocalization after the robot is manually moved
+              to an unknown pose. The destination reference is recorded by the
+              evaluator only and is never sent to the localizer.
+            </p>
+          </div>
+          <span class="count">20 TRIALS · 60-S TIMEOUT</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Scenario / ID</th>
+                <th>Purpose</th>
+                <th>Setup &amp; Controls</th>
+                <th>Step-by-step Procedure</th>
+                <th>Evidence, Metrics &amp; Pass Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Same-room relocation</strong
+                  ><code>KIDNAP_SAME_ROOM</code><br />10 trials
+                </td>
+                <td>
+                  Evaluate recovery after a moderate relocation within the
+                  current room.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      Preselect start marker A and destination marker B in one
+                      room.
+                    </li>
+                    <li>
+                      Freeze destination position and orientation for the trial
+                      set.
+                    </li>
+                  </ul>
+                </td>
+                <td rowspan="2">
+                  <ol>
+                    <li>
+                      Create a kidnapped session and start capture/mission.
+                    </li>
+                    <li>At A, wait until <code>TRACKING</code> is stable.</li>
+                    <li>Press <b>KIDNAP START</b>.</li>
+                    <li>
+                      Safely cover the LiDAR view; do not power the sensor off.
+                    </li>
+                    <li>
+                      Manually move the robot to marker B and set the planned
+                      yaw.
+                    </li>
+                    <li>Select B as evaluator ground truth only.</li>
+                    <li>
+                      Uncover LiDAR and press <b>KIDNAP RELEASE + REFERENCE</b>.
+                    </li>
+                    <li>
+                      Wait up to 60 seconds for global search and stable
+                      tracking.
+                    </li>
+                    <li>Record the final checkpoint, then stop and analyze.</li>
+                  </ol>
+                </td>
+                <td rowspan="2">
+                  <ul>
+                    <li>Relocalization success within 60 seconds.</li>
+                    <li>First scan after release.</li>
+                    <li>Median and P95 recovery time.</li>
+                    <li>Final position and heading error.</li>
+                    <li>Failure count and final score.</li>
+                    <li class="pass">
+                      Pass: one release event and one final checkpoint exist.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Cross-room relocation</strong
+                  ><code>KIDNAP_CROSS_ROOM</code><br />10 trials
+                </td>
+                <td>
+                  Evaluate the harder case where the robot is moved into the
+                  other room.
+                </td>
+                <td>
+                  <ul>
+                    <li>Place A and B in different rooms.</li>
+                    <li>
+                      Use the same destination marker/yaw plan across
+                      repetitions.
+                    </li>
+                    <li>Return the LiDAR view to normal before release.</li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">
+          Safety: <b>STOP MISSION</b> is not a mechanical emergency stop. Secure
+          the AGV against unintended motion before manually lifting or
+          relocating it.
+        </p>
+      </section>
+
+      <section id="dynamic-occluded">
+        <div class="section-heading">
+          <div>
+            <h2>04 — DYNAMIC OCCLUDED</h2>
+            <p>
+              Produces one simple, repeatable human-motion disturbance. One
+              person crosses the robot path at the same trigger point in every
+              trial.
+            </p>
+          </div>
+          <span class="count">10 TRIALS · 3 ± 0.5 S CROSSING</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Scenario / ID</th>
+                <th>Purpose</th>
+                <th>Setup &amp; Controls</th>
+                <th>Step-by-step Procedure</th>
+                <th>Evidence, Metrics &amp; Pass Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Person crossing</strong><code>dynamic_occluded</code
+                  ><br />5× R1 + 5× R2
+                </td>
+                <td>
+                  Measure checkpoint localization robustness during a short,
+                  controlled moving occlusion.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      Mark pedestrian endpoints <code>H1</code> and
+                      <code>H2</code>.
+                    </li>
+                    <li>Mark robot trigger point <code>T0</code>.</li>
+                    <li>H1–H2 crosses the robot route perpendicularly.</li>
+                    <li>Maintain at least 1 m separation.</li>
+                    <li>Use the same person and robot speed when possible.</li>
+                    <li>No other people may enter the test area.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Select <code>dynamic_occluded</code> and R1 or R2.</li>
+                    <li>
+                      Create the session, start capture/mission, and press
+                      <b>ROUTE START</b>.
+                    </li>
+                    <li>For R1, the person waits at H1; for R2, wait at H2.</li>
+                    <li>
+                      When the robot reaches T0, press <b>PERSON START</b> as
+                      crossing begins.
+                    </li>
+                    <li>Walk normally without stopping.</li>
+                    <li>At the opposite endpoint, press <b>PERSON END</b>.</li>
+                    <li>Confirm the displayed duration is 2.5–3.5 seconds.</li>
+                    <li>
+                      Record all eight checkpoints and finish the route
+                      normally.
+                    </li>
+                    <li>Repeat five times in each direction.</li>
+                  </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li><code>dynamic_occlusion.csv</code>.</li>
+                    <li>Crossing direction and duration.</li>
+                    <li>Scan count and accepted-scan rate during crossing.</li>
+                    <li>Localization score during crossing.</li>
+                    <li>Standard route accuracy metrics.</li>
+                    <li class="pass">
+                      Pass: exactly one START/END pair and 8 checkpoints.
+                    </li>
+                    <li class="danger">
+                      Repeat with a new session if duration or safety fails.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ablation">
+        <div class="section-heading">
+          <div>
+            <h2>05 — ABLATION</h2>
+            <p>
+              Replays identical raw scans through four matcher configurations.
+              No new physical movement, board capture, or Python pipeline is
+              required.
+            </p>
+          </div>
+          <span class="count">≥10 SOURCE RECORDINGS · 4 VARIANTS</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Scenario / ID</th>
+                <th>Purpose</th>
+                <th>Setup &amp; Controls</th>
+                <th>Step-by-step Procedure</th>
+                <th>Evidence, Metrics &amp; Pass Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Local only</strong><code>local_only</code></td>
+                <td>Baseline without global-search recovery.</td>
+                <td rowspan="4">
+                  <ul>
+                    <li>
+                      Select at least ten finalized route/kidnapped recordings.
+                    </li>
+                    <li>
+                      Include nominal, static occlusion, furniture change,
+                      dynamic occlusion, and kidnapped evidence.
+                    </li>
+                    <li>
+                      Use the same raw scan and map for all four variants.
+                    </li>
+                    <li>Change only the component named by the variant.</li>
+                  </ul>
+                </td>
+                <td rowspan="4">
+                  <ol>
+                    <li>
+                      Select a finalized source recording containing raw scans.
+                    </li>
+                    <li>Create an <code>ablation</code> session.</li>
+                    <li>Press <b>RUN ABLATION REPLAY</b>.</li>
+                    <li>BE runs all four existing C++ replay modes.</li>
+                    <li>Confirm four replay JSONL files were created.</li>
+                    <li>Analyze and compare all variants.</li>
+                    <li>
+                      Review the report, finalize, then repeat for the next
+                      source.
+                    </li>
+                  </ol>
+                </td>
+                <td rowspan="4">
+                  <ul>
+                    <li>Success rate.</li>
+                    <li>Mean/P95 execution time.</li>
+                    <li>Recovery time.</li>
+                    <li>Final position and heading error.</li>
+                    <li><code>tables/ablation.csv</code>.</li>
+                    <li class="pass">
+                      Pass: all four replay outputs use the same source hash.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Local + global</strong><code>local_global</code>
+                </td>
+                <td>
+                  Shows the contribution of existing global relocalization.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Single resolution</strong
+                  ><code>single_resolution</code>
+                </td>
+                <td>Baseline without multi-resolution search.</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Multi resolution</strong><code>multi_resolution</code>
+                </td>
+                <td>
+                  Shows the contribution of existing multi-resolution search.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="resource">
+        <div class="section-heading">
+          <div>
+            <h2>06 — RESOURCE</h2>
+            <p>
+              Measures computational feasibility using telemetry generated
+              directly by the RV1106 application. Only computational-resource
+              metrics are collected.
+            </p>
+          </div>
+          <span class="count">15 INTERVALS · 60 S EACH</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Scenario / ID</th>
+                <th>Purpose</th>
+                <th>Setup &amp; Controls</th>
+                <th>Step-by-step Procedure</th>
+                <th>Evidence, Metrics &amp; Pass Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Idle</strong><code>idle</code><br />5 repetitions
+                </td>
+                <td>
+                  Measure process CPU and memory while mission and LiDAR
+                  processing are stopped.
+                </td>
+                <td>
+                  <ul>
+                    <li>Capture active.</li>
+                    <li>Mission stopped.</li>
+                    <li>No other experiment process running.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Select repetition 1–5.</li>
+                    <li>Confirm mission is stopped.</li>
+                    <li>Press <b>IDLE START</b> and run for 60 seconds.</li>
+                    <li>Press <b>IDLE END</b>.</li>
+                    <li>Repeat five times.</li>
+                  </ol>
+                </td>
+                <td rowspan="3">
+                  <ul>
+                    <li>CPU usage.</li>
+                    <li>RAM/RSS and peak RAM/RSS.</li>
+                    <li>Processing time per scan.</li>
+                    <li>Scan/update rate.</li>
+                    <li>Binary size.</li>
+                    <li>Recorded interval durations.</li>
+                    <li class="pass">
+                      Pass: 5 complete intervals/state, each 55–65 seconds.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Normal tracking</strong><code>normal_tracking</code
+                  ><br />5 repetitions
+                </td>
+                <td>
+                  Measure steady-state localization cost during normal tracking.
+                </td>
+                <td>
+                  <ul>
+                    <li>Mission running.</li>
+                    <li>Pose stable in <code>TRACKING</code>.</li>
+                    <li>Nominal LiDAR and room condition.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Select repetition 1–5 and start mission.</li>
+                    <li>Wait for stable <code>TRACKING</code>.</li>
+                    <li>Press <b>NORMAL TRACKING START</b>.</li>
+                    <li>Continue normal localization for 60 seconds.</li>
+                    <li>
+                      Press <b>NORMAL TRACKING END</b>; repeat five times.
+                    </li>
+                  </ol>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Global relocalization</strong
+                  ><code>global_relocalization</code><br />5 repetitions
+                </td>
+                <td>
+                  Measure the highest-cost recovery state during global search.
+                </td>
+                <td>
+                  <ul>
+                    <li>Mission running.</li>
+                    <li>
+                      Trigger global search using the same safe method each
+                      time.
+                    </li>
+                    <li>Keep the map and search parameters frozen.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Select repetition 1–5.</li>
+                    <li>Trigger global relocalization.</li>
+                    <li>Press <b>GLOBAL RELOCALIZATION START</b>.</li>
+                    <li>
+                      Record for 60 seconds, including recovery if it occurs.
+                    </li>
+                    <li>
+                      Press <b>GLOBAL RELOCALIZATION END</b>; repeat five times.
+                    </li>
+                  </ol>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        Source of truth: EXPERIMENTS/INSTRUKSI.md · Output root:
+        EXPERIMENTS/Ouputs
+      </footer>
+    </main>
+  </body>
+</html>

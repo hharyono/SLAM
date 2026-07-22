@@ -13,7 +13,10 @@
         "HTTP_PORT": "8080",
         "ROBOT_TCP_PORT": "42000",
         "MAP_DIR": "${workspaceFolder}/maps",
-        "MAP_NAME": "ruang_utama"
+        "MAP_NAME": "ruang_utama",
+        "EXPERIMENT_OUTPUT_DIR": "${workspaceFolder}/EXPERIMENTS/Ouputs",
+        "BOARD_SSH_TARGET": "root@192.168.1.24",
+        "BOARD_SSH_KEY": "/root/.ssh/luckfox_experiment_ed25519"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**", "${workspaceFolder}/**/node_modules/**"]

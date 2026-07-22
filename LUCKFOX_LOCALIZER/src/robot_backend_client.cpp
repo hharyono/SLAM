@@ -88,7 +88,7 @@ bool InstallMap(const std::uint8_t* payload, std::uint32_t length,
 struct RobotBackendClient::Impl {
   explicit Impl(RobotBackendConfig value) : config(std::move(value)) {}
   RobotBackendConfig config; int fd = -1; std::thread worker; std::mutex mutex;
-  LocalizationResult pose; float power = -1.0F, voltage = 0.0F;
+  LocalizationResult pose;
   bool mission_running = false;
   std::function<void(MissionCommand)> callback; std::atomic<bool> running{false};
   std::function<bool(const std::string&)> map_installed_callback;
@@ -116,14 +116,15 @@ void RobotBackendClient::Start() {
         impl_->incoming.clear();
       }
 
-      LocalizationResult pose; float power, voltage; bool mission_running;
-      { std::lock_guard<std::mutex> lock(impl_->mutex); pose=impl_->pose; power=impl_->power;
-        voltage=impl_->voltage; mission_running=impl_->mission_running; }
+      LocalizationResult pose; bool mission_running;
+      { std::lock_guard<std::mutex> lock(impl_->mutex); pose=impl_->pose;
+        mission_running=impl_->mission_running; }
       auto frame = Header(kStatus, kStatusSize, ++impl_->sequence);
       char id[32]{}; std::strncpy(id, impl_->config.robot_id.c_str(), sizeof(id)-1);
       frame.insert(frame.end(), id, id + sizeof(id)); Put64(frame, NowMs());
       PutFloat(frame, pose.pose.x); PutFloat(frame, pose.pose.y); PutFloat(frame, pose.pose.yaw);
-      PutFloat(frame, pose.score); PutFloat(frame, power); PutFloat(frame, voltage);
+      // Keep both legacy float slots reserved so AGV1 v1 remains 70 bytes.
+      PutFloat(frame, pose.score); PutFloat(frame, 0.0F); PutFloat(frame, 0.0F);
       frame.push_back(pose.valid ? 1 : 0); frame.push_back(pose.global_search ? 1 : 0);
       frame.push_back(mission_running ? 1 : 0); frame.insert(frame.end(), 3, 0);
       if (!SendAll(impl_->fd, frame)) { close(impl_->fd); impl_->fd=-1; continue; }
@@ -175,7 +176,6 @@ void RobotBackendClient::Stop() noexcept {
   impl_->fd = -1;
 }
 void RobotBackendClient::UpdatePose(const LocalizationResult& value){std::lock_guard<std::mutex>l(impl_->mutex);impl_->pose=value;}
-void RobotBackendClient::UpdatePower(float percent,float voltage){std::lock_guard<std::mutex>l(impl_->mutex);impl_->power=percent;impl_->voltage=voltage;}
 void RobotBackendClient::UpdateMissionRunning(bool running){std::lock_guard<std::mutex>l(impl_->mutex);impl_->mission_running=running;}
 void RobotBackendClient::SetMissionCallback(std::function<void(MissionCommand)> value){std::lock_guard<std::mutex>l(impl_->mutex);impl_->callback=std::move(value);}
 void RobotBackendClient::SetMapInstalledCallback(

@@ -51,7 +51,7 @@ struct CapturedScan {
 class UartLocalizer {
  public:
   UartLocalizer(SlamMap map, UartLidarConfig lidar,
-                SearchOptions search = {});
+                SearchOptions search = {}, StateOptions state = {});
   ~UartLocalizer();
 
   UartLocalizer(const UartLocalizer&) = delete;

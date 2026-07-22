@@ -34,6 +34,50 @@ int main() {
   assert(result.valid);
   assert(std::fabs(result.pose.x - truth.x) < 0.06F);
   assert(std::fabs(result.pose.y - truth.y) < 0.06F);
+  auto single_resolution = options;
+  single_resolution.use_multi_resolution = false;
+  const auto single_result = luckfox::Localize(
+      loaded, scan, {0.3F, 0.2F, 0.0F}, single_resolution);
+  assert(single_result.valid);
+
+  luckfox::StateOptions state_options;
+  state_options.lost_after_rejections = 2;
+  state_options.recovery_confirmations = 2;
+  luckfox::PoseTracker tracker(options, state_options);
+  auto tracked = tracker.Update(loaded, scan);
+  assert(tracked.valid);
+  assert(tracked.state == luckfox::LocalizationState::Recovered);
+  tracked = tracker.Update(loaded, scan);
+  assert(tracked.state == luckfox::LocalizationState::Recovered);
+  tracked = tracker.Update(loaded, scan);
+  assert(tracked.state == luckfox::LocalizationState::Tracking);
+
+  const std::vector<luckfox::Point2f> invalid_scan{
+      {100.0F, 100.0F}, {101.0F, 100.0F}, {100.0F, 101.0F}};
+  tracked = tracker.Update(loaded, invalid_scan);
+  assert(!tracked.valid);
+  assert(tracked.state == luckfox::LocalizationState::Degraded);
+  tracked = tracker.Update(loaded, invalid_scan);
+  assert(tracked.state == luckfox::LocalizationState::Lost);
+  assert(!tracker.has_pose());
+  tracked = tracker.Update(loaded, scan);
+  assert(tracked.valid);
+  assert(tracked.global_search);
+  assert(tracked.state == luckfox::LocalizationState::Recovered);
+  assert(std::string(luckfox::LocalizationStateName(tracked.state)) == "RECOVERED");
+
+  auto local_only_state = state_options;
+  local_only_state.enable_global_relocalization = false;
+  luckfox::PoseTracker local_only_tracker(options, local_only_state);
+  local_only_tracker.Update(loaded, scan);
+  local_only_tracker.Update(loaded, scan);
+  local_only_tracker.Update(loaded, scan);
+  local_only_tracker.Update(loaded, invalid_scan);
+  const auto local_only_lost = local_only_tracker.Update(loaded, invalid_scan);
+  assert(local_only_lost.state == luckfox::LocalizationState::Lost);
+  assert(local_only_tracker.has_pose());
+  const auto local_only_retry = local_only_tracker.Update(loaded, scan);
+  assert(!local_only_retry.global_search);
   std::remove(path);
   std::cout << "map_tests passed\n";
 }

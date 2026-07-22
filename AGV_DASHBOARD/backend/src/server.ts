@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
+import { ExperimentManager, type CreateSessionInput } from './experiments.js';
 
 type Pose = {
   x: number;
@@ -16,17 +17,12 @@ type Pose = {
   valid: boolean;
   mode: 'global' | 'tracking';
 };
-type Power = {
-  percent: number;
-  voltage: number;
-};
 type RobotStatus = {
   type: 'robot_status';
   robot_id: string;
   seq: number;
   timestamp_ms: number;
   pose: Pose;
-  power: Power;
   mission_running: boolean;
   online: boolean;
   received_ms: number;
@@ -49,6 +45,7 @@ const robotPort = Number(process.env.ROBOT_TCP_PORT || 42000);
 const mapBridgePort = Number(process.env.MAP_BRIDGE_TCP_PORT || 42020);
 const httpPort = Number(process.env.HTTP_PORT || 8080);
 const offlineMs = Number(process.env.ROBOT_OFFLINE_MS || 1500);
+const robotArrivalLog = process.env.ROBOT_ARRIVAL_LOG;
 const PROTOCOL_MAGIC = 0x41475631; // ASCII: AGV1
 const PROTOCOL_VERSION = 1;
 const FRAME_HEADER_BYTES = 16;
@@ -74,6 +71,10 @@ const execFileAsync = promisify(execFile);
 const mapperScript = path.join(root, 'MAPPER/Config/mapper');
 const saveMapScript = path.join(root, 'LUCKFOX_LOCALIZER/scripts/save_and_convert_map.sh');
 const portProxyScript = path.join(root, 'AGV_DASHBOARD/scripts/setup-wsl-portproxy.ps1');
+const experimentOutputDir =
+  process.env.EXPERIMENT_OUTPUT_DIR || path.join(root, 'EXPERIMENTS', 'Ouputs');
+const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.24';
+const boardSshKey = process.env.BOARD_SSH_KEY || '/root/.ssh/luckfox_experiment_ed25519';
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 let lastSavedMap: string | undefined;
@@ -99,7 +100,7 @@ function ensureWslPortProxy(): void {
   const distro = process.env.WSL_DISTRO_NAME || 'Ubuntu2204ArduP';
   const powershell = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
   if (!fs.existsSync(powershell) || !fs.existsSync(portProxyScript)) {
-    console.warn('WSL portproxy helper tidak ditemukan; board mungkin tidak dapat terhubung.');
+    console.warn('WSL portproxy helper not found; the board may be unable to connect.');
     return;
   }
 
@@ -111,7 +112,7 @@ function ensureWslPortProxy(): void {
     (error, stdout, stderr) => {
       const output = `${stdout}${stderr}`.trim();
       if (output) console.log(`WSL portproxy: ${output}`);
-      if (error) console.warn(`WSL portproxy gagal: ${error.message}`);
+      if (error) console.warn(`WSL portproxy failed: ${error.message}`);
     },
   );
 }
@@ -124,8 +125,15 @@ function broadcastToDashboards(message: unknown): void {
     }
   }
 }
-function parseYamlMap(): MapMetadata {
-  const yaml = fs.readFileSync(path.join(mapDir, `${mapName}.yaml`), 'utf8');
+const experiments = new ExperimentManager({
+  repoRoot: root,
+  outputRoot: experimentOutputDir,
+  boardSshTarget,
+  boardSshKey,
+  notify: (session) => broadcastToDashboards({ type: 'experiment_session', data: session }),
+});
+function parseYamlMap(name = mapName): MapMetadata {
+  const yaml = fs.readFileSync(path.join(mapDir, `${name}.yaml`), 'utf8');
   const number = (key: string): number =>
     Number(yaml.match(new RegExp(`^${key}:\\s*([^#\\n]+)`, 'm'))?.[1]);
   const origin = yaml
@@ -133,13 +141,13 @@ function parseYamlMap(): MapMetadata {
     .split(',')
     .map(Number);
   return {
-    map_id: mapName,
+    map_id: name,
     resolution: number('resolution'),
     origin: { x: origin?.[0] ?? 0, y: origin?.[1] ?? 0, yaw: origin?.[2] ?? 0 },
   };
 }
-function parsePgm(): { width: number; height: number; pixels: string } {
-  const bytes = fs.readFileSync(path.join(mapDir, `${mapName}.pgm`));
+function parsePgm(name = mapName): { width: number; height: number; pixels: string } {
+  const bytes = fs.readFileSync(path.join(mapDir, `${name}.pgm`));
   let offset = 0;
   const tokens: string[] = [];
   while (tokens.length < 4) {
@@ -227,14 +235,24 @@ function decodeRobotStatus(payload: Buffer, sequence: number): RobotStatus {
       valid: payload.readUInt8(64) === 1,
       mode: payload.readUInt8(65) === 1 ? 'global' : 'tracking',
     },
-    power: {
-      percent: payload.readFloatBE(56),
-      voltage: payload.readFloatBE(60),
-    },
     mission_running: payload.readUInt8(66) === 1,
     online: true,
     received_ms: Date.now(),
   };
+}
+
+function logRobotArrival(status: RobotStatus): void {
+  if (!robotArrivalLog) return;
+  fs.appendFileSync(
+    robotArrivalLog,
+    `${JSON.stringify({
+      schema: 'luckfox.backend.arrival.v1',
+      robot_id: status.robot_id,
+      sequence: status.seq,
+      robot_timestamp_ms: status.timestamp_ms,
+      backend_received_unix_ms: status.received_ms,
+    })}\n`,
+  );
 }
 
 app.get('/api/map', (_req, res) => {
@@ -255,8 +273,128 @@ app.post('/api/robots/:id/mission/:action', (req, res) => {
 
   const commandName = command === MissionCommand.Start ? 'START_MISSION' : 'STOP_MISSION';
   const commandId = sendMissionCommand(robot, command);
+  experiments.RecordSystemEvent(
+    command === MissionCommand.Start ? 'MISSION_START_SENT' : 'MISSION_STOP_SENT',
+    { robot_id: req.params.id, command_id: commandId },
+  );
   broadcastToDashboards({ type: 'command_sent', robot_id: req.params.id, command: commandName });
   return res.status(202).json({ accepted: true, command: commandName, command_id: commandId });
+});
+
+app.get('/api/experiments', (_req, res) => res.json(experiments.List()));
+app.get('/api/experiments/active', (_req, res) => res.json(experiments.GetActive() ?? null));
+app.get('/api/experiments/preflight', async (_req, res) => {
+  try {
+    res.json(await experiments.Preflight());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/ros/:action', async (req, res) => {
+  if (req.params.action !== 'start' && req.params.action !== 'stop')
+    return res.status(400).json({ error: 'ROS action must be start or stop' });
+  try {
+    const output = await runRootCommand(mapperScript, [
+      req.params.action === 'start' ? 'start-remote' : 'stop',
+    ]);
+    experiments.RecordSystemEvent(req.params.action === 'start' ? 'NOTE' : 'NOTE', {
+      ros_remote_stack: req.params.action,
+    });
+    return res.json({ state: req.params.action === 'start' ? 'running' : 'stopped', output });
+  } catch (error) {
+    return res.status(500).json({ error: (error as Error).message });
+  }
+});
+app.get('/api/experiments/:id', (req, res) => {
+  try {
+    res.json(experiments.Get(req.params.id));
+  } catch (error) {
+    res.status(404).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments', (req, res) => {
+  try {
+    res.status(201).json(experiments.Create(req.body as CreateSessionInput));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/start', async (req, res) => {
+  try {
+    res.json(await experiments.Start(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/event', (req, res) => {
+  try {
+    res.json(experiments.RecordEvent(req.params.id, req.body as Record<string, unknown>));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/checkpoint', (req, res) => {
+  try {
+    const session = experiments.Get(req.params.id);
+    res.json(
+      experiments.RecordCheckpoint(
+        req.params.id,
+        req.body as Record<string, unknown>,
+        robots.get(session.robot_id)?.status,
+      ),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/ablation', async (req, res) => {
+  try {
+    res.json(await experiments.RunAblation(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/stop', async (req, res) => {
+  try {
+    const session = experiments.Get(req.params.id);
+    const robot = robots.get(session.robot_id);
+    if (robot?.status.mission_running) {
+      const commandId = sendMissionCommand(robot, MissionCommand.Stop);
+      experiments.RecordSystemEvent('MISSION_STOP_SENT', { command_id: commandId });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    res.json(await experiments.Stop(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/analyze', (req, res) => {
+  try {
+    res.json(experiments.Analyze(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/finalize', (req, res) => {
+  try {
+    res.json(experiments.Finalize(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+app.get('/api/experiments/:id/report', (req, res) => {
+  try {
+    res.json(experiments.Report(req.params.id));
+  } catch (error) {
+    res.status(404).json({ error: (error as Error).message });
+  }
+});
+app.get('/api/experiments/:id/download', (req, res) => {
+  try {
+    res.download(experiments.ResolveDownload(req.params.id, String(req.query.path || '')));
+  } catch (error) {
+    res.status(404).json({ error: (error as Error).message });
+  }
 });
 
 app.get('/api/mapping/status', (_req, res) => {
@@ -327,9 +465,12 @@ app.post('/api/mapping/save', async (req, res) => {
   broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
   try {
     const output = await runRootCommand(saveMapScript, [mapName]);
+    const alignedMap = { ...parseYamlMap(mapName), ...parsePgm(mapName) };
+    liveMap = alignedMap;
     mappingState = 'running';
     lastSavedMap = mapName;
     broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
+    broadcastToDashboards({ type: 'mapping_map', data: alignedMap });
     broadcastToDashboards({ type: 'map_saved', data: { name: mapName } });
     return res.json({ state: mappingState, name: mapName, output });
   } catch (error) {
@@ -369,10 +510,20 @@ const robotServer = net.createServer((socket) => {
       const payload = incoming.subarray(FRAME_HEADER_BYTES, FRAME_HEADER_BYTES + payloadLength);
       if (type === FrameType.Status && payloadLength === STATUS_PAYLOAD_BYTES) {
         const status = decodeRobotStatus(payload, sequence);
+        logRobotArrival(status);
+        experiments.RecordStatus(status);
+        if (!robotId)
+          experiments.RecordSystemEvent('ROBOT_CONNECTED', { robot_id: status.robot_id });
         robotId = status.robot_id;
         robots.set(robotId, { status, socket });
         broadcastToDashboards({ type: 'robot_status', data: status });
       } else if (type === FrameType.Acknowledgement && payloadLength === COMMAND_PAYLOAD_BYTES) {
+        experiments.RecordSystemEvent('MISSION_ACK', {
+          robot_id: robotId,
+          command: payload.readUInt8(0) === MissionCommand.Start ? 'START_MISSION' : 'STOP_MISSION',
+          command_id: payload.readUInt32BE(4),
+          sequence,
+        });
         broadcastToDashboards({
           type: 'command_ack',
           data: {
@@ -397,6 +548,7 @@ const robotServer = net.createServer((socket) => {
     }
   });
   socket.on('close', () => {
+    experiments.RecordSystemEvent('ROBOT_DISCONNECTED', { robot_id: robotId });
     if (robotId && robots.get(robotId)?.socket === socket) {
       const robot = robots.get(robotId)!;
       robot.status.online = false;

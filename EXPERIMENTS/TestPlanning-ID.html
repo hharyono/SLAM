@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Luckfox AGV — Perencanaan Pengujian</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: #e5edf8;
+        background: #07101c;
+        --panel: #0d1928;
+        --soft: #101f31;
+        --border: #263b54;
+        --muted: #99a9bd;
+        --blue: #38bdf8;
+        --green: #4ade80;
+        --amber: #fbbf24;
+        --red: #fb7185;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 20% 0%, #15345a 0, transparent 32rem),
+          linear-gradient(180deg, #07101c, #050b13);
+      }
+      main {
+        width: min(1500px, calc(100% - 32px));
+        margin: auto;
+        padding: 32px 0 64px;
+      }
+      header,
+      section {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        box-shadow: 0 18px 50px #0005;
+      }
+      header {
+        padding: 28px;
+      }
+      .eyebrow {
+        margin: 0;
+        color: var(--blue);
+        font:
+          700 12px ui-monospace,
+          monospace;
+        letter-spacing: 0.18em;
+      }
+      .language-switch {
+        display: flex;
+        gap: 7px;
+        margin-top: 12px;
+      }
+      .language-switch a {
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--muted);
+        background: #07111f;
+        font-size: 11px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .language-switch a.active {
+        color: #dff5ff;
+        border-color: #38bdf888;
+        background: #07598588;
+      }
+      h1 {
+        margin: 8px 0 10px;
+        font-size: clamp(28px, 4vw, 46px);
+        line-height: 1.08;
+      }
+      .lead {
+        max-width: 920px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(120px, 1fr));
+        gap: 9px;
+        margin-top: 22px;
+      }
+      .summary a {
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        color: #d9e8f8;
+        background: var(--soft);
+        text-decoration: none;
+      }
+      .summary small,
+      .summary b {
+        display: block;
+      }
+      .summary small {
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .summary b {
+        font-size: 13px;
+      }
+      .workflow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 7px;
+        margin-top: 18px;
+        color: var(--muted);
+        font:
+          700 11px ui-monospace,
+          monospace;
+      }
+      .workflow span {
+        padding: 7px 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: #dbeafe;
+        background: #07111f;
+      }
+      section {
+        margin-top: 18px;
+        padding: 22px;
+        scroll-margin-top: 14px;
+      }
+      .section-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+      }
+      .section-heading h2 {
+        margin: 0 0 5px;
+        font-size: 22px;
+      }
+      .section-heading p {
+        max-width: 850px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .count {
+        flex: 0 0 auto;
+        padding: 7px 10px;
+        border: 1px solid #38bdf866;
+        border-radius: 999px;
+        color: #bdeaff;
+        background: #07598555;
+        font:
+          700 11px ui-monospace,
+          monospace;
+      }
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      table {
+        width: 100%;
+        min-width: 1180px;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      col.scenario {
+        width: 15%;
+      }
+      col.purpose {
+        width: 18%;
+      }
+      col.setup {
+        width: 22%;
+      }
+      col.steps {
+        width: 28%;
+      }
+      col.results {
+        width: 17%;
+      }
+      th,
+      td {
+        padding: 13px;
+        vertical-align: top;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }
+      th:last-child,
+      td:last-child {
+        border-right: 0;
+      }
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        color: #cdeeff;
+        background: #10263b;
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      td {
+        color: #d3deeb;
+        background: #0a1523;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      tbody tr:nth-child(even) td {
+        background: #0d1928;
+      }
+      td strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #f2f7ff;
+      }
+      code {
+        padding: 2px 5px;
+        border: 1px solid #334b66;
+        border-radius: 5px;
+        color: #7dd3fc;
+        background: #07111f;
+        font-size: 0.9em;
+        overflow-wrap: anywhere;
+      }
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 18px;
+      }
+      li + li {
+        margin-top: 4px;
+      }
+      .pass {
+        color: var(--green);
+      }
+      .warning {
+        color: var(--amber);
+      }
+      .danger {
+        color: var(--red);
+      }
+      .note {
+        margin: 13px 0 0;
+        padding: 10px 12px;
+        border-left: 3px solid var(--amber);
+        border-radius: 7px;
+        color: #d7e1ec;
+        background: #42200655;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      footer {
+        padding: 22px 4px 0;
+        color: var(--muted);
+        text-align: center;
+        font-size: 11px;
+      }
+      @media (max-width: 1000px) {
+        .summary {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 620px) {
+        main {
+          width: calc(100% - 18px);
+          padding-top: 10px;
+        }
+        header,
+        section {
+          padding: 16px;
+          border-radius: 13px;
+        }
+        .summary {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .section-heading {
+          display: block;
+        }
+        .count {
+          display: inline-block;
+          margin-top: 9px;
+        }
+      }
+      @media print {
+        :root {
+          color-scheme: light;
+        }
+        body,
+        header,
+        section,
+        td,
+        tbody tr:nth-child(even) td {
+          color: #111827;
+          background: white;
+        }
+        main {
+          width: 100%;
+          padding: 0;
+        }
+        header,
+        section {
+          break-inside: avoid;
+          box-shadow: none;
+        }
+        .summary {
+          display: none;
+        }
+        th {
+          color: #111827;
+          background: #e5e7eb;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">LUCKFOX AGV · CAMPAIGN PUBLIKASI</p>
+        <div class="language-switch" aria-label="Pilihan bahasa">
+          <a href="TestPlanning.html" lang="en">ENGLISH</a>
+          <a class="active" href="TestPlanning-ID.html" lang="id">INDONESIA</a>
+        </div>
+        <h1>Perencanaan Pengujian</h1>
+        <p class="lead">
+          Panduan operator untuk campaign eksperimen Scopus Q3. Seluruh tabel
+          menggunakan lima kolom yang sama agar tujuan, setup terkendali,
+          langkah pelaksanaan, serta bukti yang wajib tersedia dapat diperiksa
+          sebelum trial difinalisasi.
+        </p>
+        <nav class="summary" aria-label="Bagian pengujian">
+          <a href="#ground-truth"
+            ><small>01 · 10 placement</small><b>GROUND TRUTH</b></a
+          >
+          <a href="#route"><small>02 · 30 trial</small><b>ROUTE</b></a>
+          <a href="#kidnapped"><small>03 · 20 trial</small><b>KIDNAPPED</b></a>
+          <a href="#dynamic-occluded"
+            ><small>04 · 10 trial</small><b>DYNAMIC OCCLUDED</b></a
+          >
+          <a href="#ablation"><small>05 · ≥10 rekaman</small><b>ABLATION</b></a>
+          <a href="#resource"><small>06 · 15 interval</small><b>RESOURCE</b></a>
+        </nav>
+        <div class="workflow" aria-label="Alur umum">
+          <span>0 PREFLIGHT</span> → <span>1 CREATE SESSION</span> →
+          <span>2 START CAPTURE</span> → <span>3 START MISSION</span> →
+          <span>4 EXECUTE TEST</span> → <span>5 STOP MISSION</span> →
+          <span>6 STOP CAPTURE</span> → <span>7 ANALYZE</span> →
+          <span>8 FINALIZE</span>
+        </div>
+      </header>
+
+      <section id="ground-truth">
+        <div class="section-heading">
+          <div>
+            <h2>01 — GROUND TRUTH</h2>
+            <p>
+              Mengukur repeatability penempatan robot agar error checkpoint
+              tidak dilaporkan lebih presisi daripada kemampuan referensi
+              fisiknya.
+            </p>
+          </div>
+          <span class="count">1 SESSION · 10 PLACEMENT</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Skenario / ID</th>
+                <th>Tujuan</th>
+                <th>Setup &amp; Kontrol</th>
+                <th>Langkah Pengujian</th>
+                <th>Bukti, Metrik &amp; Kriteria Lulus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Repeatability ground truth</strong
+                  ><code>GROUND_TRUTH_REPEAT</code><br />
+                  Kondisi: <code>nominal</code>
+                </td>
+                <td>
+                  Mengukur ketidakpastian yang muncul ketika robot berulang kali
+                  diletakkan pada satu marker lantai yang sudah disurvei.
+                </td>
+                <td>
+                  <ul>
+                    <li>Delapan marker tetap tersebar pada dua ruangan.</li>
+                    <li>Pilih satu marker untuk seluruh placement.</li>
+                    <li>Jangan mengubah referensi X, Y, dan yaw marker.</li>
+                    <li>Map, firmware, dan parameter localizer harus tetap.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>
+                      Jalankan preflight dan buat session
+                      <code>ground_truth</code>.
+                    </li>
+                    <li>
+                      Mulai capture/mission dan tunggu pose valid yang stabil.
+                    </li>
+                    <li>Letakkan robot pada marker lalu rekam placement.</li>
+                    <li>Angkat atau pindahkan robot sepenuhnya dari marker.</li>
+                    <li>Letakkan kembali secara independen dan rekam lagi.</li>
+                    <li>Ulangi sampai tepat sepuluh placement.</li>
+                    <li>Stop, analyze, review, lalu finalize.</li>
+                  </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li>Tepat 10 record placement valid.</li>
+                    <li>Sebaran posisi dan heading.</li>
+                    <li>Ketidakpastian ground truth.</li>
+                    <li class="pass">
+                      Lulus: hanya satu referensi marker yang digunakan.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="route">
+        <div class="section-heading">
+          <div>
+            <h2>02 — ROUTE</h2>
+            <p>
+              Mengukur checkpoint localization accuracy pada dua rute
+              antarruangan yang dibekukan. Dynamic occlusion ditempatkan pada
+              pengujian tersendiri di bagian berikutnya.
+            </p>
+          </div>
+          <span class="count">30 TRIAL · 8 CHECKPOINT/TRIAL</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Skenario / ID</th>
+                <th>Tujuan</th>
+                <th>Setup &amp; Kontrol</th>
+                <th>Langkah Pengujian</th>
+                <th>Bukti, Metrik &amp; Kriteria Lulus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Baseline nominal</strong><code>nominal</code><br />5×
+                  R1 + 5× R2
+                </td>
+                <td>
+                  Menetapkan baseline akurasi checkpoint pada kondisi ruangan
+                  normal.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      <code>R1_ROOM_1_TO_2</code> dan
+                      <code>R2_ROOM_2_TO_1</code>.
+                    </li>
+                    <li>
+                      Pandangan LiDAR normal dan furnitur pada posisi awal.
+                    </li>
+                    <li>
+                      Kecepatan robot, map, parameter, dan marker tetap sama.
+                    </li>
+                  </ul>
+                </td>
+                <td rowspan="3">
+                  <ol>
+                    <li>Pilih condition, route, dan nomor trial berikutnya.</li>
+                    <li>
+                      Jalankan preflight, buat session, dan mulai capture.
+                    </li>
+                    <li>
+                      Start mission lalu tunggu <code>TRACKING</code> stabil.
+                    </li>
+                    <li>Tekan <b>ROUTE START</b> pada marker awal.</li>
+                    <li>Jalankan rute tetap dan berhenti di setiap marker.</li>
+                    <li>
+                      Pilih referensi yang benar lalu tekan
+                      <b>RECORD CHECKPOINT</b>.
+                    </li>
+                    <li>Setelah delapan marker, tekan <b>ROUTE END</b>.</li>
+                    <li>
+                      Stop mission/capture, analyze, review, dan finalize.
+                    </li>
+                    <li>Ulangi lima kali per rute untuk setiap condition.</li>
+                  </ol>
+                </td>
+                <td rowspan="3">
+                  <ul>
+                    <li>Position dan heading RMSE.</li>
+                    <li>Median, P95, dan maximum error.</li>
+                    <li>Checkpoint success rate.</li>
+                    <li>95% confidence interval.</li>
+                    <li>Raw scan dan telemetry board.</li>
+                    <li class="pass">Lulus: tersedia 8 record checkpoint.</li>
+                    <li class="warning">Klaim hanya checkpoint accuracy.</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Occlusion LiDAR statis</strong
+                  ><code>lidar_occluded_90</code><br />5× R1 + 5× R2
+                </td>
+                <td>
+                  Mengukur penurunan akurasi ketika sektor LiDAR 90° ditutup
+                  secara tetap.
+                </td>
+                <td>
+                  <ul>
+                    <li>Gunakan penutup opaque non-reflektif yang sama.</li>
+                    <li>Tutup sektor 90° yang sama pada setiap trial.</li>
+                    <li>Penutup tidak boleh bergerak selama trial.</li>
+                    <li>Rute dan kecepatan robot tidak berubah.</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Susunan furnitur berubah</strong
+                  ><code>furniture_changed</code><br />5× R1 + 5× R2
+                </td>
+                <td>
+                  Menguji robustness ketika geometri ruangan berbeda dari frozen
+                  map.
+                </td>
+                <td>
+                  <ul>
+                    <li>Pilih satu susunan furnitur yang mudah diulang.</li>
+                    <li>Tandai posisi furnitur pada lantai.</li>
+                    <li>Gunakan susunan yang sama untuk sepuluh trial.</li>
+                    <li>Rute dan referensi marker tidak berubah.</li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="kidnapped">
+        <div class="section-heading">
+          <div>
+            <h2>03 — KIDNAPPED</h2>
+            <p>
+              Mengukur global relocalization setelah robot dipindahkan secara
+              manual ke pose yang tidak diketahui localizer. Referensi tujuan
+              hanya digunakan evaluator.
+            </p>
+          </div>
+          <span class="count">20 TRIAL · TIMEOUT 60 DETIK</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Skenario / ID</th>
+                <th>Tujuan</th>
+                <th>Setup &amp; Kontrol</th>
+                <th>Langkah Pengujian</th>
+                <th>Bukti, Metrik &amp; Kriteria Lulus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Relokasi satu ruangan</strong
+                  ><code>KIDNAP_SAME_ROOM</code><br />10 trial
+                </td>
+                <td>
+                  Menguji recovery setelah relokasi sedang di dalam ruangan yang
+                  sama.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      Pilih marker awal A dan tujuan B dalam satu ruangan.
+                    </li>
+                    <li>Posisi dan orientasi tujuan ditetapkan sebelumnya.</li>
+                  </ul>
+                </td>
+                <td rowspan="2">
+                  <ol>
+                    <li>Buat session kidnapped lalu mulai capture/mission.</li>
+                    <li>Di A, tunggu <code>TRACKING</code> stabil.</li>
+                    <li>Tekan <b>KIDNAP START</b>.</li>
+                    <li>
+                      Tutup pandangan LiDAR dengan aman; sensor tidak dimatikan.
+                    </li>
+                    <li>Pindahkan robot secara manual ke B dan atur yaw.</li>
+                    <li>Pilih B sebagai ground truth evaluator saja.</li>
+                    <li>
+                      Buka LiDAR lalu tekan <b>KIDNAP RELEASE + REFERENCE</b>.
+                    </li>
+                    <li>
+                      Tunggu global search dan tracking maksimal 60 detik.
+                    </li>
+                    <li>Rekam final checkpoint, stop, lalu analyze.</li>
+                  </ol>
+                </td>
+                <td rowspan="2">
+                  <ul>
+                    <li>Keberhasilan relocalization dalam 60 detik.</li>
+                    <li>Waktu scan pertama setelah release.</li>
+                    <li>Median dan P95 recovery time.</li>
+                    <li>Final position dan heading error.</li>
+                    <li>Jumlah gagal dan final score.</li>
+                    <li class="pass">
+                      Lulus: satu release dan satu final checkpoint.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Relokasi antarruangan</strong
+                  ><code>KIDNAP_CROSS_ROOM</code><br />10 trial
+                </td>
+                <td>
+                  Menguji kasus lebih berat ketika robot dipindahkan ke ruangan
+                  lain.
+                </td>
+                <td>
+                  <ul>
+                    <li>Marker A dan B berada pada ruangan berbeda.</li>
+                    <li>Gunakan rencana marker/yaw tujuan yang sama.</li>
+                    <li>Pandangan LiDAR harus normal sebelum release.</li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">
+          Keselamatan: <b>STOP MISSION</b> bukan emergency stop mekanis.
+          Pastikan AGV tidak dapat bergerak tanpa sengaja sebelum diangkat atau
+          dipindahkan.
+        </p>
+      </section>
+
+      <section id="dynamic-occluded">
+        <div class="section-heading">
+          <div>
+            <h2>04 — DYNAMIC OCCLUDED</h2>
+            <p>
+              Membuat gangguan gerakan manusia yang sederhana dan dapat diulang.
+              Satu orang melintasi jalur robot pada titik pemicu yang sama.
+            </p>
+          </div>
+          <span class="count">10 TRIAL · DURASI 3 ± 0,5 DETIK</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Skenario / ID</th>
+                <th>Tujuan</th>
+                <th>Setup &amp; Kontrol</th>
+                <th>Langkah Pengujian</th>
+                <th>Bukti, Metrik &amp; Kriteria Lulus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Orang melintas</strong><code>dynamic_occluded</code
+                  ><br />5× R1 + 5× R2
+                </td>
+                <td>
+                  Mengukur robustness checkpoint localization saat terjadi
+                  moving occlusion singkat dan terkendali.
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      Tandai endpoint pejalan kaki <code>H1</code> dan
+                      <code>H2</code>.
+                    </li>
+                    <li>Tandai titik pemicu robot <code>T0</code>.</li>
+                    <li>H1–H2 memotong rute robot secara tegak lurus.</li>
+                    <li>Pertahankan jarak aman minimal 1 meter.</li>
+                    <li>Gunakan orang dan kecepatan robot yang sama.</li>
+                    <li>Tidak ada orang lain di area pengujian.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>
+                      Pilih <code>dynamic_occluded</code> dan route R1 atau R2.
+                    </li>
+                    <li>
+                      Buat session, mulai capture/mission, lalu tekan
+                      <b>ROUTE START</b>.
+                    </li>
+                    <li>Untuk R1 orang menunggu di H1; untuk R2 di H2.</li>
+                    <li>
+                      Saat robot mencapai T0, tekan
+                      <b>PERSON START</b> bersamaan dengan mulai berjalan.
+                    </li>
+                    <li>Berjalan normal tanpa berhenti.</li>
+                    <li>Di endpoint seberang, tekan <b>PERSON END</b>.</li>
+                    <li>Pastikan durasi yang tampil 2,5–3,5 detik.</li>
+                    <li>Rekam delapan checkpoint dan selesaikan route.</li>
+                    <li>Ulangi lima kali untuk setiap arah.</li>
+                  </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li><code>dynamic_occlusion.csv</code>.</li>
+                    <li>Arah dan durasi orang melintas.</li>
+                    <li>Scan count serta accepted-scan rate.</li>
+                    <li>Localization score selama crossing.</li>
+                    <li>Metrik akurasi route standar.</li>
+                    <li class="pass">
+                      Lulus: satu START/END dan 8 checkpoint.
+                    </li>
+                    <li class="danger">
+                      Buat session baru jika durasi atau keselamatan gagal.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ablation">
+        <div class="section-heading">
+          <div>
+            <h2>05 — ABLATION</h2>
+            <p>
+              Memutar raw scan yang sama melalui empat konfigurasi matcher.
+              Tidak memerlukan eksperimen fisik atau capture board baru.
+            </p>
+          </div>
+          <span class="count">≥10 REKAMAN SUMBER · 4 VARIAN</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Skenario / ID</th>
+                <th>Tujuan</th>
+                <th>Setup &amp; Kontrol</th>
+                <th>Langkah Pengujian</th>
+                <th>Bukti, Metrik &amp; Kriteria Lulus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Local only</strong><code>local_only</code></td>
+                <td>Baseline tanpa recovery global search.</td>
+                <td rowspan="4">
+                  <ul>
+                    <li>
+                      Pilih minimal sepuluh rekaman route/kidnapped yang
+                      finalized.
+                    </li>
+                    <li>
+                      Wakili nominal, occlusion statis/dinamis, perubahan
+                      furnitur, dan kidnapped.
+                    </li>
+                    <li>
+                      Gunakan raw scan dan map yang sama pada seluruh varian.
+                    </li>
+                    <li>Hanya komponen yang diuji yang boleh berubah.</li>
+                  </ul>
+                </td>
+                <td rowspan="4">
+                  <ol>
+                    <li>
+                      Pilih source recording finalized yang memiliki raw scan.
+                    </li>
+                    <li>Buat session <code>ablation</code>.</li>
+                    <li>Tekan <b>RUN ABLATION REPLAY</b>.</li>
+                    <li>BE menjalankan empat mode replay C++.</li>
+                    <li>Pastikan empat replay JSONL tersedia.</li>
+                    <li>Analyze dan bandingkan seluruh varian.</li>
+                    <li>
+                      Review, finalize, lalu lanjutkan ke rekaman berikutnya.
+                    </li>
+                  </ol>
+                </td>
+                <td rowspan="4">
+                  <ul>
+                    <li>Success rate.</li>
+                    <li>Mean/P95 execution time.</li>
+                    <li>Recovery time.</li>
+                    <li>Final position dan heading error.</li>
+                    <li><code>tables/ablation.csv</code>.</li>
+                    <li class="pass">
+                      Lulus: keempat replay memakai source hash yang sama.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Local + global</strong><code>local_global</code>
+                </td>
+                <td>Menunjukkan kontribusi existing global relocalization.</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Single resolution</strong
+                  ><code>single_resolution</code>
+                </td>
+                <td>Baseline tanpa multi-resolution search.</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Multi resolution</strong><code>multi_resolution</code>
+                </td>
+                <td>
+                  Menunjukkan kontribusi existing multi-resolution search.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="resource">
+        <div class="section-heading">
+          <div>
+            <h2>06 — RESOURCE</h2>
+            <p>
+              Mengukur kelayakan komputasi menggunakan telemetry yang dihasilkan
+              langsung oleh aplikasi RV1106. Hanya metrik resource komputasi
+              yang dikumpulkan.
+            </p>
+          </div>
+          <span class="count">15 INTERVAL · MASING-MASING 60 DETIK</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <colgroup>
+              <col class="scenario" />
+              <col class="purpose" />
+              <col class="setup" />
+              <col class="steps" />
+              <col class="results" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Skenario / ID</th>
+                <th>Tujuan</th>
+                <th>Setup &amp; Kontrol</th>
+                <th>Langkah Pengujian</th>
+                <th>Bukti, Metrik &amp; Kriteria Lulus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Idle</strong><code>idle</code><br />5 pengulangan
+                </td>
+                <td>
+                  Mengukur CPU dan memori proses saat mission dan pemrosesan
+                  LiDAR berhenti.
+                </td>
+                <td>
+                  <ul>
+                    <li>Capture aktif.</li>
+                    <li>Mission berhenti.</li>
+                    <li>Tidak ada proses eksperimen lain.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Pilih repetition 1–5.</li>
+                    <li>Pastikan mission berhenti.</li>
+                    <li>Tekan START pada IDLE dan tunggu 60 detik.</li>
+                    <li>Tekan END pada IDLE.</li>
+                    <li>Ulangi sebanyak lima kali.</li>
+                  </ol>
+                </td>
+                <td rowspan="3">
+                  <ul>
+                    <li>CPU usage.</li>
+                    <li>RAM/RSS dan peak RAM/RSS.</li>
+                    <li>Processing time per scan.</li>
+                    <li>Scan/update rate.</li>
+                    <li>Binary size.</li>
+                    <li>Durasi interval yang direkam.</li>
+                    <li class="pass">
+                      Lulus: 5 interval/state dengan durasi 55–65 detik.
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Normal tracking</strong><code>normal_tracking</code
+                  ><br />5 pengulangan
+                </td>
+                <td>
+                  Mengukur beban steady-state localization selama tracking
+                  normal.
+                </td>
+                <td>
+                  <ul>
+                    <li>Mission berjalan.</li>
+                    <li>Pose stabil pada <code>TRACKING</code>.</li>
+                    <li>LiDAR dan ruangan pada kondisi nominal.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Pilih repetition 1–5 dan start mission.</li>
+                    <li>Tunggu <code>TRACKING</code> stabil.</li>
+                    <li>Tekan START pada NORMAL TRACKING.</li>
+                    <li>Jalankan localization normal selama 60 detik.</li>
+                    <li>Tekan END lalu ulangi lima kali.</li>
+                  </ol>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Global relocalization</strong
+                  ><code>global_relocalization</code><br />5 pengulangan
+                </td>
+                <td>
+                  Mengukur keadaan recovery dengan beban komputasi tertinggi.
+                </td>
+                <td>
+                  <ul>
+                    <li>Mission berjalan.</li>
+                    <li>Global search dipicu dengan metode aman yang sama.</li>
+                    <li>Map dan parameter search tidak berubah.</li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Pilih repetition 1–5.</li>
+                    <li>Picu global relocalization.</li>
+                    <li>Tekan START pada GLOBAL RELOCALIZATION.</li>
+                    <li>Rekam 60 detik termasuk recovery jika terjadi.</li>
+                    <li>Tekan END lalu ulangi lima kali.</li>
+                  </ol>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        Sumber utama: EXPERIMENTS/INSTRUKSI.md · Folder output:
+        EXPERIMENTS/Ouputs
+      </footer>
+    </main>
+  </body>
+</html>

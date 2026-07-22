@@ -85,6 +85,13 @@ periksa proses dengan:
 tail -f /tmp/localize_uart.log
 ```
 
+Telemetri per scan tersimpan sebagai JSONL di `/tmp/localize_scans.jsonl`.
+Untuk campaign eksperimen, gunakan script di `EXPERIMENTS/` agar telemetry dan
+raw scan memakai experiment ID/path unik dan tidak menimpa bukti mentah.
+Backend juga mengirim condition, run type, dan route ID melalui environment;
+firmware memvalidasi enam test type pada TestPlanning dan mencantumkan konteks
+tersebut pada setiap record telemetry.
+
 Set `ENABLED=0` di `/etc/default/localize_uart` untuk mematikan autostart.
 Default endpoint dashboard adalah host Windows `172.32.0.100`, TCP 42000 untuk
 status/kontrol robot dan TCP 42010 untuk stream scan. Ubah nilai

@@ -25,6 +25,9 @@ target_compile_options(scan_tcp_client PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(map_converter tools/map_converter.cpp)
 target_link_libraries(map_converter PRIVATE slam_map)
 
+add_executable(map_align tools/map_align.cpp)
+target_compile_options(map_align PRIVATE -Wall -Wextra -Wpedantic)
+
 add_executable(map_inspect tools/map_inspect.cpp)
 target_link_libraries(map_inspect PRIVATE slam_map)
 
@@ -41,7 +44,7 @@ if(YDLIDAR_SDK_ROOT)
   if(NOT YDLIDAR_INCLUDE_DIR OR NOT YDLIDAR_LIBRARY)
     message(FATAL_ERROR "YDLidar headers/library not found under YDLIDAR_SDK_ROOT")
   endif()
-  add_library(uart_localizer src/uart_localizer.cpp)
+  add_library(uart_localizer src/uart_localizer.cpp src/telemetry.cpp)
   target_include_directories(uart_localizer PUBLIC include PRIVATE
     ${YDLIDAR_INCLUDE_DIR} ${YDLIDAR_SDK_ROOT})
   target_link_libraries(uart_localizer PUBLIC slam_map PRIVATE ${YDLIDAR_LIBRARY} pthread)
@@ -51,11 +54,20 @@ if(YDLIDAR_SDK_ROOT)
   target_link_libraries(localize_uart PRIVATE uart_localizer robot_backend_client scan_tcp_client ${YDLIDAR_LIBRARY} pthread)
 endif()
 
+add_executable(localize_replay tools/localize_replay.cpp)
+target_link_libraries(localize_replay PRIVATE slam_map)
+
 include(CTest)
 if(BUILD_TESTING)
   add_executable(map_tests tests/map_tests.cpp)
   target_link_libraries(map_tests PRIVATE slam_map)
   add_test(NAME map_tests COMMAND map_tests)
+  add_test(NAME align_test
+    COMMAND ${CMAKE_COMMAND}
+      -DMAP_ALIGN=$<TARGET_FILE:map_align>
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/data
+      -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/align-test
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/map_align_test.cmake)
   add_test(NAME converter_test
     COMMAND map_converter
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/tiny.yaml

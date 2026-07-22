@@ -45,6 +45,20 @@ Buka `http://IP_BACKEND:8080`. Port TCP binary robot adalah `42000`. Atur
 `MAP_DIR`, `MAP_NAME`, `ROBOT_TCP_PORT`, atau
 `HTTP_PORT` melalui environment bila diperlukan.
 
+Tab **TESTING** mengikuti skenario ringkas pada `EXPERIMENTS/INSTRUKSI.md`:
+
+1. ground-truth repeatability, 10 placement pada satu marker;
+2. dua route antarruangan pada kondisi nominal, occlusion 90°, dan perubahan
+   furnitur;
+3. kidnapped relocation dalam ruangan atau antarruangan;
+4. `dynamic_occluded` sebagai test type tersendiri dengan satu orang melintas
+   pada marker pemicu `T0`;
+5. ablation replay empat konfigurasi tanpa eksperimen fisik baru;
+6. resource komputasi untuk idle, tracking, dan global relocalization.
+
+Setiap trial mengikuti lifecycle preflight, session, capture/replay, analyze,
+dan finalize. Output immutable berada di `EXPERIMENTS/Ouputs`.
+
 STOP pada dashboard hanya menghentikan LiDAR/localization dan bukan pengganti
 emergency stop motor penggerak robot yang fail-safe.
 

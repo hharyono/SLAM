@@ -25,8 +25,10 @@ ros2 run nav2_map_server map_saver_cli \
     --ros-args -p map_subscribe_transient_local:=true
 
 cmake -S "$ProjectDir" -B "$ProjectDir/build" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$ProjectDir/build" --target map_converter -j"$(nproc)"
+cmake --build "$ProjectDir/build" --target map_align map_converter map_inspect -j"$(nproc)"
+"$ProjectDir/build/map_align" "$MapDir/$Name.yaml"
 "$ProjectDir/build/map_converter" "$MapDir/$Name.yaml" "$MapDir/$Name.bin"
 "$ProjectDir/build/map_inspect" "$MapDir/$Name.bin"
 
+echo "Auto alignment: $MapDir/$Name.alignment.json"
 echo "Map untuk RV1106: $MapDir/$Name.bin"

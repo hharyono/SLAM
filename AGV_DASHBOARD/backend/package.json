@@ -7,6 +7,7 @@
     "start": "tsx src/server.ts",
     "build": "tsc",
     "check": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts",
     "format": "prettier --write src tsconfig.json package.json",
     "format:check": "prettier --check src tsconfig.json package.json"
   },
