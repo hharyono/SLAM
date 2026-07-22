@@ -11,7 +11,7 @@ ENABLED=1
 MAP=/etc/slam/ruang_utama.bin
 UART=/dev/ttyS3
 BAUD=230400
-NETWORK_IFACE=usb0
+NETWORK_IFACE=wlan0
 NETWORK_WAIT_SECONDS=30
 
 [ -r "$CONFIG" ] && . "$CONFIG"
@@ -42,9 +42,9 @@ start() {
 		return 1
 	fi
 
-	# The vendor USB network service runs immediately before this script, but
-	# usb0 may need a few more seconds to get carrier and its static IPv4
-	# address. Do not launch the localizer until the board-side network is
+	# The Wi-Fi startup service runs before this script, but DHCP may need a few
+	# more seconds to install its IPv4 address. Do not launch the localizer until
+	# the selected network interface is
 	# usable. The daemon reconnects to the backend itself, so only wait for the
 	# local interface here (not for the host/backend TCP port).
 	if [ -n "$NETWORK_IFACE" ]; then

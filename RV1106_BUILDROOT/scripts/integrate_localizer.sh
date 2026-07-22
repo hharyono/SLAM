@@ -19,6 +19,9 @@ rm -rf "$PKG_DIR"
 mkdir -p "$PKG_DIR/src/include" "$PKG_DIR/src/src" "$PKG_DIR/src/tools" "$PKG_DIR/src/maps"
 cp "$WORK_DIR/package/luckfox-localizer/Config.in" "$PKG_DIR/Config.in"
 cp "$WORK_DIR/package/luckfox-localizer/luckfox-localizer.mk" "$PKG_DIR/luckfox-localizer.mk"
+cp "$WORK_DIR/package/luckfox-localizer/S30rtl8188eus_wifi" \
+  "$PKG_DIR/S30rtl8188eus_wifi"
+cp "$WORK_DIR/package/luckfox-localizer/wifi-health" "$PKG_DIR/wifi-health"
 cp "$WORK_DIR/package/luckfox-localizer/S99zzlocalize_uart" "$PKG_DIR/S99zzlocalize_uart"
 cp "$WORK_DIR/package/luckfox-localizer/localize_uart.default" \
   "$PKG_DIR/localize_uart.default"
@@ -56,5 +59,11 @@ fi
 DEFCONFIG="$BR_DIR/configs/luckfox_pico_defconfig"
 grep -q '^BR2_PACKAGE_LUCKFOX_LOCALIZER=y$' "$DEFCONFIG" || \
   printf '\nBR2_PACKAGE_LUCKFOX_LOCALIZER=y\n' >> "$DEFCONFIG"
+
+# Local packages use Buildroot stamps. Use its official clean target so package
+# file-list metadata remains consistent when init scripts change.
+if [[ -f "$BR_DIR/.config" ]]; then
+  make -C "$BR_DIR" luckfox-localizer-dirclean
+fi
 
 echo "Integrasi localizer siap di Buildroot."

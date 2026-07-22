@@ -1,0 +1,47 @@
+#!/bin/sh
+
+WLAN_IF=${1:-wlan0}
+
+echo "=== USB Wi-Fi ==="
+found=0
+for uevent in /sys/bus/usb/devices/*/uevent; do
+	[ -f "$uevent" ] || continue
+	if grep -qisE 'PRODUCT=(.*/8179|2357/0?10c|2357/0?111)/' "$uevent"; then
+		found=1
+		echo "$uevent"
+		grep -E '^(PRODUCT|DEVNAME|DRIVER)=' "$uevent" 2>/dev/null || :
+	fi
+done
+[ "$found" -eq 1 ] || echo "adapter RTL8188EUS tidak terdeteksi"
+
+echo "=== Modules ==="
+grep -E '^(r8188eu|cfg80211|lib80211)' /proc/modules 2>/dev/null || \
+	echo "modul Wi-Fi belum lengkap"
+
+echo "=== Crypto ==="
+if grep -qE '^[[:space:]]*name[[:space:]]*:[[:space:]]*ccm\(aes\)[[:space:]]*$' \
+	/proc/crypto 2>/dev/null; then
+	echo "ccm(aes): READY"
+else
+	echo "ccm(aes): MISSING"
+fi
+
+echo "=== Link ==="
+if command -v iw >/dev/null 2>&1; then
+	iw dev "$WLAN_IF" link 2>/dev/null || echo "$WLAN_IF belum terhubung"
+else
+	echo "iw tidak tersedia"
+fi
+ip link show "$WLAN_IF" 2>/dev/null || echo "$WLAN_IF tidak tersedia"
+
+echo "=== WPA ==="
+if [ -x /usr/bin/wpa_cli ]; then
+	/usr/bin/wpa_cli -i "$WLAN_IF" status 2>/dev/null || \
+		echo "wpa_supplicant belum aktif"
+else
+	echo "wpa_cli tidak tersedia"
+fi
+
+echo "=== Address and route ==="
+ip addr show "$WLAN_IF" 2>/dev/null || :
+ip route 2>/dev/null || :

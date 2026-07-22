@@ -1,0 +1,113 @@
+#!/bin/sh
+
+KO_DIR=/oem/usr/ko
+WPA_BIN=/usr/bin/wpa_supplicant
+WPA_CLI=/usr/bin/wpa_cli
+WPA_CONF=/etc/wpa_supplicant.conf
+WLAN_IF=wlan0
+
+device_present() {
+	grep -qisE 'PRODUCT=(.*/8179|2357/0?10c|2357/0?111)/' \
+		/sys/bus/usb/devices/*/uevent 2>/dev/null
+}
+
+module_loaded() {
+	grep -q "^$1 " /proc/modules 2>/dev/null
+}
+
+load_module() {
+	module_loaded "${1%.ko}" || insmod "$KO_DIR/$1"
+}
+
+crypto_ccmp_ready() {
+	grep -qE '^[[:space:]]*name[[:space:]]*:[[:space:]]*ccm\(aes\)[[:space:]]*$' \
+		/proc/crypto 2>/dev/null
+}
+
+start_wifi() {
+	count=0
+	while ! device_present && [ "$count" -lt 20 ]; do
+		sleep 1
+		count=$((count + 1))
+	done
+	device_present || return 0
+
+	if [ ! -d "/sys/class/net/$WLAN_IF" ]; then
+		load_module libarc4.ko
+		load_module lib80211.ko
+		load_module lib80211_crypt_wep.ko
+		load_module lib80211_crypt_ccmp.ko
+		load_module cfg80211.ko
+		load_module r8188eu.ko
+	fi
+
+	count=0
+	while [ ! -d "/sys/class/net/$WLAN_IF" ] && [ "$count" -lt 10 ]; do
+		sleep 1
+		count=$((count + 1))
+	done
+	[ -d "/sys/class/net/$WLAN_IF" ] || {
+		echo "RTL8188EUS terdeteksi tetapi $WLAN_IF tidak tersedia" >&2
+		return 1
+	}
+	crypto_ccmp_ready || {
+		echo "Transform crypto ccm(aes) belum siap; association dibatalkan untuk mencegah kernel crash" >&2
+		return 1
+	}
+
+	[ -x "$WPA_BIN" ] || {
+		echo "wpa_supplicant tidak ditemukan: $WPA_BIN" >&2
+		return 1
+	}
+	[ -x "$WPA_CLI" ] || {
+		echo "wpa_cli tidak ditemukan: $WPA_CLI" >&2
+		return 1
+	}
+	[ -f "$WPA_CONF" ] || {
+		echo "Konfigurasi Wi-Fi tidak ditemukan: $WPA_CONF" >&2
+		return 1
+	}
+
+	export PATH=/oem/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin
+	export LD_LIBRARY_PATH=/oem/usr/lib:/usr/lib:/lib
+	mkdir -p /var/run/wpa_supplicant
+	ip link set "$WLAN_IF" up
+	killall wpa_supplicant 2>/dev/null || true
+	if ! "$WPA_BIN" -B -D wext -i "$WLAN_IF" -c "$WPA_CONF"; then
+		echo "Gagal menjalankan wpa_supplicant dengan backend wext" >&2
+		return 1
+	fi
+
+	count=0
+	while [ "$count" -lt 30 ]; do
+		"$WPA_CLI" -i "$WLAN_IF" status 2>/dev/null | \
+			grep -q '^wpa_state=COMPLETED$' && break
+		sleep 1
+		count=$((count + 1))
+	done
+	"$WPA_CLI" -i "$WLAN_IF" status 2>/dev/null | \
+		grep -q '^wpa_state=COMPLETED$' || {
+			echo "Gagal terhubung ke access point Wi-Fi" >&2
+			return 1
+		}
+
+	echo "RTL8188EUS terhubung pada $WLAN_IF; DHCP dilanjutkan oleh S41dhcpcd"
+}
+
+case "$1" in
+	start)
+		start_wifi
+		;;
+	stop)
+		killall wpa_supplicant 2>/dev/null || true
+		ip link set "$WLAN_IF" down 2>/dev/null || true
+		;;
+	restart)
+		"$0" stop
+		"$0" start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac

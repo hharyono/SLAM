@@ -1,0 +1,36 @@
+From: Codex <codex@local>
+Subject: [PATCH] lib80211: instantiate ccm(aes) before atomic transmit
+
+The staging r8188eu driver can allocate its lib80211 CCMP context from a
+softirq transmit path.  The first ccm(aes) allocation may invoke cryptomgr
+and request_module(), which sleeps and crashes the kernel in atomic context.
+Warm the composed transform during module initialization, where sleeping is
+allowed, before registering the CCMP operations with lib80211.
+---
+ net/wireless/lib80211_crypt_ccmp.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/net/wireless/lib80211_crypt_ccmp.c b/net/wireless/lib80211_crypt_ccmp.c
+index 1111111..2222222 100644
+--- a/net/wireless/lib80211_crypt_ccmp.c
++++ b/net/wireless/lib80211_crypt_ccmp.c
+@@ -437,2 +437,19 @@ static struct lib80211_crypto_ops lib80211_crypt_ccmp = {
+ static int __init lib80211_crypto_ccmp_init(void)
+ {
++	struct crypto_aead *tfm;
++	int ret;
++
++	/*
++	 * r8188eu can create a CCMP key while transmitting from softirq.
++	 * Instantiate ccm(aes) here, in process context, so cryptomgr never
++	 * has to invoke request_module() from that atomic transmit path.
++	 */
++	tfm = crypto_alloc_aead("ccm(aes)", 0, CRYPTO_ALG_ASYNC);
++	if (IS_ERR(tfm)) {
++		ret = PTR_ERR(tfm);
++		pr_err("lib80211_crypt_ccmp: failed to warm up ccm(aes): %d\n",
++		       ret);
++		return ret;
++	}
++	crypto_free_aead(tfm);
++

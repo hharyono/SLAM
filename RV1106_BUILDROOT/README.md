@@ -22,6 +22,44 @@ Skrip build juga mengaktifkan `UART3_M1` pada header board:
 - pin 20: UART3 RX
 - device Linux: `/dev/ttyS3`
 
+Port USB DWC3 diubah ke mode **host** agar adaptor Wi-Fi USB dapat dipakai.
+Mode gadget `usb0` dan akses SSH melalui alamat USB `172.32.0.93` tidak tersedia
+pada image ini; beri daya board secara terpisah dan gunakan Ethernet, Wi-Fi, atau
+UART untuk akses.
+
+Skrip yang sama mengaktifkan adaptor Wi-Fi USB **RTL8188EUS**
+(`0bda:8179` serta TP-Link `2357:010c/0111`) untuk Luckfox Pico Pro/Max
+RV1106:
+
+- driver staging kernel 5.10 `r8188eu.ko` dibangun sebagai module;
+- firmware `rtlwifi/rtl8188eufw.bin` dipasang melalui paket
+  `linux-firmware` pilihan Realtek 81xx;
+- module disalin ke `/oem/usr/ko` bersama module Wi-Fi lain;
+- `insmod_wifi.sh` mendeteksi USB product `8179`, memuat dependency
+  `lib80211`/`cfg80211`, lalu `r8188eu.ko` saat boot;
+- transform `ccm(aes)` diinisialisasi dari process context agar driver staging
+  tidak memanggil `request_module()` dari softirq;
+- `S30rtl8188eus_wifi` menggunakan backend WEXT, menunggu association selesai,
+  lalu menyerahkan konfigurasi IP kepada `dhcpcd`;
+- `wifi-health` menampilkan status USB, module, crypto, WPA, alamat, dan route;
+- konfigurasi SSID/PSK tetap menggunakan `LF_WIFI_SSID` dan `LF_WIFI_PSK` di
+  BoardConfig SDK. Jangan menyimpan kredensial Wi-Fi nyata di Git.
+
+Untuk hanya menerapkan integrasi RTL8188EUS ke SDK tanpa membangun image:
+
+```bash
+./RV1106_BUILDROOT/scripts/enable_rtl8188eus.sh
+```
+
+Setelah flash, verifikasi dengan:
+
+```sh
+lsusb
+lsmod | grep r8188eu
+ip link show wlan0
+dmesg | grep -iE 'r8188eu|0bda|8179'
+```
+
 Image hasil build berada di:
 
 - `RV1106_BUILDROOT/luckfox-pico/output/image/rootfs.img`

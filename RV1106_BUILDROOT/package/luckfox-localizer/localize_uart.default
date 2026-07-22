@@ -5,11 +5,11 @@ MAP=/etc/slam/ruang_utama.bin
 UART=/dev/ttyS3
 BAUD=230400
 
-# Wait for the board-side USB network before starting the localizer.
-NETWORK_IFACE=usb0
+# Wait for Wi-Fi DHCP before starting the localizer.
+NETWORK_IFACE=wlan0
 NETWORK_WAIT_SECONDS=30
 
-# Dashboard endpoint on the Windows side of the Luckfox USB network.
+# Dashboard endpoint reachable through the configured network.
 export LUCKFOX_BACKEND_HOST=172.32.0.100
 export LUCKFOX_BACKEND_PORT=42000
 export LUCKFOX_SCAN_STREAM_HOST=172.32.0.100

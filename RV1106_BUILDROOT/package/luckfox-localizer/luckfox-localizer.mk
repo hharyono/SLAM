@@ -32,6 +32,10 @@ define LUCKFOX_LOCALIZER_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/map_inspect $(TARGET_DIR)/usr/bin/map_inspect
 	$(INSTALL) -D -m 0755 $(@D)/localize_scan $(TARGET_DIR)/usr/bin/localize_scan
 	$(INSTALL) -D -m 0755 $(@D)/localize_uart $(TARGET_DIR)/usr/bin/localize_uart
+	$(INSTALL) -D -m 0755 $(LUCKFOX_LOCALIZER_PKGDIR)/S30rtl8188eus_wifi \
+		$(TARGET_DIR)/etc/init.d/S30rtl8188eus_wifi
+	$(INSTALL) -D -m 0755 $(LUCKFOX_LOCALIZER_PKGDIR)/wifi-health \
+		$(TARGET_DIR)/usr/bin/wifi-health
 	$(INSTALL) -D -m 0755 $(LUCKFOX_LOCALIZER_PKGDIR)/S99zzlocalize_uart \
 		$(TARGET_DIR)/etc/init.d/S99zzlocalize_uart
 	$(INSTALL) -D -m 0644 $(LUCKFOX_LOCALIZER_PKGDIR)/localize_uart.default \
