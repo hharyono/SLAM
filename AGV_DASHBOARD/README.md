@@ -95,6 +95,10 @@ powershell -ExecutionPolicy Bypass -File \
   "\\wsl.localhost\Ubuntu2204ArduP\root\DATA\SLAM\AGV_DASHBOARD\scripts\setup-wsl-portproxy.ps1"
 ```
 
-Script mendeteksi IP WSL dan adapter Windows `172.32.x.x`, kemudian membuat
-port forwarding TCP `42000` (status/command) dan `42010` (ScanFrame). Gunakan IP
-Windows yang dicetak script sebagai `LUCKFOX_BACKEND_HOST` pada robot.
+Script mendeteksi IP WSL dan alamat adapter Windows yang memiliki rute ke board
+(`BOARD_SSH_TARGET`, default `192.168.1.24`), kemudian membuat port forwarding
+TCP `42000` (status/command) dan `42010` (ScanFrame). Saat rule belum sehat,
+backend meminta izin Administrator melalui UAC dan menunggu hasil aktivasi.
+Gunakan IP Windows yang dicetak script sebagai `LUCKFOX_BACKEND_HOST` pada
+robot. `BOARD_ADDRESS` dapat dipakai bila alamat koneksi board berbeda dari
+host pada `BOARD_SSH_TARGET`.

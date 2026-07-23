@@ -77,6 +77,8 @@ const experimentOutputDir =
   process.env.EXPERIMENT_OUTPUT_DIR || path.join(root, 'EXPERIMENTS', 'Ouputs');
 const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.24';
 const boardSshKey = process.env.BOARD_SSH_KEY || '/root/.ssh/luckfox_experiment_ed25519';
+const boardAddress = process.env.BOARD_ADDRESS || boardSshTarget.split('@').at(-1)!;
+const scanStreamPort = Number(process.env.SCAN_STREAM_TCP_PORT || 42010);
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 let lastSavedMap: string | undefined;
@@ -114,7 +116,21 @@ function ensureWslPortProxy(): void {
   const windowsScript = `\\\\wsl.localhost\\${distro}${portProxyScript.replaceAll('/', '\\')}`;
   execFile(
     powershell,
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', windowsScript, '-WslDistro', distro],
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      windowsScript,
+      '-WslDistro',
+      distro,
+      '-BoardAddress',
+      boardAddress,
+      '-RobotPort',
+      String(robotPort),
+      '-ScanPort',
+      String(scanStreamPort),
+    ],
     { timeout: 60_000 },
     (error, stdout, stderr) => {
       const output = `${stdout}${stderr}`.trim();
