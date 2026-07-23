@@ -63,13 +63,22 @@ type ResourceRow = {
 
 type ReplayRow = TelemetryRow & { variant: string };
 
-function ReadJsonLines<T>(file: string): T[] {
+export function ReadJsonLines<T>(file: string): T[] {
   if (!fs.existsSync(file)) return [];
-  return fs
+  const lines = fs
     .readFileSync(file, 'utf8')
     .split(/\r?\n/)
-    .filter((line) => line.trim())
-    .map((line) => JSON.parse(line) as T);
+    .filter((line) => line.trim());
+  return lines.flatMap((line, index) => {
+    try {
+      return [JSON.parse(line) as T];
+    } catch (error) {
+      // A recorder can be stopped between two writes. Preserve the raw evidence,
+      // but do not let one incomplete trailing row invalidate the whole analysis.
+      if (index === lines.length - 1) return [];
+      throw error;
+    }
+  });
 }
 
 function Percentile(values: number[], percent: number): number {
@@ -134,8 +143,9 @@ function SummaryValues(summary: NumericSummary): unknown[] {
   ];
 }
 
-function AngleErrorDegrees(estimate: number, reference: number): number {
-  const wrapped = ((estimate - reference + Math.PI) % (2 * Math.PI)) - Math.PI;
+export function AngleErrorDegrees(estimate: number, reference: number): number {
+  const delta = estimate - reference;
+  const wrapped = Math.atan2(Math.sin(delta), Math.cos(delta));
   return (Math.abs(wrapped) * 180) / Math.PI;
 }
 

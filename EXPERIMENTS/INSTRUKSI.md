@@ -51,7 +51,6 @@ Menentukan repeatability penempatan robot pada marker dan menyatakan ketidakpast
 
 ### Setup
 
-- Gunakan **8 marker** yang tersebar di dua ruangan.
 - Gunakan satu marker yang sama untuk pengujian repeatability.
 - Pastikan posisi dan arah hadap acuan marker tidak berubah selama pengujian.
 

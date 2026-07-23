@@ -494,9 +494,6 @@
                 </td>
                 <td>
                   <ul>
-                    <li>
-                      Eight surveyed markers remain fixed across both rooms.
-                    </li>
                     <li>Select one marker for all ten placements.</li>
                     <li>Do not change its X, Y, or yaw reference.</li>
                     <li>
@@ -603,13 +600,13 @@
                     <li>
                       Start mission and wait for stable <code>TRACKING</code>.
                     </li>
-                    <li>Press <b>ROUTE START</b> at the starting marker.</li>
+                    <li>Record the first checkpoint as the route start.</li>
                     <li>Drive the frozen route and stop at every marker.</li>
                     <li>
                       Select the correct reference and press
                       <b>RECORD CHECKPOINT</b>.
                     </li>
-                    <li>After all eight markers, press <b>ROUTE END</b>.</li>
+                    <li>The eighth checkpoint automatically ends the route.</li>
                     <li>
                       Stop mission/capture, analyze, review, and finalize.
                     </li>
@@ -848,8 +845,8 @@
                   <ol>
                     <li>Select <code>dynamic_occluded</code> and R1 or R2.</li>
                     <li>
-                      Create the session, start capture/mission, and press
-                      <b>ROUTE START</b>.
+                      Create the session, start capture/mission, then record
+                      the first checkpoint as the route start.
                     </li>
                     <li>For R1, the person waits at H1; for R2, wait at H2.</li>
                     <li>
@@ -874,7 +871,7 @@
                     <li>Localization score during crossing.</li>
                     <li>Standard route accuracy metrics.</li>
                     <li class="pass">
-                      Pass: exactly one START/END pair and 8 checkpoints.
+                      Pass: exactly one PERSON START/END pair and 8 checkpoints.
                     </li>
                     <li class="danger">
                       Repeat with a new session if duration or safety fails.

@@ -55,8 +55,24 @@ export type ExperimentSession = {
   analyzed_unix_ms?: number;
   finalized_unix_ms?: number;
   status_count: number;
+  checkpoint_count?: number;
+  route_started?: boolean;
+  route_ended?: boolean;
+  recorded_marker_ids?: string[];
+  checkpoint_estimates?: Record<string, ExperimentRobotStatus['pose']>;
+  output_relative_path?: string;
+  reference_marker?: ExperimentMarker;
+  route_markers?: ExperimentMarker[];
   source_experiment_id?: string;
   error?: string;
+};
+
+export type ExperimentMarker = {
+  marker_id: string;
+  zone: string;
+  x: number;
+  y: number;
+  yaw: number;
 };
 
 export type CreateSessionInput = {
@@ -68,6 +84,8 @@ export type CreateSessionInput = {
   ground_truth_method?: string;
   robot_id?: string;
   source_experiment_id?: string;
+  reference_marker?: Partial<ExperimentMarker>;
+  route_markers?: Array<Partial<ExperimentMarker>>;
 };
 
 type ExperimentManagerOptions = {
@@ -92,6 +110,18 @@ const RunTypes = new Set<ExperimentRunType>([
   'ablation',
   'resource',
 ]);
+const OutputFolderByRunType: Record<ExperimentRunType, string> = {
+  ground_truth: 'GROUND TRUTH',
+  route: 'ROUTE',
+  kidnapped: 'KIDNAPPED',
+  dynamic_occluded: 'DYNAMIC OCCLUDED',
+  ablation: 'ABLATION',
+  resource: 'RESOURCE',
+};
+
+export function ExperimentOutputFolder(runType: ExperimentRunType): string {
+  return OutputFolderByRunType[runType];
+}
 const Routes = new Set([
   'R1_ROOM_1_TO_2',
   'R2_ROOM_2_TO_1',
@@ -114,6 +144,8 @@ const Events = new Set([
   'MISSION_START_SENT',
   'MISSION_STOP_SENT',
   'MISSION_ACK',
+  'CHECKPOINT_REPLACED',
+  'CHECKPOINT_UNLOCKED',
   'RESOURCE_IDLE_START',
   'RESOURCE_IDLE_END',
   'RESOURCE_TRACKING_START',
@@ -170,6 +202,8 @@ export class ExperimentManager {
     this.BoardSshKey = options.boardSshKey;
     this.Notify = options.notify;
     fs.mkdirSync(this.OutputRoot, { recursive: true });
+    for (const folder of Object.values(OutputFolderByRunType))
+      fs.mkdirSync(path.join(this.OutputRoot, folder), { recursive: true });
     for (const session of this.List()) {
       if (
         session.state === 'starting' ||
@@ -184,12 +218,23 @@ export class ExperimentManager {
 
   List(): ExperimentSession[] {
     if (!fs.existsSync(this.OutputRoot)) return [];
-    return fs
-      .readdirSync(this.OutputRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .flatMap((entry) => {
-        const file = path.join(this.OutputRoot, entry.name, 'config', 'session.json');
-        if (!fs.existsSync(file)) return [];
+    const files: string[] = [];
+    for (const entry of fs.readdirSync(this.OutputRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const directory = path.join(this.OutputRoot, entry.name);
+      const legacyFile = path.join(directory, 'config', 'session.json');
+      if (fs.existsSync(legacyFile)) {
+        files.push(legacyFile);
+        continue;
+      }
+      for (const child of fs.readdirSync(directory, { withFileTypes: true })) {
+        if (!child.isDirectory()) continue;
+        const categorizedFile = path.join(directory, child.name, 'config', 'session.json');
+        if (fs.existsSync(categorizedFile)) files.push(categorizedFile);
+      }
+    }
+    return files
+      .flatMap((file) => {
         try {
           return [JSON.parse(fs.readFileSync(file, 'utf8')) as ExperimentSession];
         } catch {
@@ -203,7 +248,22 @@ export class ExperimentManager {
     this.ValidateExperimentId(experimentId);
     const file = this.SessionFile(experimentId);
     if (!fs.existsSync(file)) throw new Error('Experiment not found');
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as ExperimentSession;
+    const session = JSON.parse(fs.readFileSync(file, 'utf8')) as ExperimentSession;
+    if (['route', 'dynamic_occluded'].includes(session.run_type) && !session.checkpoint_estimates) {
+      const checkpointFile = path.join(this.Directory(experimentId), 'raw', 'ground_truth.jsonl');
+      const estimates: Record<string, ExperimentRobotStatus['pose']> = {};
+      if (fs.existsSync(checkpointFile)) {
+        for (const line of fs.readFileSync(checkpointFile, 'utf8').split(/\r?\n/).filter(Boolean)) {
+          const row = JSON.parse(line) as {
+            marker_id: string;
+            estimate: ExperimentRobotStatus['pose'];
+          };
+          estimates[row.marker_id] = row.estimate;
+        }
+      }
+      session.checkpoint_estimates = estimates;
+    }
+    return session;
   }
 
   GetActive(): ExperimentSession | undefined {
@@ -233,9 +293,41 @@ export class ExperimentManager {
       resource: 'RESOURCE_SEQUENCE',
     }[runType];
     const routeId = SafeText(input.route_id || defaultRoute, 40);
-    const zone = SafeText(input.zone || 'cross_room', 32);
+    const zone = SafeText(input.zone || (runType === 'ground_truth' ? 'room_1' : 'cross_room'), 32);
     if (!Routes.has(routeId)) throw new Error('Invalid route ID');
     if (!Zones.has(zone)) throw new Error('Invalid zone');
+    let referenceMarker: ExperimentMarker | undefined;
+    let routeMarkers: ExperimentMarker[] | undefined;
+    if (runType === 'ground_truth') {
+      const markerId = SafeText(input.reference_marker?.marker_id || 'M1', 40);
+      const markerZone = SafeText(input.reference_marker?.zone || zone, 32);
+      const x = Number(input.reference_marker?.x ?? 1.65);
+      const y = Number(input.reference_marker?.y ?? 1.35);
+      const yaw = Number(input.reference_marker?.yaw ?? (85.1 * Math.PI) / 180);
+      if (!markerId) throw new Error('Ground-truth marker ID is required');
+      if (!Zones.has(markerZone)) throw new Error('Invalid ground-truth marker zone');
+      if (![x, y, yaw].every(Number.isFinite))
+        throw new Error('Ground-truth marker X, Y, and yaw must be finite numbers');
+      referenceMarker = { marker_id: markerId, zone: markerZone, x, y, yaw };
+    }
+    if (['route', 'dynamic_occluded'].includes(runType)) {
+      if (!Array.isArray(input.route_markers) || input.route_markers.length !== 8)
+        throw new Error('A route session requires exactly 8 marker references');
+      routeMarkers = input.route_markers.map((marker, index) => {
+        const markerId = SafeText(marker.marker_id, 40);
+        const markerZone = SafeText(marker.zone, 32);
+        const x = Number(marker.x);
+        const y = Number(marker.y);
+        const yaw = Number(marker.yaw);
+        if (!markerId) throw new Error(`Route marker ${index + 1} requires an ID`);
+        if (!Zones.has(markerZone)) throw new Error(`Route marker ${markerId} has an invalid zone`);
+        if (![x, y, yaw].every(Number.isFinite))
+          throw new Error(`Route marker ${markerId} requires finite X, Y, and yaw values`);
+        return { marker_id: markerId, zone: markerZone, x, y, yaw };
+      });
+      if (new Set(routeMarkers.map((marker) => marker.marker_id)).size !== 8)
+        throw new Error('Route marker IDs must be unique');
+    }
     const sourceExperimentId = SafeText(input.source_experiment_id, 160) || undefined;
     if (runType === 'ablation') {
       if (!sourceExperimentId) throw new Error('A source experiment is required for ablation');
@@ -247,8 +339,12 @@ export class ExperimentManager {
     const commit = this.GitValue(['rev-parse', '--short=12', 'HEAD']) || 'no_commit';
     const now = new Date();
     const experimentId = `${TimestampId(now)}_${input.condition}_${runType}_${String(input.trial).padStart(2, '0')}_${commit}`;
-    const directory = this.Directory(experimentId);
-    fs.mkdirSync(directory, { recursive: false });
+    const outputFolder = ExperimentOutputFolder(runType);
+    const directory = path.join(this.OutputRoot, outputFolder, experimentId);
+    // Output folders may be removed when an operator clears a previous
+    // campaign while the backend is still running. Recreate the full category
+    // path at session creation time instead of relying only on startup setup.
+    fs.mkdirSync(directory, { recursive: true });
     for (const name of ['config', 'raw', 'processed', 'tables', 'plots'])
       fs.mkdirSync(path.join(directory, name));
     for (const name of [
@@ -271,6 +367,14 @@ export class ExperimentManager {
       state: 'created',
       created_unix_ms: now.getTime(),
       status_count: 0,
+      checkpoint_count: 0,
+      route_started: false,
+      route_ended: false,
+      recorded_marker_ids: [],
+      checkpoint_estimates: {},
+      output_relative_path: path.join(outputFolder, experimentId),
+      reference_marker: referenceMarker,
+      route_markers: routeMarkers,
       source_experiment_id: sourceExperimentId,
     };
     this.WriteSession(session);
@@ -284,12 +388,17 @@ export class ExperimentManager {
         path.join(directory, 'config', 'localizer.env'),
         fs.constants.COPYFILE_EXCL,
       );
-    fs.writeFileSync(path.join(directory, 'config', 'markers.json'), '[]\n', { flag: 'wx' });
-    const mapFile = path.join(this.RepoRoot, 'maps', 'ruang_utama.bin');
+    fs.writeFileSync(
+      path.join(directory, 'config', 'markers.json'),
+      `${JSON.stringify(routeMarkers || (referenceMarker ? [referenceMarker] : []), null, 2)}\n`,
+      { flag: 'wx' },
+    );
+    const mapFile = this.ActiveMapFile();
     fs.writeFileSync(
       path.join(directory, 'config', 'map.json'),
       `${JSON.stringify(
         {
+          name: path.basename(mapFile, '.bin'),
           path: mapFile,
           bytes: fs.statSync(mapFile).size,
           sha256: FileSha256(mapFile),
@@ -304,7 +413,7 @@ export class ExperimentManager {
   }
 
   async Preflight(): Promise<unknown> {
-    const mapFile = path.join(this.RepoRoot, 'maps', 'ruang_utama.bin');
+    const mapFile = this.ActiveMapFile();
     const stagedBinary = path.join(
       this.RepoRoot,
       'RV1106_BUILDROOT/luckfox-pico/sysdrv/source/buildroot/buildroot-2023.02.6/output/target/usr/bin/localize_uart',
@@ -327,6 +436,7 @@ export class ExperimentManager {
     const boardTimestamp = Date.parse(remote.split('\n', 1)[0] || '');
     return {
       board_target: this.BoardSshTarget,
+      active_map: path.basename(mapFile, '.bin'),
       backend_unix_ms: backendUnixMs,
       local_map_bytes: fs.statSync(mapFile).size,
       local_map_sha256: localMapSha256,
@@ -388,6 +498,8 @@ export LUCKFOX_TELEMETRY_LOG='${remoteDir}/telemetry.jsonl'
 export LUCKFOX_RAW_SCAN_LOG='${remoteDir}/raw_scans.csv'
 nohup /usr/bin/localize_uart "$MAP" "$UART" "$BAUD" >'${remoteDir}/runtime.log' 2>&1 &
 echo $! > '${remoteDir}/pid'
+sleep 1
+kill -0 "$(cat '${remoteDir}/pid')"
 `;
     try {
       await this.RunSsh(command, 20_000);
@@ -400,7 +512,12 @@ echo $! > '${remoteDir}/pid'
       session.state = 'error';
       session.error = (error as Error).message;
       this.WriteSession(session);
-      await this.RunSsh('/etc/init.d/S99zzlocalize_uart start', 10_000).catch(() => undefined);
+      await this.RunSsh(
+        `if test -f '${remoteDir}/pid'; then kill $(cat '${remoteDir}/pid') 2>/dev/null || true; fi
+rm -rf '${remoteDir}'
+/etc/init.d/S99zzlocalize_uart start`,
+        10_000,
+      ).catch(() => undefined);
       this.ActiveExperimentId = undefined;
       throw error;
     }
@@ -418,20 +535,55 @@ echo $! > '${remoteDir}/pid'
         10_000,
       );
       const raw = path.join(this.Directory(experimentId), 'raw');
-      await this.CopyRemote(
-        `${remoteDir}/telemetry.jsonl`,
-        path.join(raw, 'telemetry.jsonl'),
-        false,
+      const captureFiles = [
+        'telemetry.jsonl',
+        'raw_scans.csv',
+        'runtime.log',
+        'system.txt',
+        'runtime_default.env',
+      ];
+      const remoteManifest = await this.RunSsh(
+        `set -eu
+cd '${remoteDir}'
+for name in ${captureFiles.map((name) => `'${name}'`).join(' ')}; do
+  test -f "$name"
+  sha256sum "$name"
+done`,
+        10_000,
       );
-      await this.CopyRemote(`${remoteDir}/raw_scans.csv`, path.join(raw, 'raw_scans.csv'), true);
-      await this.CopyRemote(`${remoteDir}/runtime.log`, path.join(raw, 'runtime.log'), true);
-      await this.CopyRemote(`${remoteDir}/system.txt`, path.join(raw, 'system.txt'), false);
-      await this.CopyRemote(
-        `${remoteDir}/runtime_default.env`,
-        path.join(raw, 'runtime_default.env'),
-        false,
+      const checksums = new Map(
+        remoteManifest
+          .trim()
+          .split(/\r?\n/)
+          .map((line) => {
+            const match = line.match(/^([a-f0-9]{64})\s+\*?([A-Za-z0-9_.-]+)$/i);
+            if (!match) throw new Error(`Invalid board capture manifest row: ${line}`);
+            return [match[2]!, match[1]!.toLowerCase()] as const;
+          }),
       );
+      if (
+        checksums.size !== captureFiles.length ||
+        captureFiles.some((name) => !checksums.has(name))
+      )
+        throw new Error('Board capture manifest is incomplete');
+      for (const name of captureFiles)
+        await this.CopyRemoteVerified(
+          `${remoteDir}/${name}`,
+          path.join(raw, name),
+          checksums.get(name)!,
+        );
+      const localManifest = `${captureFiles
+        .map((name) => `${checksums.get(name)}  ${name}`)
+        .join('\n')}\n`;
+      const localManifestFile = path.join(raw, 'capture_manifest.sha256');
+      if (fs.existsSync(localManifestFile)) {
+        if (fs.readFileSync(localManifestFile, 'utf8') !== localManifest)
+          throw new Error('Existing local capture manifest does not match the board');
+      } else {
+        fs.writeFileSync(localManifestFile, localManifest, { flag: 'wx' });
+      }
       await this.RunSsh('/etc/init.d/S99zzlocalize_uart start', 10_000);
+      await this.RunSsh(`rm -rf '${remoteDir}'`, 10_000);
       session.state = 'stopped';
       session.stopped_unix_ms = Date.now();
       this.ActiveExperimentId = undefined;
@@ -456,7 +608,7 @@ echo $! > '${remoteDir}/pid'
     const sourceDirectory = this.Directory(session.source_experiment_id);
     const rawScan = path.join(sourceDirectory, 'raw', 'raw_scans.csv');
     const replayBinary = path.join(this.RepoRoot, 'LUCKFOX_LOCALIZER', 'build', 'localize_replay');
-    const mapFile = path.join(this.RepoRoot, 'maps', 'ruang_utama.bin');
+    const mapFile = this.ActiveMapFile();
     if (!fs.existsSync(replayBinary)) throw new Error('localize_replay has not been built');
     session.state = 'starting';
     session.started_unix_ms = Date.now();
@@ -581,12 +733,30 @@ echo $! > '${remoteDir}/pid'
       data.repetition = repetition;
     }
     const eventsFile = path.join(this.Directory(experimentId), 'raw', 'operator_events.jsonl');
+    const previousEvents = fs
+      .readFileSync(eventsFile, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { event?: string; data?: Record<string, unknown> });
+    if (event === 'ROUTE_START' || event === 'ROUTE_END') {
+      if (!['route', 'dynamic_occluded'].includes(session.run_type))
+        throw new Error('Route events require a route-based test session');
+      if (previousEvents.some((row) => row.event === event))
+        throw new Error(`${event} has already been recorded`);
+      const checkpointCount = this.Checkpoints(experimentId).length;
+      if (event === 'ROUTE_START') {
+        if (checkpointCount !== 0)
+          throw new Error('Record ROUTE START before the first checkpoint');
+        session.route_started = true;
+      } else {
+        if (!previousEvents.some((row) => row.event === 'ROUTE_START'))
+          throw new Error('Record ROUTE START before ROUTE END');
+        if (checkpointCount !== 8)
+          throw new Error(`ROUTE END requires exactly 8 checkpoints; found ${checkpointCount}`);
+        session.route_ended = true;
+      }
+    }
     if (event.startsWith('DYNAMIC_OCCLUSION_') || event.startsWith('RESOURCE_')) {
-      const previousEvents = fs
-        .readFileSync(eventsFile, 'utf8')
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { event?: string; data?: Record<string, unknown> });
       const duplicate = previousEvents.some(
         (row) =>
           row.event === event &&
@@ -617,6 +787,7 @@ echo $! > '${remoteDir}/pid'
       data,
       notes: SafeText(input.notes, 500),
     });
+    this.WriteSession(session);
     this.Notify(session);
     return session;
   }
@@ -629,22 +800,131 @@ echo $! > '${remoteDir}/pid'
     const session = this.Get(experimentId);
     this.RequireState(session, ['capturing']);
     if (!status || !status.online) throw new Error('Robot status is unavailable');
-    const reference = this.ParseReference(input);
+    const requestedMarkerId = SafeText(input.marker_id, 40);
+    const lockedMarker =
+      session.run_type === 'ground_truth'
+        ? session.reference_marker
+        : session.route_markers?.find((marker) => marker.marker_id === requestedMarkerId);
+    if (
+      ['route', 'dynamic_occluded'].includes(session.run_type) &&
+      session.route_markers &&
+      !lockedMarker
+    )
+      throw new Error(`Marker ${requestedMarkerId || '(empty)'} is not configured for this route`);
+    const reference = lockedMarker
+      ? {
+          x: lockedMarker.x,
+          y: lockedMarker.y,
+          yaw: lockedMarker.yaw,
+          marker_id: lockedMarker.marker_id,
+        }
+      : this.ParseReference(input);
     if (!reference) throw new Error('Reference pose is required');
-    const markerId = SafeText(input.marker_id, 40);
+    const markerId = lockedMarker?.marker_id || requestedMarkerId;
     if (!markerId) throw new Error('Marker ID is required');
-    AppendJsonLine(path.join(this.Directory(experimentId), 'raw', 'ground_truth.jsonl'), {
+    const checkpoints = this.Checkpoints(experimentId);
+    const existingCheckpoint = checkpoints.find((row) => row.marker_id === markerId);
+    if (session.run_type === 'ground_truth' && checkpoints.length >= 10)
+      throw new Error('Ground-truth verification already has 10 placements');
+    if (['route', 'dynamic_occluded'].includes(session.run_type)) {
+      if (checkpoints.length >= 8 && !existingCheckpoint)
+        throw new Error('The route already has 8 checkpoints');
+    }
+    const checkpointFile = path.join(this.Directory(experimentId), 'raw', 'ground_truth.jsonl');
+    const checkpoint = {
       schema: 'luckfox.experiment.checkpoint.v1',
       timestamp_ms: Date.now(),
       marker_id: markerId,
-      zone: SafeText(input.zone || session.zone, 32),
+      zone: lockedMarker?.zone || SafeText(input.zone || session.zone, 32),
       reference,
       estimate: status.pose,
       robot_timestamp_ms: status.timestamp_ms,
       backend_received_ms: status.received_ms,
       robot_sequence: status.seq,
       notes: SafeText(input.notes, 500),
+    };
+    if (existingCheckpoint && ['route', 'dynamic_occluded'].includes(session.run_type)) {
+      const rows = fs
+        .readFileSync(checkpointFile, 'utf8')
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      const existingIndex = rows.findIndex((row) => row.marker_id === markerId);
+      const previousCheckpoint = rows[existingIndex];
+      rows[existingIndex] = checkpoint;
+      fs.writeFileSync(checkpointFile, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+      AppendJsonLine(path.join(this.Directory(experimentId), 'raw', 'operator_events.jsonl'), {
+        schema: 'luckfox.experiment.event.v1',
+        timestamp_ms: Date.now(),
+        event: 'CHECKPOINT_REPLACED',
+        source: 'operator',
+        data: {
+          marker_id: markerId,
+          previous_checkpoint: previousCheckpoint,
+          replacement_checkpoint: checkpoint,
+        },
+      });
+      session.checkpoint_count = checkpoints.length;
+    } else {
+      AppendJsonLine(checkpointFile, checkpoint);
+      session.checkpoint_count = checkpoints.length + 1;
+      session.recorded_marker_ids = [...(session.recorded_marker_ids || []), markerId];
+    }
+    if (['route', 'dynamic_occluded'].includes(session.run_type))
+      session.checkpoint_estimates = {
+        ...(session.checkpoint_estimates || {}),
+        [markerId]: status.pose,
+      };
+    if (['route', 'dynamic_occluded'].includes(session.run_type)) {
+      session.route_started = (session.checkpoint_count || 0) >= 1;
+      session.route_ended = session.checkpoint_count === 8;
+    }
+    this.WriteSession(session);
+    this.Notify(session);
+    return session;
+  }
+
+  UnlockCheckpoint(experimentId: string, markerIdInput: unknown): ExperimentSession {
+    const session = this.Get(experimentId);
+    this.RequireState(session, ['capturing']);
+    if (!['route', 'dynamic_occluded'].includes(session.run_type))
+      throw new Error('Checkpoint unlock is only available for route-based tests');
+    const markerId = SafeText(markerIdInput, 40);
+    if (!markerId) throw new Error('Marker ID is required');
+
+    const checkpointFile = path.join(this.Directory(experimentId), 'raw', 'ground_truth.jsonl');
+    const rows = fs
+      .readFileSync(checkpointFile, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const existingIndex = rows.findIndex((row) => row.marker_id === markerId);
+    if (existingIndex < 0) throw new Error(`Marker ${markerId} is not locked`);
+    const [removedCheckpoint] = rows.splice(existingIndex, 1);
+    fs.writeFileSync(
+      checkpointFile,
+      rows.length ? `${rows.map((row) => JSON.stringify(row)).join('\n')}\n` : '',
+    );
+    AppendJsonLine(path.join(this.Directory(experimentId), 'raw', 'operator_events.jsonl'), {
+      schema: 'luckfox.experiment.event.v1',
+      timestamp_ms: Date.now(),
+      event: 'CHECKPOINT_UNLOCKED',
+      source: 'operator',
+      data: {
+        marker_id: markerId,
+        removed_checkpoint: removedCheckpoint,
+      },
     });
+    session.checkpoint_count = rows.length;
+    session.route_started = rows.length >= 1;
+    session.route_ended = rows.length === 8;
+    session.recorded_marker_ids = (session.recorded_marker_ids || []).filter(
+      (recordedMarkerId) => recordedMarkerId !== markerId,
+    );
+    const estimates = { ...(session.checkpoint_estimates || {}) };
+    delete estimates[markerId];
+    session.checkpoint_estimates = estimates;
+    this.WriteSession(session);
     this.Notify(session);
     return session;
   }
@@ -669,9 +949,9 @@ echo $! > '${remoteDir}/pid'
       throw new Error(
         `Ground-truth verification requires exactly 10 placements; found ${checkpointCount}`,
       );
-    if (['route', 'dynamic_occluded'].includes(session.run_type) && checkpointCount < 8)
+    if (['route', 'dynamic_occluded'].includes(session.run_type) && checkpointCount !== 8)
       throw new Error(
-        `A route-based test requires all 8 marker checkpoints; found ${checkpointCount}`,
+        `A route-based test requires exactly 8 marker checkpoints; found ${checkpointCount}`,
       );
     const eventFile = path.join(raw, 'operator_events.jsonl');
     const recordedEvents = fs.existsSync(eventFile)
@@ -681,6 +961,15 @@ echo $! > '${remoteDir}/pid'
           .filter(Boolean)
           .map((line) => JSON.parse(line) as { event?: string; timestamp_ms?: number })
       : [];
+    if (['route', 'dynamic_occluded'].includes(session.run_type)) {
+      const checkpoints = this.Checkpoints(experimentId);
+      if (new Set(checkpoints.map((row) => row.marker_id)).size !== 8)
+        throw new Error('A route-based test requires 8 unique marker IDs');
+      session.route_started = true;
+      session.route_ended = true;
+      session.checkpoint_count = 8;
+      this.WriteSession(session);
+    }
     if (
       session.run_type === 'dynamic_occluded' ||
       (session.run_type === 'route' && session.condition === 'dynamic_occluded')
@@ -788,9 +1077,48 @@ echo $! > '${remoteDir}/pid'
       throw new Error(`Operation is invalid while experiment state=${session.state}`);
   }
 
+  private Checkpoints(experimentId: string): Array<{ marker_id: string; timestamp_ms: number }> {
+    const file = path.join(this.Directory(experimentId), 'raw', 'ground_truth.jsonl');
+    if (!fs.existsSync(file)) return [];
+    return fs
+      .readFileSync(file, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            marker_id: string;
+            timestamp_ms: number;
+          },
+      );
+  }
+
   private Directory(experimentId: string): string {
     this.ValidateExperimentId(experimentId);
-    return path.join(this.OutputRoot, experimentId);
+    const legacy = path.join(this.OutputRoot, experimentId);
+    if (fs.existsSync(legacy)) return legacy;
+    for (const folder of Object.values(OutputFolderByRunType)) {
+      const categorized = path.join(this.OutputRoot, folder, experimentId);
+      if (fs.existsSync(categorized)) return categorized;
+    }
+    return legacy;
+  }
+
+  private ActiveMapFile(): string {
+    const maps = path.join(this.RepoRoot, 'maps');
+    let name = 'ruang_utama';
+    try {
+      const configured = JSON.parse(
+        fs.readFileSync(path.join(maps, 'active_map.json'), 'utf8'),
+      ) as { name?: unknown };
+      if (typeof configured.name === 'string' && /^[A-Za-z0-9_-]+$/.test(configured.name))
+        name = configured.name;
+    } catch {
+      // The established default remains valid before the first explicit selection.
+    }
+    const file = path.join(maps, `${name}.bin`);
+    if (!fs.existsSync(file)) throw new Error(`Active map binary is unavailable: ${file}`);
+    return file;
   }
 
   private SessionFile(experimentId: string): string {
@@ -854,5 +1182,18 @@ echo $! > '${remoteDir}/pid'
     } catch (error) {
       if (!optional) throw error;
     }
+  }
+
+  private async CopyRemoteVerified(
+    remote: string,
+    destination: string,
+    expectedSha256: string,
+  ): Promise<void> {
+    if (!fs.existsSync(destination)) await this.CopyRemote(remote, destination, false);
+    const actualSha256 = FileSha256(destination);
+    if (actualSha256 !== expectedSha256)
+      throw new Error(
+        `Capture checksum mismatch for ${path.basename(destination)}: expected ${expectedSha256}, found ${actualSha256}`,
+      );
   }
 }

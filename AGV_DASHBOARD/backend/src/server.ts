@@ -41,6 +41,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../..');
 const mapDir = process.env.MAP_DIR || path.join(root, 'maps');
 const mapName = process.env.MAP_NAME || 'ruang_utama';
+const activeMapFile = path.join(mapDir, 'active_map.json');
+const mapFileExtensions = ['yaml', 'pgm', 'bin', 'alignment.json'] as const;
 const robotPort = Number(process.env.ROBOT_TCP_PORT || 42000);
 const mapBridgePort = Number(process.env.MAP_BRIDGE_TCP_PORT || 42020);
 const httpPort = Number(process.env.HTTP_PORT || 8080);
@@ -78,6 +80,11 @@ const boardSshKey = process.env.BOARD_SSH_KEY || '/root/.ssh/luckfox_experiment_
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 let lastSavedMap: string | undefined;
+let activeMapName = ReadActiveMapName();
+const pendingMapTransfers = new Map<
+  number,
+  { catalog_name: string; robot_id: string; activate: boolean }
+>();
 const app = express();
 app.use(express.json());
 const server = http.createServer(app);
@@ -173,6 +180,148 @@ function parsePgm(name = mapName): { width: number; height: number; pixels: stri
   };
 }
 
+function loadSavedMap(name = mapName): MapMetadata & {
+  width: number;
+  height: number;
+  pixels: string;
+} {
+  return { ...parseYamlMap(name), ...parsePgm(name) };
+}
+
+function IsValidMapName(name: string): boolean {
+  return /^[a-zA-Z0-9_-]+$/.test(name);
+}
+
+function HasCompleteMap(name: string): boolean {
+  return (
+    IsValidMapName(name) &&
+    ['yaml', 'pgm', 'bin'].every((extension) =>
+      fs.existsSync(path.join(mapDir, `${name}.${extension}`)),
+    )
+  );
+}
+
+function ExistingMapFiles(name: string): string[] {
+  return mapFileExtensions
+    .map((extension) => path.join(mapDir, `${name}.${extension}`))
+    .filter((file) => fs.existsSync(file));
+}
+
+function MoveMapFiles(name: string, collection: '.history' | '.trash'): string {
+  const files = ExistingMapFiles(name);
+  if (!files.length) throw new Error(`Map ${name} has no files to move`);
+  const collectionDir = path.join(mapDir, collection);
+  fs.mkdirSync(collectionDir, { recursive: true });
+  const destination = path.join(collectionDir, `${Date.now()}_${name}`);
+  fs.mkdirSync(destination);
+  const moved: string[] = [];
+  try {
+    for (const source of files) {
+      fs.renameSync(source, path.join(destination, path.basename(source)));
+      moved.push(source);
+    }
+  } catch (error) {
+    for (const source of moved.reverse()) {
+      const archived = path.join(destination, path.basename(source));
+      if (fs.existsSync(archived)) fs.renameSync(archived, source);
+    }
+    fs.rmSync(destination, { recursive: true });
+    throw error;
+  }
+  return destination;
+}
+
+function RestoreMapFiles(name: string, sourceDirectory: string): void {
+  for (const current of ExistingMapFiles(name)) fs.rmSync(current);
+  for (const extension of mapFileExtensions) {
+    const archived = path.join(sourceDirectory, `${name}.${extension}`);
+    if (fs.existsSync(archived)) fs.renameSync(archived, path.join(mapDir, `${name}.${extension}`));
+  }
+  fs.rmSync(sourceDirectory, { recursive: true });
+}
+
+function ReadActiveMapName(): string {
+  try {
+    const configured = JSON.parse(fs.readFileSync(activeMapFile, 'utf8')) as { name?: unknown };
+    if (typeof configured.name === 'string' && HasCompleteMap(configured.name))
+      return configured.name;
+  } catch {
+    // A missing or invalid selection safely falls back to the default map.
+  }
+  return HasCompleteMap(mapName) ? mapName : '';
+}
+
+function PersistActiveMap(name: string): void {
+  const temporary = `${activeMapFile}.tmp`;
+  fs.writeFileSync(
+    temporary,
+    `${JSON.stringify({ schema: 'luckfox.active-map.v1', name, updated_unix_ms: Date.now() }, null, 2)}\n`,
+  );
+  fs.renameSync(temporary, activeMapFile);
+}
+
+function MapCatalog() {
+  if (!fs.existsSync(mapDir)) return [];
+  return fs
+    .readdirSync(mapDir)
+    .filter((file) => file.endsWith('.yaml'))
+    .map((file) => file.slice(0, -'.yaml'.length))
+    .filter(HasCompleteMap)
+    .sort((left, right) => left.localeCompare(right))
+    .map((name) => {
+      const metadata = parseYamlMap(name);
+      const image = parsePgm(name);
+      const files = ['yaml', 'pgm', 'bin', 'alignment.json']
+        .map((extension) => path.join(mapDir, `${name}.${extension}`))
+        .filter((file) => fs.existsSync(file));
+      return {
+        name,
+        active: name === activeMapName,
+        width: image.width,
+        height: image.height,
+        resolution: metadata.resolution,
+        origin: metadata.origin,
+        binary_bytes: fs.statSync(path.join(mapDir, `${name}.bin`)).size,
+        updated_unix_ms: Math.max(...files.map((file) => fs.statSync(file).mtimeMs)),
+      };
+    });
+}
+
+function ActivateBackendMap(name: string): void {
+  if (!HasCompleteMap(name)) throw new Error(`Map ${name} is incomplete or unavailable`);
+  const selected = loadSavedMap(name);
+  activeMapName = name;
+  liveMap = selected;
+  PersistActiveMap(name);
+  broadcastToDashboards({ type: 'mapping_map', data: selected });
+  broadcastToDashboards({ type: 'map_activated', data: { name } });
+}
+
+function ArmMapTransferTimeout(transferId: number): void {
+  setTimeout(() => {
+    const pending = pendingMapTransfers.get(transferId);
+    if (!pending) return;
+    pendingMapTransfers.delete(transferId);
+    broadcastToDashboards({
+      type: 'map_transfer_ack',
+      data: {
+        robot_id: pending.robot_id,
+        transfer_id: transferId,
+        name: pending.catalog_name,
+        success: false,
+        activated: false,
+        error: 'Map transfer timed out before robot ACK',
+      },
+    });
+  }, 15_000).unref();
+}
+
+function publishSavedMap(name = activeMapName || mapName): void {
+  const savedMap = loadSavedMap(name);
+  liveMap = savedMap;
+  broadcastToDashboards({ type: 'mapping_map', data: savedMap });
+}
+
 function createMissionFrame(command: MissionCommand, commandId: number): Buffer {
   const frame = Buffer.alloc(FRAME_HEADER_BYTES + COMMAND_PAYLOAD_BYTES);
 
@@ -257,7 +406,8 @@ function logRobotArrival(status: RobotStatus): void {
 
 app.get('/api/map', (_req, res) => {
   try {
-    res.json(liveMap ?? { ...parseYamlMap(), ...parsePgm() });
+    const selected = activeMapName || mapName;
+    res.json(liveMap ?? { ...parseYamlMap(selected), ...parsePgm(selected) });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -283,6 +433,33 @@ app.post('/api/robots/:id/mission/:action', (req, res) => {
 
 app.get('/api/experiments', (_req, res) => res.json(experiments.List()));
 app.get('/api/experiments/active', (_req, res) => res.json(experiments.GetActive() ?? null));
+app.get('/api/experiments/route-markers/:routeId', (req, res) => {
+  const filename = {
+    R1_ROOM_1_TO_2: 'markers_R1.json',
+    R2_ROOM_2_TO_1: 'markers_R2.json',
+  }[req.params.routeId];
+  if (!filename) return res.status(400).json({ error: 'Unsupported public route marker set' });
+  try {
+    const markers = JSON.parse(
+      fs.readFileSync(path.join(experimentOutputDir, 'Global', filename), 'utf8'),
+    ) as Array<{ marker_id: string; zone: string; x: number; y: number; yaw: number }>;
+    if (
+      !Array.isArray(markers) ||
+      markers.length !== 8 ||
+      new Set(markers.map((marker) => marker.marker_id)).size !== 8 ||
+      markers.some(
+        (marker) =>
+          !marker.marker_id ||
+          !marker.zone ||
+          ![marker.x, marker.y, marker.yaw].every(Number.isFinite),
+      )
+    )
+      throw new Error(`Invalid public marker data in ${filename}`);
+    return res.json(markers);
+  } catch (error) {
+    return res.status(500).json({ error: (error as Error).message });
+  }
+});
 app.get('/api/experiments/preflight', async (_req, res) => {
   try {
     res.json(await experiments.Preflight());
@@ -347,6 +524,13 @@ app.post('/api/experiments/:id/checkpoint', (req, res) => {
     res.status(400).json({ error: (error as Error).message });
   }
 });
+app.post('/api/experiments/:id/checkpoint/unlock', (req, res) => {
+  try {
+    res.json(experiments.UnlockCheckpoint(req.params.id, req.body?.marker_id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
 app.post('/api/experiments/:id/ablation', async (req, res) => {
   try {
     res.json(await experiments.RunAblation(req.params.id));
@@ -398,7 +582,45 @@ app.get('/api/experiments/:id/download', (req, res) => {
 });
 
 app.get('/api/mapping/status', (_req, res) => {
-  res.json({ state: mappingState, last_saved_map: lastSavedMap });
+  res.json({
+    state: mappingState,
+    last_saved_map: lastSavedMap,
+    active_map: activeMapName || null,
+  });
+});
+
+app.get('/api/maps', (_req, res) => {
+  try {
+    res.json({ active_map: activeMapName || null, maps: MapCatalog() });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/maps/:name', (req, res) => {
+  const { name } = req.params;
+  if (!IsValidMapName(name)) return res.status(400).json({ error: 'invalid map name' });
+  if (mappingState !== 'stopped')
+    return res
+      .status(409)
+      .json({ error: `stop mapping before deleting a map; state=${mappingState}` });
+  if (name === activeMapName)
+    return res
+      .status(409)
+      .json({ error: 'active map cannot be deleted; activate another map first' });
+  if (!HasCompleteMap(name)) return res.status(404).json({ error: 'complete map not found' });
+  try {
+    const trashed = MoveMapFiles(name, '.trash');
+    if (lastSavedMap === name) lastSavedMap = undefined;
+    broadcastToDashboards({ type: 'map_deleted', data: { name } });
+    return res.json({
+      deleted: true,
+      name,
+      recoverable_path: path.relative(mapDir, trashed),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: (error as Error).message });
+  }
 });
 
 app.post('/api/mapping/start', async (_req, res) => {
@@ -431,6 +653,12 @@ app.post('/api/maps/:name/transfer/:robotId', (req, res) => {
   const data = fs.readFileSync(mapPath);
   const transferId = ++commandSequence;
   robot.socket.write(createMapTransferFrame(name, data, transferId));
+  pendingMapTransfers.set(transferId, {
+    catalog_name: name,
+    robot_id: robotId,
+    activate: false,
+  });
+  ArmMapTransferTimeout(transferId);
   broadcastToDashboards({
     type: 'map_transfer_started',
     data: { name, robot_id: robotId, transfer_id: transferId },
@@ -440,6 +668,44 @@ app.post('/api/maps/:name/transfer/:robotId', (req, res) => {
     .json({ accepted: true, name, robot_id: robotId, transfer_id: transferId, bytes: data.length });
 });
 
+app.post('/api/maps/:name/activate/:robotId', (req, res) => {
+  const { name, robotId } = req.params;
+  if (!IsValidMapName(name)) return res.status(400).json({ error: 'invalid map name' });
+  if (!HasCompleteMap(name))
+    return res.status(404).json({ error: 'complete map set not found in backend catalog' });
+  if (mappingState !== 'stopped')
+    return res.status(409).json({ error: `stop mapping before activation; state=${mappingState}` });
+  const robot = robots.get(robotId);
+  if (!robot || !robot.status.online) return res.status(404).json({ error: 'robot not connected' });
+  if (robot.status.mission_running)
+    return res.status(409).json({ error: 'stop mission before activating a map' });
+
+  const data = fs.readFileSync(path.join(mapDir, `${name}.bin`));
+  const transferId = ++commandSequence;
+  // The board service boots from /etc/slam/ruang_utama.bin. Install the
+  // selected catalog payload under that stable active filename so the choice
+  // survives both a live reload and a later localizer restart.
+  robot.socket.write(createMapTransferFrame('ruang_utama', data, transferId));
+  pendingMapTransfers.set(transferId, {
+    catalog_name: name,
+    robot_id: robotId,
+    activate: true,
+  });
+  ArmMapTransferTimeout(transferId);
+  broadcastToDashboards({
+    type: 'map_transfer_started',
+    data: { name, robot_id: robotId, transfer_id: transferId, activate: true },
+  });
+  return res.status(202).json({
+    accepted: true,
+    pending_activation: true,
+    name,
+    robot_id: robotId,
+    transfer_id: transferId,
+    bytes: data.length,
+  });
+});
+
 app.post('/api/mapping/stop', async (_req, res) => {
   mappingState = 'stopping';
   broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
@@ -447,6 +713,7 @@ app.post('/api/mapping/stop', async (_req, res) => {
   if (robot) sendMissionCommand(robot, MissionCommand.Stop);
   try {
     const output = await runRootCommand(mapperScript, ['stop']);
+    publishSavedMap(activeMapName || mapName);
     mappingState = 'stopped';
     broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
     return res.json({ state: mappingState, output });
@@ -457,23 +724,74 @@ app.post('/api/mapping/stop', async (_req, res) => {
 });
 
 app.post('/api/mapping/save', async (req, res) => {
-  const mapName = typeof req.body?.name === 'string' ? req.body.name : 'ruang_utama';
-  if (!/^[a-zA-Z0-9_-]+$/.test(mapName)) {
+  const requestedMapName = typeof req.body?.name === 'string' ? req.body.name : '';
+  const replace = req.body?.replace === true;
+  if (!IsValidMapName(requestedMapName)) {
     return res.status(400).json({ error: 'invalid map name' });
   }
+  if (mappingState !== 'running')
+    return res
+      .status(409)
+      .json({ error: `mapping must be running before save; state=${mappingState}` });
+  const mapExists = ExistingMapFiles(requestedMapName).length > 0;
+  if (mapExists && !replace)
+    return res.status(409).json({
+      error: `map ${requestedMapName} already exists; choose a new name to preserve the catalog`,
+    });
+  if (replace && !HasCompleteMap(requestedMapName))
+    return res.status(404).json({ error: `complete map ${requestedMapName} not found` });
+  if (replace && requestedMapName === activeMapName)
+    return res
+      .status(409)
+      .json({ error: 'active map cannot be replaced; activate another map first' });
+
+  let backupDirectory: string | undefined;
   mappingState = 'saving';
   broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
   try {
-    const output = await runRootCommand(saveMapScript, [mapName]);
-    const alignedMap = { ...parseYamlMap(mapName), ...parsePgm(mapName) };
+    if (replace) backupDirectory = MoveMapFiles(requestedMapName, '.history');
+    const output = await runRootCommand(saveMapScript, [requestedMapName]);
+    const alignedMap = loadSavedMap(requestedMapName);
+    if (
+      Math.abs(alignedMap.origin.x) > 1e-6 ||
+      Math.abs(alignedMap.origin.y) > 1e-6 ||
+      Math.abs(alignedMap.origin.yaw) > 1e-6
+    ) {
+      throw new Error(
+        `auto alignment produced a non-zero origin: ` +
+          `${alignedMap.origin.x}, ${alignedMap.origin.y}, ${alignedMap.origin.yaw}`,
+      );
+    }
     liveMap = alignedMap;
     mappingState = 'running';
-    lastSavedMap = mapName;
+    lastSavedMap = requestedMapName;
     broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
     broadcastToDashboards({ type: 'mapping_map', data: alignedMap });
-    broadcastToDashboards({ type: 'map_saved', data: { name: mapName } });
-    return res.json({ state: mappingState, name: mapName, output });
+    broadcastToDashboards({
+      type: 'map_saved',
+      data: { name: requestedMapName, replaced: replace },
+    });
+    return res.json({
+      state: mappingState,
+      name: requestedMapName,
+      replaced: replace,
+      backup_path: backupDirectory ? path.relative(mapDir, backupDirectory) : undefined,
+      output,
+      map: {
+        width: alignedMap.width,
+        height: alignedMap.height,
+        resolution: alignedMap.resolution,
+        origin: alignedMap.origin,
+      },
+    });
   } catch (error) {
+    if (backupDirectory) {
+      try {
+        RestoreMapFiles(requestedMapName, backupDirectory);
+      } catch (restoreError) {
+        console.error(`Unable to restore map ${requestedMapName}:`, restoreError);
+      }
+    }
     mappingState = 'error';
     return res.status(500).json({ error: (error as Error).message, state: mappingState });
   }
@@ -535,12 +853,29 @@ const robotServer = net.createServer((socket) => {
           },
         });
       } else if (type === FrameType.MapAcknowledgement && payloadLength === 8) {
+        const transferId = payload.readUInt32BE(0);
+        const success = payload.readUInt8(4) === 1;
+        const pending = pendingMapTransfers.get(transferId);
+        let activated = false;
+        let activationError: string | undefined;
+        if (pending?.activate && success) {
+          try {
+            ActivateBackendMap(pending.catalog_name);
+            activated = true;
+          } catch (error) {
+            activationError = (error as Error).message;
+          }
+        }
+        pendingMapTransfers.delete(transferId);
         broadcastToDashboards({
           type: 'map_transfer_ack',
           data: {
             robot_id: robotId,
-            transfer_id: payload.readUInt32BE(0),
-            success: payload.readUInt8(4) === 1,
+            transfer_id: transferId,
+            name: pending?.catalog_name,
+            success: success && !activationError,
+            activated,
+            error: activationError,
           },
         });
       }
@@ -564,6 +899,7 @@ const mapServer = net.createServer((socket) => {
     incoming = Buffer.concat([incoming, chunk]);
   });
   socket.on('end', () => {
+    if (!['starting', 'running', 'saving'].includes(mappingState)) return;
     if (incoming.length < 40 || incoming.readUInt32BE(0) !== 0x4d415031) return;
     const payloadLength = incoming.readUInt32BE(8);
     if (incoming.length !== 16 + payloadLength || payloadLength < 24) return;

@@ -414,7 +414,6 @@
                 </td>
                 <td>
                   <ul>
-                    <li>Delapan marker tetap tersebar pada dua ruangan.</li>
                     <li>Pilih satu marker untuk seluruh placement.</li>
                     <li>Jangan mengubah referensi X, Y, dan yaw marker.</li>
                     <li>Map, firmware, dan parameter localizer harus tetap.</li>
@@ -515,13 +514,17 @@
                     <li>
                       Start mission lalu tunggu <code>TRACKING</code> stabil.
                     </li>
-                    <li>Tekan <b>ROUTE START</b> pada marker awal.</li>
+                    <li>
+                      Rekam checkpoint pertama sebagai awal rute.
+                    </li>
                     <li>Jalankan rute tetap dan berhenti di setiap marker.</li>
                     <li>
                       Pilih referensi yang benar lalu tekan
                       <b>RECORD CHECKPOINT</b>.
                     </li>
-                    <li>Setelah delapan marker, tekan <b>ROUTE END</b>.</li>
+                    <li>
+                      Checkpoint kedelapan otomatis menjadi akhir rute.
+                    </li>
                     <li>
                       Stop mission/capture, analyze, review, dan finalize.
                     </li>
@@ -746,8 +749,8 @@
                       Pilih <code>dynamic_occluded</code> dan route R1 atau R2.
                     </li>
                     <li>
-                      Buat session, mulai capture/mission, lalu tekan
-                      <b>ROUTE START</b>.
+                      Buat session, mulai capture/mission, lalu rekam
+                      checkpoint pertama sebagai awal rute.
                     </li>
                     <li>Untuk R1 orang menunggu di H1; untuk R2 di H2.</li>
                     <li>
@@ -769,7 +772,7 @@
                     <li>Localization score selama crossing.</li>
                     <li>Metrik akurasi route standar.</li>
                     <li class="pass">
-                      Lulus: satu START/END dan 8 checkpoint.
+                      Lulus: satu PERSON START/END dan 8 checkpoint.
                     </li>
                     <li class="danger">
                       Buat session baru jika durasi atau keselamatan gagal.

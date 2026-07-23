@@ -6,13 +6,18 @@
 
 #include "CYdLidar.h"
 
-#include <cstdlib>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <memory>
-#include <thread>
 #include <stdexcept>
+#include <thread>
+
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
 
 namespace {
 
@@ -73,6 +78,22 @@ int main(int argc, char** argv) try {
                  "       localize_uart MAP.bin UART INITIAL_X INITIAL_Y INITIAL_YAW [BAUD]\n"
                  "Example: localize_uart /etc/slam/ruang_utama.bin /dev/ttyS3 230400\n";
     return 2;
+  }
+
+  // Keep the UART, lidar and backend robot identity owned by exactly one
+  // process. The descriptor remains open for the process lifetime, so the
+  // kernel releases this lock even after a crash or SIGKILL.
+  const char* lock_path = "/var/run/localize_uart.lock";
+  const int instance_lock = ::open(lock_path, O_CREAT | O_RDWR, 0644);
+  if (instance_lock < 0) {
+    std::cerr << "Cannot open instance lock " << lock_path << ": "
+              << std::strerror(errno) << '\n';
+    return 1;
+  }
+  if (::flock(instance_lock, LOCK_EX | LOCK_NB) != 0) {
+    std::cerr << "Another localize_uart instance is already running\n";
+    ::close(instance_lock);
+    return 1;
   }
 
   luckfox::UartLidarConfig config;

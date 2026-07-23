@@ -6,6 +6,7 @@ DAEMON=/usr/bin/localize_uart
 CONFIG=/etc/default/localize_uart
 PIDFILE=/var/run/localize_uart.pid
 LOGFILE=/tmp/localize_uart.log
+DAEMON_NAME=localize_uart
 
 ENABLED=1
 MAP=/etc/slam/ruang_utama.bin
@@ -29,6 +30,10 @@ start() {
 	if [ ! -r "$MAP" ]; then
 		echo "localize_uart map not found: $MAP"
 		return 1
+	fi
+	if pidof "$DAEMON_NAME" >/dev/null 2>&1; then
+		echo "localize_uart is already running (pid $(pidof "$DAEMON_NAME"))"
+		return 0
 	fi
 
 	# UART may appear shortly after rcS begins on some board revisions.
@@ -76,11 +81,22 @@ start() {
 
 stop() {
 	printf "Stopping localize_uart: "
-	start-stop-daemon -K -q -p "$PIDFILE" -x "$DAEMON" -o
-	status=$?
+	# The experiment runner owns its own PID file. Also terminate orphaned or
+	# manually launched copies when the service PID file is absent/stale.
+	start-stop-daemon -K -q -p "$PIDFILE" -x "$DAEMON" -o 2>/dev/null || true
+	killall "$DAEMON_NAME" 2>/dev/null || true
 	rm -f "$PIDFILE"
-	[ "$status" -eq 0 ] && echo "OK" || echo "FAIL"
-	return "$status"
+	wait_count=0
+	while pidof "$DAEMON_NAME" >/dev/null 2>&1 && [ "$wait_count" -lt 20 ]; do
+		sleep 1
+		wait_count=$((wait_count + 1))
+	done
+	if pidof "$DAEMON_NAME" >/dev/null 2>&1; then
+		echo "FAIL"
+		return 1
+	fi
+	echo "OK"
+	return 0
 }
 
 case "$1" in
@@ -96,8 +112,8 @@ case "$1" in
 		start
 		;;
 	status)
-		if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-			echo "localize_uart is running (pid $(cat "$PIDFILE"))"
+		if pidof "$DAEMON_NAME" >/dev/null 2>&1; then
+			echo "localize_uart is running (pid $(pidof "$DAEMON_NAME"))"
 		else
 			echo "localize_uart is not running"
 			exit 1

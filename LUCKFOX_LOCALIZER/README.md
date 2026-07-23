@@ -43,13 +43,15 @@ Setiap map yang berhasil disimpan diproses otomatis dalam urutan berikut:
 
 1. `map_saver_cli` menulis PGM dan YAML mentah.
 2. `map_align` mendeteksi arah dinding dominan/terpanjang dengan Hough transform,
-   membuatnya sejajar sumbu X (0 derajat), lalu menetapkan origin X/Y non-negatif.
+   merotasi grid agar sejajar sumbu X, membuang margin unknown di luar area
+   terpetakan, lalu menetapkan origin tepat `[0, 0, 0]`.
 3. Metadata audit ditulis ke `maps/<nama>.alignment.json`.
-4. `map_converter` membuat BIN yang memakai origin dan yaw hasil alignment.
+4. `map_converter` membuat BIN dari grid yang sudah dinormalisasi.
 5. `map_inspect` memvalidasi BIN sebelum map dinyatakan berhasil disimpan.
 
-PGM tidak di-resample sehingga bentuk occupancy grid tetap utuh; rotasi disimpan
-sebagai transform koordinat pada YAML/BIN.
+PGM di-resample dengan nearest-neighbor pada resolusi asli agar nilai occupancy
+tetap diskret. Koordinat peta hasil normalisasi selalu dimulai dari sudut
+kiri-bawah `(0,0)`.
 
 Output utama:
 
@@ -107,7 +109,7 @@ GLOBAL_SEARCH -> RECOVERED -> TRACKING -> DEGRADED -> LOST
                       +------ global search ---+---------+
 ```
 
-Default yang dipertahankan adalah score minimum `0.35`, `LOST` setelah tiga
+Default yang dipakai adalah score minimum `0.90`, `LOST` setelah tiga
 tracking scan ditolak, dan `TRACKING` setelah tiga konfirmasi pasca-recovery.
 Semua threshold dapat dikonfigurasi melalui environment:
 

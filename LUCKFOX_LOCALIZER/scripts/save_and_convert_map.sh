@@ -31,4 +31,5 @@ cmake --build "$ProjectDir/build" --target map_align map_converter map_inspect -
 "$ProjectDir/build/map_inspect" "$MapDir/$Name.bin"
 
 echo "Auto alignment: $MapDir/$Name.alignment.json"
+echo "Normalized origin: (0, 0, 0); unknown border cropped"
 echo "Map untuk RV1106: $MapDir/$Name.bin"

@@ -17,15 +17,17 @@ Luckfox YDLidar SDK → TCP 42010 → ROS /scan → RF2O → SLAM Toolbox → /m
 React FE ← WebSocket ← Node BE ← TCP localhost 42020 ───┘
 ```
 
-`START MAPPING` menjalankan ROS remote mapper dan menyalakan LiDAR. `SAVE MAP`
-menghasilkan PGM/YAML/BIN. Setelah save sukses, tombol `TRANSFER MAP TO ROBOT`
-mengirim BIN lewat koneksi TCP binary yang sama. Board memvalidasi map sebelum
-memasang ke `/etc/slam` dan menyimpan versi sebelumnya sebagai `.bak`.
-`STOP MAPPING` mematikan LiDAR dan ROS mapping.
+`START MAPPING` menjalankan ROS remote mapper dan menyalakan LiDAR.
+`SAVE + AUTO ALIGN` memakai nama dari kartu **MAPPING SELECTION** dan menyimpan
+PGM/YAML/BIN/alignment JSON sebagai satu entri katalog di folder `maps/`.
+Nama map lama tidak ditimpa. `STOP MAPPING` mematikan LiDAR dan ROS mapping.
 
-Setelah transfer sukses, board langsung melakukan hot reload dan mereset pose;
-scan berikutnya menjalankan global localization pada map baru. Proses
-`localize_uart` dan LiDAR tidak perlu direstart.
+`ACTIVATE MAP ON ROBOT` mengirim binary terpilih ke board. Board memvalidasi,
+memasang sebagai `/etc/slam/ruang_utama.bin`, melakukan hot reload, dan
+mengirim ACK. Backend baru menyimpan `maps/active_map.json` dan mengganti map
+aktif setelah ACK sukses. Scan berikutnya menjalankan global localization pada
+map baru; proses `localize_uart` tidak perlu direstart. Preflight dan config
+session eksperimen selalu memakai map aktif tersebut.
 
 ## Jalankan
 
@@ -57,7 +59,8 @@ Tab **TESTING** mengikuti skenario ringkas pada `EXPERIMENTS/INSTRUKSI.md`:
 6. resource komputasi untuk idle, tracking, dan global relocalization.
 
 Setiap trial mengikuti lifecycle preflight, session, capture/replay, analyze,
-dan finalize. Output immutable berada di `EXPERIMENTS/Ouputs`.
+dan finalize. Output immutable dikelompokkan berdasarkan tipe test, misalnya
+`EXPERIMENTS/Ouputs/GROUND TRUTH/<experiment_id>`.
 
 STOP pada dashboard hanya menghentikan LiDAR/localization dan bukan pengganti
 emergency stop motor penggerak robot yang fail-safe.

@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -19,6 +20,9 @@ constexpr double kPi = 3.14159265358979323846;
 struct Config {
   std::string image;
   double resolution = 0.0;
+  double origin_x = 0.0;
+  double origin_y = 0.0;
+  double origin_yaw = 0.0;
   double occupied_threshold = 0.65;
   bool negate = false;
 };
@@ -73,6 +77,15 @@ Config ParseYaml(const fs::path& path) {
     else if (key == "resolution") config.resolution = std::stod(value);
     else if (key == "occupied_thresh") config.occupied_threshold = std::stod(value);
     else if (key == "negate") config.negate = std::stoi(value) != 0;
+    else if (key == "origin") {
+      auto numbers = value;
+      for (char& character : numbers) {
+        if (character == '[' || character == ']' || character == ',') character = ' ';
+      }
+      std::istringstream values(numbers);
+      if (!(values >> config.origin_x >> config.origin_y >> config.origin_yaw))
+        throw std::runtime_error("invalid origin in YAML");
+    }
   }
   if (config.image.empty() || config.resolution <= 0.0) {
     throw std::runtime_error("YAML requires image and positive resolution");
@@ -120,6 +133,99 @@ GrayImage ReadPgm(const fs::path& path) {
     }
   }
   return image;
+}
+
+struct NormalizedMap {
+  GrayImage image;
+  double source_minimum_x = 0.0;
+  double source_minimum_y = 0.0;
+  double source_maximum_x = 0.0;
+  double source_maximum_y = 0.0;
+};
+
+NormalizedMap NormalizeKnownArea(const GrayImage& source, double resolution,
+                                 double rotation) {
+  const double cosine = std::cos(rotation);
+  const double sine = std::sin(rotation);
+  double minimum_x = std::numeric_limits<double>::infinity();
+  double minimum_y = std::numeric_limits<double>::infinity();
+  double maximum_x = -std::numeric_limits<double>::infinity();
+  double maximum_y = -std::numeric_limits<double>::infinity();
+
+  for (std::uint32_t row = 0; row < source.height; ++row) {
+    for (std::uint32_t column = 0; column < source.width; ++column) {
+      const auto gray =
+          source.pixels[static_cast<std::size_t>(row) * source.width + column];
+      if (gray == 205) continue;
+      const double left = static_cast<double>(column) * resolution;
+      const double right = static_cast<double>(column + 1U) * resolution;
+      const auto map_row = source.height - 1U - row;
+      const double bottom = static_cast<double>(map_row) * resolution;
+      const double top = static_cast<double>(map_row + 1U) * resolution;
+      for (const auto& [x, y] :
+           std::vector<std::pair<double, double>>{
+               {left, bottom}, {right, bottom}, {right, top}, {left, top}}) {
+        const double aligned_x = cosine * x - sine * y;
+        const double aligned_y = sine * x + cosine * y;
+        minimum_x = std::min(minimum_x, aligned_x);
+        minimum_y = std::min(minimum_y, aligned_y);
+        maximum_x = std::max(maximum_x, aligned_x);
+        maximum_y = std::max(maximum_y, aligned_y);
+      }
+    }
+  }
+  if (!std::isfinite(minimum_x) || !std::isfinite(minimum_y))
+    throw std::runtime_error("map has no known cells to normalize");
+
+  GrayImage output;
+  output.width = std::max<std::uint32_t>(
+      1U, static_cast<std::uint32_t>(
+              std::ceil((maximum_x - minimum_x) / resolution - 1.0e-9)));
+  output.height = std::max<std::uint32_t>(
+      1U, static_cast<std::uint32_t>(
+              std::ceil((maximum_y - minimum_y) / resolution - 1.0e-9)));
+  output.pixels.assign(static_cast<std::size_t>(output.width) * output.height, 205);
+
+  for (std::uint32_t output_row = 0; output_row < output.height; ++output_row) {
+    const auto output_map_row = output.height - 1U - output_row;
+    const double aligned_y =
+        minimum_y + (static_cast<double>(output_map_row) + 0.5) * resolution;
+    for (std::uint32_t output_column = 0; output_column < output.width;
+         ++output_column) {
+      const double aligned_x =
+          minimum_x + (static_cast<double>(output_column) + 0.5) * resolution;
+      const double source_x = cosine * aligned_x + sine * aligned_y;
+      const double source_y = -sine * aligned_x + cosine * aligned_y;
+      const int source_column =
+          static_cast<int>(std::floor(source_x / resolution));
+      const int source_map_row =
+          static_cast<int>(std::floor(source_y / resolution));
+      if (source_column < 0 || source_map_row < 0 ||
+          source_column >= static_cast<int>(source.width) ||
+          source_map_row >= static_cast<int>(source.height))
+        continue;
+      const auto source_row =
+          source.height - 1U - static_cast<std::uint32_t>(source_map_row);
+      output.pixels[static_cast<std::size_t>(output_row) * output.width +
+                    output_column] =
+          source.pixels[static_cast<std::size_t>(source_row) * source.width +
+                        static_cast<std::uint32_t>(source_column)];
+    }
+  }
+  return {std::move(output), minimum_x, minimum_y, maximum_x, maximum_y};
+}
+
+void WritePgm(const fs::path& path, const GrayImage& image) {
+  const fs::path temporary = path.string() + ".normalizing";
+  {
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+    if (!output) throw std::runtime_error("cannot write PGM: " + temporary.string());
+    output << "P5\n" << image.width << ' ' << image.height << "\n255\n";
+    output.write(reinterpret_cast<const char*>(image.pixels.data()),
+                 static_cast<std::streamsize>(image.pixels.size()));
+    if (!output) throw std::runtime_error("failed writing PGM: " + temporary.string());
+  }
+  fs::rename(temporary, path);
 }
 
 std::vector<PixelPoint> OccupiedPixels(const GrayImage& image, const Config& config) {
@@ -217,24 +323,35 @@ void WriteAlignedYaml(const fs::path& yaml_path, double origin_x, double origin_
   fs::rename(temporary, yaml_path);
 }
 
-void WriteAlignmentReport(const fs::path& yaml_path, const GrayImage& image,
-                          const Direction& direction, double wall_angle, double origin_x,
-                          double origin_y, double origin_yaw, double resolution) {
+void WriteAlignmentReport(const fs::path& yaml_path, const GrayImage& source,
+                          const NormalizedMap& normalized,
+                          const Direction& direction, double wall_angle,
+                          double applied_rotation, const Config& config) {
   fs::path report_path = yaml_path;
   report_path.replace_extension(".alignment.json");
   std::ofstream report(report_path, std::ios::trunc);
   if (!report) throw std::runtime_error("cannot write alignment report: " + report_path.string());
   report << std::fixed << std::setprecision(9)
          << "{\n"
-         << "  \"method\": \"occupied-pixel-hough-dominant-wall\",\n"
-         << "  \"image_width_px\": " << image.width << ",\n"
-         << "  \"image_height_px\": " << image.height << ",\n"
-         << "  \"resolution_m_per_px\": " << resolution << ",\n"
+         << "  \"method\": \"hough-align-resample-crop-known-area\",\n"
+         << "  \"source_image_width_px\": " << source.width << ",\n"
+         << "  \"source_image_height_px\": " << source.height << ",\n"
+         << "  \"normalized_image_width_px\": " << normalized.image.width << ",\n"
+         << "  \"normalized_image_height_px\": " << normalized.image.height << ",\n"
+         << "  \"resolution_m_per_px\": " << config.resolution << ",\n"
          << "  \"detected_wall_angle_deg\": " << wall_angle * 180.0 / kPi << ",\n"
+         << "  \"applied_rotation_rad\": " << applied_rotation << ",\n"
          << "  \"hough_votes\": " << direction.votes << ",\n"
-         << "  \"origin_x_m\": " << origin_x << ",\n"
-         << "  \"origin_y_m\": " << origin_y << ",\n"
-         << "  \"origin_yaw_rad\": " << origin_yaw << "\n"
+         << "  \"source_known_min_x_m\": " << normalized.source_minimum_x << ",\n"
+         << "  \"source_known_min_y_m\": " << normalized.source_minimum_y << ",\n"
+         << "  \"source_known_max_x_m\": " << normalized.source_maximum_x << ",\n"
+         << "  \"source_known_max_y_m\": " << normalized.source_maximum_y << ",\n"
+         << "  \"previous_origin_x_m\": " << config.origin_x << ",\n"
+         << "  \"previous_origin_y_m\": " << config.origin_y << ",\n"
+         << "  \"previous_origin_yaw_rad\": " << config.origin_yaw << ",\n"
+         << "  \"origin_x_m\": 0.000000000,\n"
+         << "  \"origin_y_m\": 0.000000000,\n"
+         << "  \"origin_yaw_rad\": 0.000000000\n"
          << "}\n";
 }
 
@@ -256,32 +373,18 @@ int main(int argc, char** argv) try {
   // PGM Y grows downward; the map/world Y axis grows upward. Canonicalize the
   // undirected wall angle to [-90, +90] degrees, then cancel it with map yaw.
   const double wall_angle = std::remainder(-direction.image_angle, kPi);
-  const double origin_yaw = -wall_angle;
-  const double width_m = image.width * config.resolution;
-  const double height_m = image.height * config.resolution;
-  const double cosine = std::cos(origin_yaw);
-  const double sine = std::sin(origin_yaw);
-  const std::vector<std::pair<double, double>> corners = {
-      {0.0, 0.0}, {width_m, 0.0}, {width_m, height_m}, {0.0, height_m}};
-  double minimum_x = std::numeric_limits<double>::infinity();
-  double minimum_y = std::numeric_limits<double>::infinity();
-  for (const auto& [x, y] : corners) {
-    minimum_x = std::min(minimum_x, cosine * x - sine * y);
-    minimum_y = std::min(minimum_y, sine * x + cosine * y);
-  }
-  const auto without_negative_zero = [](double value) {
-    return std::abs(value) < 1.0e-12 ? 0.0 : value;
-  };
-  const double origin_x = without_negative_zero(-minimum_x);
-  const double origin_y = without_negative_zero(-minimum_y);
+  const double applied_rotation = -wall_angle;
+  auto normalized = NormalizeKnownArea(image, config.resolution, applied_rotation);
 
-  WriteAlignedYaml(yaml_path, origin_x, origin_y, origin_yaw);
-  WriteAlignmentReport(yaml_path, image, direction, wall_angle, origin_x, origin_y,
-                       origin_yaw, config.resolution);
+  WritePgm(image_path, normalized.image);
+  WriteAlignedYaml(yaml_path, 0.0, 0.0, 0.0);
+  WriteAlignmentReport(yaml_path, image, normalized, direction, wall_angle,
+                       applied_rotation, config);
   std::cout << std::fixed << std::setprecision(3)
             << "Aligned " << yaml_path << ": wall=" << wall_angle * 180.0 / kPi
-            << " deg, yaw=" << origin_yaw * 180.0 / kPi << " deg, origin=("
-            << origin_x << ", " << origin_y << ") m, votes=" << direction.votes << '\n';
+            << " deg, normalized=" << normalized.image.width << 'x'
+            << normalized.image.height << ", origin=(0.000, 0.000, 0.000), votes="
+            << direction.votes << '\n';
   return 0;
 } catch (const std::exception& error) {
   std::cerr << "map_align: " << error.what() << '\n';

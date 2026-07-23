@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 
@@ -24,15 +24,36 @@ type MapData = {
   height: number;
   pixels: string;
 };
+type MapCatalogEntry = {
+  name: string;
+  active: boolean;
+  width: number;
+  height: number;
+  resolution: number;
+  origin: { x: number; y: number; yaw: number };
+  binary_bytes: number;
+  updated_unix_ms: number;
+};
 type ServerMessage =
   | { type: 'snapshot'; data: RobotStatus[] }
   | { type: 'robot_status'; data: RobotStatus }
   | { type: 'command_ack'; data: { command: string } }
   | { type: 'mapping_status'; data: { state: MappingState } }
   | { type: 'mapping_map'; data: MapData }
-  | { type: 'map_saved'; data: { name: string } }
+  | { type: 'map_saved'; data: { name: string; replaced?: boolean } }
+  | { type: 'map_activated'; data: { name: string } }
+  | { type: 'map_deleted'; data: { name: string } }
   | { type: 'map_transfer_started'; data: { name: string } }
-  | { type: 'map_transfer_ack'; data: { success: boolean; transfer_id: number } }
+  | {
+      type: 'map_transfer_ack';
+      data: {
+        success: boolean;
+        transfer_id: number;
+        name?: string;
+        activated?: boolean;
+        error?: string;
+      };
+    }
   | { type: string; data?: unknown };
 
 type MappingState = 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error';
@@ -48,6 +69,13 @@ type ExperimentState =
   | 'analyzed'
   | 'finalized'
   | 'error';
+type ExperimentMarker = {
+  marker_id: string;
+  zone: string;
+  x: number;
+  y: number;
+  yaw: number;
+};
 type ExperimentSession = {
   experiment_id: string;
   condition: 'nominal' | 'lidar_occluded_90' | 'furniture_changed' | 'dynamic_occluded';
@@ -56,12 +84,66 @@ type ExperimentSession = {
   route_id: string;
   zone: string;
   state: ExperimentState;
+  created_unix_ms: number;
   status_count: number;
+  checkpoint_count?: number;
+  route_started?: boolean;
+  route_ended?: boolean;
+  recorded_marker_ids?: string[];
+  checkpoint_estimates?: Record<string, Pose>;
+  output_relative_path?: string;
+  reference_marker?: ExperimentMarker;
+  route_markers?: ExperimentMarker[];
   source_experiment_id?: string;
   error?: string;
 };
+type RouteMarkerDraft = {
+  marker_id: string;
+  zone: string;
+  x: string;
+  y: string;
+  yawRadians: string;
+  saved: boolean;
+};
+
+function InitialRouteMarkers(): RouteMarkerDraft[] {
+  return Array.from({ length: 8 }, (_, index) => ({
+    marker_id: `M${index + 1}`,
+    zone: index < 3 ? 'room_1' : index < 5 ? 'doorway_transition' : 'room_2',
+    x: '',
+    y: '',
+    yawRadians: '',
+    saved: false,
+  }));
+}
+
+const RouteMarkerStorageKey = 'luckfox.route-marker-drafts.v1';
+
+function StoredRouteMarkers(): RouteMarkerDraft[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(RouteMarkerStorageKey) || 'null');
+    if (
+      Array.isArray(stored) &&
+      stored.length === 8 &&
+      stored.every(
+        (marker) =>
+          typeof marker.marker_id === 'string' &&
+          typeof marker.zone === 'string' &&
+          typeof marker.x === 'string' &&
+          typeof marker.y === 'string' &&
+          typeof marker.yawRadians === 'string' &&
+          typeof marker.saved === 'boolean',
+      )
+    )
+      return stored as RouteMarkerDraft[];
+  } catch {
+    // Invalid browser state is safely replaced by a clean marker set.
+  }
+  return InitialRouteMarkers();
+}
 type ExperimentPreflight = {
   board_target: string;
+  active_map?: string;
   backend_unix_ms: number;
   local_map_sha256: string;
   board_map_sha256?: string;
@@ -82,7 +164,6 @@ type MapViewProps = {
 
 type MapPoint = { x: number; y: number };
 type MetricPoint = { x: number; y: number };
-type WallMeasurement = { start: MapPoint; end: MapPoint };
 
 type MapDisplayTransform = {
   scale: number;
@@ -257,55 +338,13 @@ function drawMetricGrid(
   context.restore();
 }
 
-function snapToBlackPixel(
-  point: MapPoint,
-  pixels: Uint8Array,
-  map: MapData,
-  radius: number,
-): MapPoint {
-  let nearest = point;
-  let nearestDistanceSquared = Number.POSITIVE_INFINITY;
-  const centerX = Math.round(point.x);
-  const centerY = Math.round(point.y);
-
-  for (
-    let y = Math.max(0, centerY - radius);
-    y <= Math.min(map.height - 1, centerY + radius);
-    y++
-  ) {
-    for (
-      let x = Math.max(0, centerX - radius);
-      x <= Math.min(map.width - 1, centerX + radius);
-      x++
-    ) {
-      if (pixels[y * map.width + x]! > 60) continue;
-      const distanceSquared = (x - point.x) ** 2 + (y - point.y) ** 2;
-      if (distanceSquared < nearestDistanceSquared) {
-        nearest = { x, y };
-        nearestDistanceSquared = distanceSquared;
-      }
-    }
-  }
-  return nearest;
-}
-
 function MapView({ map, robot }: MapViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [measuring, setMeasuring] = useState(false);
-  const [pendingPoint, setPendingPoint] = useState<MapPoint>();
-  const [measurements, setMeasurements] = useState<WallMeasurement[]>([]);
-  const [cursorWorld, setCursorWorld] = useState<MetricPoint>();
   const grayscalePixels = useMemo(
     () =>
       map ? Uint8Array.from(atob(map.pixels), (character) => character.charCodeAt(0)) : undefined,
     [map],
   );
-
-  useEffect(() => {
-    setPendingPoint(undefined);
-    setMeasurements([]);
-    setCursorWorld(undefined);
-  }, [map?.map_id]);
 
   useEffect(() => {
     if (!map || !grayscalePixels || !canvasRef.current) return;
@@ -346,62 +385,6 @@ function MapView({ map, robot }: MapViewProps) {
     context.restore();
 
     drawMetricGrid(context, canvas, map, transform);
-
-    for (const measurement of measurements) {
-      const start = transform.toCanvas(measurement.start);
-      const end = transform.toCanvas(measurement.end);
-      const lengthMeters =
-        Math.hypot(
-          measurement.end.x - measurement.start.x,
-          measurement.end.y - measurement.start.y,
-        ) * map.resolution;
-
-      context.save();
-      context.strokeStyle = '#0ea5e9';
-      context.fillStyle = '#0ea5e9';
-      context.lineWidth = 2;
-      context.setLineDash([7, 5]);
-      context.beginPath();
-      context.moveTo(start.x, start.y);
-      context.lineTo(end.x, end.y);
-      context.stroke();
-      context.setLineDash([]);
-      for (const point of [start, end]) {
-        context.beginPath();
-        context.arc(point.x, point.y, 4, 0, Math.PI * 2);
-        context.fill();
-      }
-
-      const label = `${lengthMeters.toFixed(2)} m`;
-      const startWorld = imageToWorld(measurement.start, map);
-      const endWorld = imageToWorld(measurement.end, map);
-      const coordinateLabel =
-        `A(${startWorld.x.toFixed(2)}, ${startWorld.y.toFixed(2)})  ` +
-        `B(${endWorld.x.toFixed(2)}, ${endWorld.y.toFixed(2)})`;
-      const labelX = (start.x + end.x) / 2;
-      const labelY = (start.y + end.y) / 2;
-      context.font = '700 15px ui-monospace, monospace';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      const labelWidth =
-        Math.max(context.measureText(label).width, context.measureText(coordinateLabel).width) + 14;
-      context.fillStyle = '#07111fdd';
-      context.fillRect(labelX - labelWidth / 2, labelY - 24, labelWidth, 48);
-      context.fillStyle = '#e0f2fe';
-      context.fillText(label, labelX, labelY - 8);
-      context.font = '700 10px ui-monospace, monospace';
-      context.fillStyle = '#7dd3fc';
-      context.fillText(coordinateLabel, labelX, labelY + 10);
-      context.restore();
-    }
-
-    if (pendingPoint) {
-      const pending = transform.toCanvas(pendingPoint);
-      context.fillStyle = '#facc15';
-      context.beginPath();
-      context.arc(pending.x, pending.y, 6, 0, Math.PI * 2);
-      context.fill();
-    }
 
     if (robot?.pose) {
       const robotCanvas = transform.toCanvas(
@@ -445,168 +428,17 @@ function MapView({ map, robot }: MapViewProps) {
       context.fill();
       context.restore();
     }
-  }, [grayscalePixels, map, measurements, pendingPoint, robot]);
+  }, [grayscalePixels, map, robot]);
 
-  const handleMapClick = (event: MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!measuring || !map || !grayscalePixels || !canvas) return;
-
-    const bounds = canvas.getBoundingClientRect();
-    const canvasX = (event.clientX - bounds.left) * (canvas.width / bounds.width);
-    const canvasY = (event.clientY - bounds.top) * (canvas.height / bounds.height);
-    const transform = mapTransform(canvas, map);
-    const rawPoint = transform.fromCanvas({ x: canvasX, y: canvasY });
-    if (rawPoint.x < 0 || rawPoint.x >= map.width || rawPoint.y < 0 || rawPoint.y >= map.height)
-      return;
-
-    const point = snapToBlackPixel(
-      rawPoint,
-      grayscalePixels,
-      map,
-      Math.max(3, Math.min(20, Math.round(14 / transform.scale))),
-    );
-    if (!pendingPoint) setPendingPoint(point);
-    else {
-      setMeasurements((current) => [...current, { start: pendingPoint, end: point }]);
-      setPendingPoint(undefined);
-    }
-  };
-
-  const handleMapMove = (event: MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!map || !canvas) return;
-    const bounds = canvas.getBoundingClientRect();
-    const canvasPoint = {
-      x: (event.clientX - bounds.left) * (canvas.width / bounds.width),
-      y: (event.clientY - bounds.top) * (canvas.height / bounds.height),
-    };
-    const imagePoint = mapTransform(canvas, map).fromCanvas(canvasPoint);
-    if (
-      imagePoint.x < 0 ||
-      imagePoint.x > map.width ||
-      imagePoint.y < 0 ||
-      imagePoint.y > map.height
-    ) {
-      setCursorWorld(undefined);
-      return;
-    }
-    setCursorWorld(imageToWorld(imagePoint, map));
-  };
-
-  return (
-    <>
-      <canvas
-        ref={canvasRef}
-        width="900"
-        height="650"
-        className={measuring ? 'measuring' : ''}
-        onClick={handleMapClick}
-        onMouseMove={handleMapMove}
-        onMouseLeave={() => setCursorWorld(undefined)}
-      />
-      <div className="measurement-tools">
-        <button
-          type="button"
-          className={measuring ? 'active' : ''}
-          onClick={() => {
-            setMeasuring((current) => !current);
-            setPendingPoint(undefined);
-          }}
-        >
-          {measuring ? 'FINISH MEASURING' : 'MEASURE WALL'}
-        </button>
-        <button
-          type="button"
-          disabled={!pendingPoint && measurements.length === 0}
-          onClick={() => {
-            if (pendingPoint) setPendingPoint(undefined);
-            else setMeasurements((current) => current.slice(0, -1));
-          }}
-        >
-          UNDO
-        </button>
-        <button
-          type="button"
-          disabled={!pendingPoint && measurements.length === 0}
-          onClick={() => {
-            setPendingPoint(undefined);
-            setMeasurements([]);
-          }}
-        >
-          CLEAR
-        </button>
-      </div>
-      <div className="coordinate-readout" aria-live="polite">
-        <small>MAP COORDINATE</small>
-        <span>X</span>
-        <b>{cursorWorld ? `${cursorWorld.x.toFixed(2)} m` : '—'}</b>
-        <span>Y</span>
-        <b>{cursorWorld ? `${cursorWorld.y.toFixed(2)} m` : '—'}</b>
-        <em>X → · Y ↑ · grid 1 m</em>
-      </div>
-      {measuring && (
-        <div className="measurement-hint">
-          {pendingPoint ? 'Click the second wall endpoint' : 'Click two endpoints on a black wall'}
-        </div>
-      )}
-    </>
-  );
+  return <canvas ref={canvasRef} width="900" height="650" />;
 }
 
 type ExperimentPanelProps = {
   robot?: RobotStatus;
   mission: (action: 'start' | 'stop') => Promise<void>;
   setNotice: (message: string) => void;
-};
-
-const TestDescriptions: Record<ExperimentRunType, string> = {
-  ground_truth: 'Repeat one surveyed marker placement 10 times to quantify reference uncertainty.',
-  route:
-    'Measure checkpoint localization on two routes under nominal, static-occlusion, and furniture-change conditions.',
-  kidnapped: 'Measure global relocalization after same-room or cross-room relocation.',
-  dynamic_occluded: 'Measure checkpoint robustness while one person crosses at trigger T0.',
-  ablation: 'Replay an existing raw recording through four matcher configurations.',
-  resource: 'Measure three 60-second states: idle, normal tracking, and global relocalization.',
-};
-
-const TestGuides: Record<ExperimentRunType, string[]> = {
-  ground_truth: [
-    'Use one surveyed marker and keep its reference coordinates unchanged.',
-    'Place the robot at the marker, wait for a valid pose, and record the checkpoint.',
-    'Remove and reposition the robot before every repetition.',
-    'Complete exactly 10 independent placements.',
-  ],
-  route: [
-    'Press ROUTE START at the starting marker.',
-    'Drive the frozen route and stop at each surveyed marker.',
-    'Select the marker reference and press RECORD CHECKPOINT.',
-    'Press ROUTE END at the final marker.',
-  ],
-  kidnapped: [
-    'Wait until localization is stable in TRACKING mode.',
-    'Press KIDNAP START, cover or lift the LiDAR, then move the robot.',
-    'Select the destination reference and press KIDNAP RELEASE.',
-    'Wait for TRACKING recovery, then record the final checkpoint.',
-  ],
-  dynamic_occluded: [
-    'Place floor markers H1, H2, and trigger marker T0 as defined in the test plan.',
-    'Press ROUTE START, then drive the selected route at the standard speed.',
-    'At T0, press PERSON START as the person begins crossing H1–H2 or H2–H1.',
-    'Press PERSON END at the opposite endpoint; the required duration is 3 ± 0.5 seconds.',
-    'Record all eight checkpoints, press ROUTE END, then complete analysis and finalization.',
-  ],
-  ablation: [
-    'Select a finalized route or kidnapped recording with raw scans.',
-    'Run replay; no new physical experiment or board capture is required.',
-    'Analyze local-only, local+global, single-resolution, and multi-resolution output.',
-    'Repeat with at least 10 representative recordings.',
-  ],
-  resource: [
-    'Record IDLE for 60 seconds while capture is active and the mission is stopped.',
-    'Start the mission, then record NORMAL TRACKING for 60 seconds.',
-    'Force relocalization and record GLOBAL RELOCALIZATION for 60 seconds.',
-    'Repeat each state five times; CPU, RAM, processing time, and update rate are recorded automatically.',
-  ],
+  preflight?: ExperimentPreflight;
+  setPreflight: (preflight: ExperimentPreflight) => void;
 };
 
 async function JsonRequest<T>(url: string, options?: RequestInit): Promise<T> {
@@ -616,7 +448,13 @@ async function JsonRequest<T>(url: string, options?: RequestInit): Promise<T> {
   return result;
 }
 
-function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
+function ExperimentPanel({
+  robot,
+  mission,
+  setNotice,
+  preflight,
+  setPreflight,
+}: ExperimentPanelProps) {
   const [runType, setRunType] = useState<ExperimentRunType>('route');
   const [condition, setCondition] = useState<ExperimentSession['condition']>('nominal');
   const [routeId, setRouteId] = useState('R1_ROOM_1_TO_2');
@@ -624,13 +462,13 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
   const [trial, setTrial] = useState(1);
   const [session, setSession] = useState<ExperimentSession>();
   const [sessions, setSessions] = useState<ExperimentSession[]>([]);
-  const [preflight, setPreflight] = useState<ExperimentPreflight>();
   const [busy, setBusy] = useState(false);
   const [markerId, setMarkerId] = useState('M1');
-  const [markerX, setMarkerX] = useState('0');
-  const [markerY, setMarkerY] = useState('0');
-  const [markerYaw, setMarkerYaw] = useState('0');
+  const [markerX, setMarkerX] = useState('1.65');
+  const [markerY, setMarkerY] = useState('1.35');
+  const [markerYawDegrees, setMarkerYawDegrees] = useState('85.1');
   const [markerZone, setMarkerZone] = useState('room_1');
+  const [routeMarkers, setRouteMarkers] = useState<RouteMarkerDraft[]>(StoredRouteMarkers);
   const [report, setReport] = useState<Record<string, unknown>>();
   const [sourceExperimentId, setSourceExperimentId] = useState('');
   const [checkpointCount, setCheckpointCount] = useState(0);
@@ -644,10 +482,28 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
       JsonRequest<ExperimentSession | null>('/api/experiments/active'),
       JsonRequest<ExperimentSession[]>('/api/experiments'),
     ]);
-    if (active) setSession(active);
-    else if (session) {
-      const updated = list.find((item) => item.experiment_id === session.experiment_id);
-      if (updated) setSession(updated);
+    if (active) {
+      setSession(active);
+      setRunType(active.run_type);
+      setCondition(active.condition);
+      setRouteId(active.route_id);
+      setCheckpointCount(active.checkpoint_count ?? 0);
+    } else {
+      const resumable = list.find((item) => !['finalized', 'error'].includes(item.state));
+      const updated = session
+        ? list.find((item) => item.experiment_id === session.experiment_id)
+        : undefined;
+      const selected = resumable || updated;
+      if (selected) {
+        setSession(selected);
+        setRunType(selected.run_type);
+        setCondition(selected.condition);
+        setRouteId(selected.route_id);
+        setCheckpointCount(selected.checkpoint_count ?? 0);
+      } else {
+        setSession(undefined);
+        setCheckpointCount(0);
+      }
     }
     setSessions(list);
   };
@@ -659,15 +515,57 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
   }, []);
 
   useEffect(() => {
-    if (runType === 'ground_truth') setRouteId('GROUND_TRUTH_REPEAT');
-    if (runType === 'route') setRouteId('R1_ROOM_1_TO_2');
+    if (runType === 'ground_truth') {
+      setRouteId('GROUND_TRUTH_REPEAT');
+      setZone('room_1');
+      setMarkerZone('room_1');
+      setMarkerId('M1');
+      setMarkerX('1.65');
+      setMarkerY('1.35');
+      setMarkerYawDegrees('85.1');
+    }
+    if (runType === 'route') {
+      setRouteId('R1_ROOM_1_TO_2');
+    }
     if (runType === 'kidnapped') setRouteId('KIDNAP_SAME_ROOM');
-    if (runType === 'dynamic_occluded') setRouteId('R1_ROOM_1_TO_2');
+    if (runType === 'dynamic_occluded') {
+      setRouteId('R1_ROOM_1_TO_2');
+    }
     if (runType === 'ablation') setRouteId('ABLATION_REPLAY');
     if (runType === 'resource') setRouteId('RESOURCE_SEQUENCE');
     if (runType === 'dynamic_occluded') setCondition('dynamic_occluded');
     else if (runType !== 'route') setCondition('nominal');
   }, [runType]);
+
+  useEffect(() => {
+    localStorage.setItem(RouteMarkerStorageKey, JSON.stringify(routeMarkers));
+  }, [routeMarkers]);
+
+  useEffect(() => {
+    if (runType !== 'route' && runType !== 'dynamic_occluded') return;
+    let active = true;
+    JsonRequest<ExperimentMarker[]>(`/api/experiments/route-markers/${encodeURIComponent(routeId)}`)
+      .then((markers) => {
+        if (!active) return;
+        setRouteMarkers(
+          markers.map((marker) => ({
+            marker_id: marker.marker_id,
+            zone: marker.zone,
+            x: String(marker.x),
+            y: String(marker.y),
+            yawRadians: String(marker.yaw),
+            saved: true,
+          })),
+        );
+        setNotice(`${routeId}: public ground-truth markers loaded`);
+      })
+      .catch((error) => {
+        if (active) setNotice((error as Error).message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [routeId, runType]);
 
   useEffect(() => {
     if (sourceExperimentId) return;
@@ -679,11 +577,63 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
     if (candidate) setSourceExperimentId(candidate.experiment_id);
   }, [sessions, sourceExperimentId]);
 
-  const Run = async (action: () => Promise<void>) => {
+  const UpdateRouteMarker = (
+    index: number,
+    field: keyof Omit<RouteMarkerDraft, 'saved'>,
+    value: string,
+  ) =>
+    setRouteMarkers((markers) =>
+      markers.map((marker, markerIndex) =>
+        markerIndex === index ? { ...marker, [field]: value, saved: false } : marker,
+      ),
+    );
+
+  const SaveRouteMarker = (index: number) => {
+    const marker = routeMarkers[index];
+    if (!marker) return;
+    if (!robot?.online || !robot.pose.valid) {
+      setNotice(`${marker.marker_id}: wait for a VALID monitoring pose before saving`);
+      return;
+    }
+    if (!marker.marker_id.trim()) {
+      setNotice(`Marker ${index + 1}: enter a valid marker ID`);
+      return;
+    }
+    if (
+      routeMarkers.some(
+        (candidate, candidateIndex) =>
+          candidateIndex !== index &&
+          candidate.marker_id.trim().toUpperCase() === marker.marker_id.trim().toUpperCase(),
+      )
+    ) {
+      setNotice(`Marker ID ${marker.marker_id} is duplicated`);
+      return;
+    }
+    setRouteMarkers((markers) =>
+      markers.map((candidate, markerIndex) =>
+        markerIndex === index
+          ? {
+              ...candidate,
+              x: String(robot.pose.x),
+              y: String(robot.pose.y),
+              yawRadians: String(robot.pose.yaw),
+              saved: true,
+            }
+          : candidate,
+      ),
+    );
+    setNotice(
+      `${marker.marker_id} locked from monitoring: X ${robot.pose.x.toFixed(
+        3,
+      )} m, Y ${robot.pose.y.toFixed(3)} m, yaw ${robot.pose.yaw.toFixed(6)} rad`,
+    );
+  };
+
+  const Run = async (action: () => Promise<void>, refreshAfter = true) => {
     setBusy(true);
     try {
       await action();
-      await Refresh();
+      if (refreshAfter) await Refresh();
     } catch (error) {
       setNotice((error as Error).message);
     } finally {
@@ -705,16 +655,40 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
           ground_truth_method: 'surveyed_floor_markers',
           robot_id: robot?.robot_id || 'AGV-001',
           source_experiment_id: runType === 'ablation' ? sourceExperimentId : undefined,
+          reference_marker:
+            runType === 'ground_truth'
+              ? {
+                  marker_id: markerId,
+                  zone,
+                  x: Number(markerX),
+                  y: Number(markerY),
+                  yaw: (Number(markerYawDegrees) * Math.PI) / 180,
+                }
+              : undefined,
+          route_markers:
+            runType === 'route' || runType === 'dynamic_occluded'
+              ? routeMarkers.map((marker) => ({
+                  marker_id: marker.marker_id,
+                  zone: marker.zone,
+                  x: Number(marker.x),
+                  y: Number(marker.y),
+                  yaw: Number(marker.yawRadians),
+                }))
+              : undefined,
         }),
       });
       setSession(created);
+      setSessions((current) => [
+        created,
+        ...current.filter((item) => item.experiment_id !== created.experiment_id),
+      ]);
       setReport(undefined);
       setCheckpointCount(0);
       setResourceMeasurementCount(0);
       setDynamicCrossingStartedAt(undefined);
       setDynamicCrossingDuration(undefined);
       setNotice(`Session created: ${created.experiment_id}`);
-    });
+    }, false);
 
   const SessionAction = (action: 'start' | 'stop' | 'analyze' | 'finalize') =>
     Run(async () => {
@@ -741,18 +715,22 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
   ) =>
     Run(async () => {
       if (!session) throw new Error('Start a capture session first');
-      await JsonRequest(`/api/experiments/${session.experiment_id}/event`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event,
-          marker_id: markerId,
-          x: includeReference ? Number(markerX) : undefined,
-          y: includeReference ? Number(markerY) : undefined,
-          yaw: includeReference ? Number(markerYaw) : undefined,
-          ...data,
-        }),
-      });
+      const updated = await JsonRequest<ExperimentSession>(
+        `/api/experiments/${session.experiment_id}/event`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event,
+            marker_id: markerId,
+            x: includeReference ? Number(markerX) : undefined,
+            y: includeReference ? Number(markerY) : undefined,
+            yaw: includeReference ? (Number(markerYawDegrees) * Math.PI) / 180 : undefined,
+            ...data,
+          }),
+        },
+      );
+      setSession(updated);
       if (event === 'DYNAMIC_OCCLUSION_START') {
         setDynamicCrossingStartedAt(Date.now());
         setDynamicCrossingDuration(undefined);
@@ -766,22 +744,49 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
       setNotice(`Event ${event} recorded`);
     });
 
-  const RecordCheckpoint = () =>
+  const RecordCheckpoint = (configuredMarker?: ExperimentMarker) =>
     Run(async () => {
       if (!session) throw new Error('Start a capture session first');
-      await JsonRequest(`/api/experiments/${session.experiment_id}/checkpoint`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          marker_id: markerId,
-          zone: markerZone,
-          x: Number(markerX),
-          y: Number(markerY),
-          yaw: Number(markerYaw),
-        }),
-      });
-      setCheckpointCount((count) => count + 1);
-      setNotice(`Checkpoint ${markerId} recorded`);
+      const replacing = Boolean(
+        configuredMarker && session.recorded_marker_ids?.includes(configuredMarker.marker_id),
+      );
+      const updated = await JsonRequest<ExperimentSession>(
+        `/api/experiments/${session.experiment_id}/checkpoint`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            marker_id: configuredMarker?.marker_id || markerId,
+            zone: configuredMarker?.zone || markerZone,
+            x: configuredMarker?.x ?? Number(markerX),
+            y: configuredMarker?.y ?? Number(markerY),
+            yaw: configuredMarker?.yaw ?? (Number(markerYawDegrees) * Math.PI) / 180,
+          }),
+        },
+      );
+      setSession(updated);
+      setCheckpointCount(updated.checkpoint_count ?? checkpointCount + 1);
+      setNotice(
+        `Checkpoint ${configuredMarker?.marker_id || markerId} ${
+          replacing ? 'replaced' : 'recorded'
+        }`,
+      );
+    });
+
+  const UnlockCheckpoint = (configuredMarker: ExperimentMarker) =>
+    Run(async () => {
+      if (!session) throw new Error('Start a capture session first');
+      const updated = await JsonRequest<ExperimentSession>(
+        `/api/experiments/${session.experiment_id}/checkpoint/unlock`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ marker_id: configuredMarker.marker_id }),
+        },
+      );
+      setSession(updated);
+      setCheckpointCount(updated.checkpoint_count ?? Math.max(0, checkpointCount - 1));
+      setNotice(`${configuredMarker.marker_id} unlocked; its card is live and can be locked again`);
     });
 
   const RunAblation = () =>
@@ -799,7 +804,7 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
     Run(async () => {
       const result = await JsonRequest<ExperimentPreflight>('/api/experiments/preflight');
       setPreflight(result);
-      setNotice('Preflight completed');
+      setNotice('Preflight completed; selected public route markers remain locked');
     });
 
   const finalized = sessions.filter((item) => item.state === 'finalized');
@@ -819,20 +824,21 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
     preflight.map_match &&
     preflight.binary_match,
   );
-  const flowLabels =
-    runType === 'ablation'
-      ? ['Preflight', 'Session', 'Replay', 'Analyze', 'Finalize']
-      : ['Preflight', 'Session', 'Capture', 'Mission', 'Test', 'Stop', 'Analyze', 'Finalize'];
-  const activeGuide = TestGuides[runType];
   const pedestrianDirection = routeId === 'R2_ROOM_2_TO_1' ? 'H2_TO_H1' : 'H1_TO_H2';
+  const routeMarkersReady = routeMarkers.every(
+    (marker) =>
+      marker.saved &&
+      marker.marker_id.trim() &&
+      marker.x.trim() &&
+      marker.y.trim() &&
+      marker.yawRadians.trim() &&
+      [Number(marker.x), Number(marker.y), Number(marker.yawRadians)].every(Number.isFinite),
+  );
+  const configuredRouteMarkers = session?.route_markers || [];
 
   return (
     <section className="experiment-panel">
-      <div className="experiment-heading">
-        <div>
-          <span className="step-kicker">PUBLICATION TESTING</span>
-          <h2>Guided Workflow</h2>
-        </div>
+      <div className="experiment-heading experiment-status-only">
         <span className={`session-state state-${session?.state || 'none'}`}>
           {session?.state?.toUpperCase() || 'NO SESSION'}
         </span>
@@ -855,31 +861,16 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
             disabled={Boolean(session && !canCreate)}
             onClick={() => setRunType(type)}
           >
-            <small>TEST TYPE</small>
             {type.replace('_', ' ').toUpperCase()}
           </button>
-        ))}
-      </div>
-      <p className="test-description">{TestDescriptions[runType]}</p>
-
-      <div className="workflow-overview" aria-label="Experiment procedure">
-        {flowLabels.map((label, index) => (
-          <div key={label}>
-            <b>{index}</b>
-            <span>{label}</span>
-          </div>
         ))}
       </div>
 
       <div className="workflow-card preflight-step">
         <div className="workflow-title">
           <b>0</b>
-          <span>Verify the system before every trial</span>
+          <span>Preflight</span>
         </div>
-        <p className="step-help">
-          Confirm that the robot is online, the mission is stopped, and the frozen map and binary
-          match the board.
-        </p>
         <button className="step-primary" disabled={busy} onClick={RunPreflight}>
           RUN PREFLIGHT
         </button>
@@ -923,6 +914,9 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
               <div>
                 <b>Map SHA:</b> {preflight.local_map_sha256.slice(0, 16)}…
               </div>
+              <div>
+                <b>Active map:</b> {preflight.active_map || 'unknown'}
+              </div>
               <pre>{preflight.mapper_status}</pre>
               <pre>{preflight.board_report}</pre>
             </details>
@@ -933,12 +927,8 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
       <div className="workflow-card">
         <div className="workflow-title">
           <b>1</b>
-          <span>Configure and create the trial session</span>
+          <span>Session setup</span>
         </div>
-        <p className="step-help">
-          The robot ID, surveyed-marker ground truth, map, and output directory are assigned
-          automatically.
-        </p>
         <div className="form-grid">
           <label>
             Condition
@@ -1022,19 +1012,172 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
             />
           </label>
         </div>
+        {runType === 'ground_truth' && (
+          <div className="ground-truth-reference-setup">
+            <small>GROUND-TRUTH MARKER REFERENCE</small>
+            <div className="marker-form">
+              <label>
+                Marker ID
+                <input
+                  value={markerId}
+                  disabled={Boolean(session && !canCreate)}
+                  onChange={(event) => setMarkerId(event.target.value)}
+                />
+              </label>
+              <label>
+                X (m)
+                <input
+                  type="number"
+                  step="0.01"
+                  value={markerX}
+                  disabled={Boolean(session && !canCreate)}
+                  onChange={(event) => setMarkerX(event.target.value)}
+                />
+              </label>
+              <label>
+                Y (m)
+                <input
+                  type="number"
+                  step="0.01"
+                  value={markerY}
+                  disabled={Boolean(session && !canCreate)}
+                  onChange={(event) => setMarkerY(event.target.value)}
+                />
+              </label>
+              <label>
+                Yaw (deg)
+                <input
+                  type="number"
+                  step="0.1"
+                  value={markerYawDegrees}
+                  disabled={Boolean(session && !canCreate)}
+                  onChange={(event) => setMarkerYawDegrees(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+        )}
+        {(runType === 'route' || runType === 'dynamic_occluded') && (
+          <div className="ground-truth-reference-setup">
+            <div className="route-survey-controls">
+              <button
+                disabled={!robot?.online || Boolean(robot?.mission_running)}
+                type="button"
+                onClick={() => mission('start')}
+              >
+                START LIVE
+              </button>
+              <button
+                className="stop"
+                disabled={!robot?.online || !robot?.mission_running}
+                type="button"
+                onClick={() => mission('stop')}
+              >
+                STOP LIVE
+              </button>
+            </div>
+            <div className="route-marker-grid">
+              {routeMarkers.map((marker, index) => {
+                const livePose = robot?.online ? robot.pose : undefined;
+                const displayX = marker.saved
+                  ? Number(marker.x)
+                  : livePose?.valid
+                    ? livePose.x
+                    : undefined;
+                const displayY = marker.saved
+                  ? Number(marker.y)
+                  : livePose?.valid
+                    ? livePose.y
+                    : undefined;
+                const displayYaw = marker.saved
+                  ? Number(marker.yawRadians)
+                  : livePose?.valid
+                    ? livePose.yaw
+                    : undefined;
+                return (
+                  <div
+                    className={`route-marker-card ${marker.saved ? 'marker-saved' : ''}`}
+                    key={index}
+                  >
+                    <div className="route-marker-title">
+                      <input
+                        aria-label={`Marker ${index + 1} ID`}
+                        value={marker.marker_id}
+                        disabled={marker.saved}
+                        onChange={(event) =>
+                          UpdateRouteMarker(index, 'marker_id', event.target.value)
+                        }
+                      />
+                      <span>{marker.saved ? 'LOCKED' : livePose?.valid ? 'LIVE' : 'NO POSE'}</span>
+                    </div>
+                    <label>
+                      Zone
+                      <select
+                        value={marker.zone}
+                        disabled={marker.saved}
+                        onChange={(event) => UpdateRouteMarker(index, 'zone', event.target.value)}
+                      >
+                        <option value="room_1">Room 1</option>
+                        <option value="doorway_transition">Doorway</option>
+                        <option value="room_2">Room 2</option>
+                      </select>
+                    </label>
+                    <div className="route-marker-values">
+                      <label>
+                        X (m)
+                        <input readOnly value={displayX === undefined ? '' : displayX.toFixed(3)} />
+                      </label>
+                      <label>
+                        Y (m)
+                        <input readOnly value={displayY === undefined ? '' : displayY.toFixed(3)} />
+                      </label>
+                      <label>
+                        Yaw (rad)
+                        <input
+                          readOnly
+                          value={displayYaw === undefined ? '' : displayYaw.toFixed(6)}
+                        />
+                      </label>
+                    </div>
+                    <div className="route-marker-save">
+                      <small>
+                        {displayYaw === undefined
+                          ? 'Waiting for valid monitoring pose'
+                          : `${((displayYaw * 180) / Math.PI).toFixed(1)}° · score ${
+                              livePose?.score.toFixed(3) ?? '—'
+                            }`}
+                      </small>
+                      <button
+                        className={marker.saved ? '' : 'highlight'}
+                        disabled={marker.saved || !livePose?.valid}
+                        type="button"
+                        onClick={() => SaveRouteMarker(index)}
+                      >
+                        {marker.saved ? `${marker.marker_id} LOCKED` : `SAVE ${marker.marker_id}`}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <button
           className="step-primary"
           disabled={
-            busy || !canCreate || !preflightReady || (runType === 'ablation' && !sourceExperimentId)
+            busy ||
+            !canCreate ||
+            !preflightReady ||
+            (runType === 'ablation' && !sourceExperimentId) ||
+            ((runType === 'route' || runType === 'dynamic_occluded') && !routeMarkersReady)
           }
           onClick={CreateSession}
         >
           CREATE SESSION
         </button>
-        {!preflightReady && (
-          <p className="gate-message">
-            Complete preflight with Robot ONLINE, Mission STOPPED, Map MATCH, and Binary MATCH.
-          </p>
+        {!preflightReady && <p className="gate-message">...</p>}
+        {(runType === 'route' || runType === 'dynamic_occluded') && !routeMarkersReady && (
+          <p className="gate-message">Save all 8 marker references before creating the session.</p>
         )}
       </div>
 
@@ -1042,22 +1185,14 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
         <div className="workflow-card">
           <div className="workflow-title">
             <b>2</b>
-            <span>Run the four replay variants</span>
+            <span>Ablation replay</span>
           </div>
-          <p className="step-help">
-            Reuses the selected raw scan recording. The robot and LiDAR remain stopped.
-          </p>
-          <ol className="procedure-list">
-            {TestGuides.ablation.map((instruction) => (
-              <li key={instruction}>{instruction}</li>
-            ))}
-          </ol>
           <button
             className="step-primary"
             disabled={busy || session?.state !== 'created'}
             onClick={RunAblation}
           >
-            RUN ABLATION REPLAY
+            RUN REPLAY
           </button>
         </div>
       ) : (
@@ -1065,11 +1200,8 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
           <div className="start-step">
             <div className="workflow-title">
               <b>2</b>
-              <span>Start board data capture</span>
+              <span>Capture</span>
             </div>
-            <p className="step-help">
-              Creates isolated telemetry and raw-scan files for this trial.
-            </p>
             <button
               disabled={busy || session?.state !== 'created'}
               onClick={() => SessionAction('start')}
@@ -1080,15 +1212,8 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
           <div className="start-step">
             <div className="workflow-title">
               <b>3</b>
-              <span>
-                {runType === 'resource' ? 'Start mission after IDLE' : 'Start the LiDAR mission'}
-              </span>
+              <span>{runType === 'resource' ? 'Mission after IDLE' : 'Mission'}</span>
             </div>
-            <p className="step-help">
-              {runType === 'resource'
-                ? 'Record the IDLE interval first; then start the mission for tracking states.'
-                : 'Wait for a stable pose before executing the selected test.'}
-            </p>
             <button
               disabled={busy || !capturing || Boolean(robot?.mission_running)}
               onClick={() => mission('start')}
@@ -1103,18 +1228,10 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
         <div className="workflow-card active-capture">
           <div className="workflow-title">
             <b>4</b>
-            <span>Execute the {runType} test procedure</span>
+            <span>Run {runType.replace('_', ' ')}</span>
           </div>
 
-          <ol className="procedure-list">
-            {activeGuide.map((instruction) => (
-              <li key={instruction}>{instruction}</li>
-            ))}
-          </ol>
-
-          {(
-            ['ground_truth', 'route', 'kidnapped', 'dynamic_occluded'] as ExperimentRunType[]
-          ).includes(runType) && (
+          {runType === 'kidnapped' && (
             <div className="marker-form">
               <label>
                 Marker ID
@@ -1147,31 +1264,49 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
                 />
               </label>
               <label>
-                Yaw (rad)
+                Yaw (deg)
                 <input
                   type="number"
-                  step="0.01"
-                  value={markerYaw}
-                  onChange={(event) => setMarkerYaw(event.target.value)}
+                  step="0.1"
+                  value={markerYawDegrees}
+                  onChange={(event) => setMarkerYawDegrees(event.target.value)}
                 />
               </label>
             </div>
           )}
 
           {runType === 'ground_truth' && (
-            <div className="ground-truth-action">
-              <div>
-                <small>PLACEMENTS RECORDED</small>
-                <b>{checkpointCount}/10</b>
+            <>
+              {session?.reference_marker && (
+                <div className="ground-truth-reference-live">
+                  <div>
+                    <span>X</span>
+                    <b>{session.reference_marker.x.toFixed(2)} m</b>
+                  </div>
+                  <div>
+                    <span>Y</span>
+                    <b>{session.reference_marker.y.toFixed(2)} m</b>
+                  </div>
+                  <div>
+                    <span>Yaw</span>
+                    <b>{((session.reference_marker.yaw * 180) / Math.PI).toFixed(1)}°</b>
+                  </div>
+                </div>
+              )}
+              <div className="ground-truth-action">
+                <div>
+                  <small>PLACEMENTS RECORDED</small>
+                  <b>{checkpointCount}/10</b>
+                </div>
+                <button
+                  className="highlight"
+                  disabled={checkpointCount >= 10}
+                  onClick={() => RecordCheckpoint()}
+                >
+                  RECORD PLACEMENT
+                </button>
               </div>
-              <button
-                className="highlight"
-                disabled={checkpointCount >= 10}
-                onClick={RecordCheckpoint}
-              >
-                RECORD PLACEMENT
-              </button>
-            </div>
+            </>
           )}
           {(runType === 'route' || runType === 'dynamic_occluded') && (
             <>
@@ -1226,13 +1361,56 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
                   </output>
                 </div>
               )}
-              <div className="event-actions">
-                <button onClick={() => RecordEvent('ROUTE_START')}>ROUTE START</button>
-                <button className="highlight" onClick={RecordCheckpoint}>
-                  RECORD CHECKPOINT ({checkpointCount}/8)
-                </button>
-                <button onClick={() => RecordEvent('ROUTE_END')}>ROUTE END</button>
+              <div className="route-checkpoint-grid">
+                {configuredRouteMarkers.map((configuredMarker) => {
+                  const recorded = Boolean(
+                    session?.recorded_marker_ids?.includes(configuredMarker.marker_id),
+                  );
+                  const displayedPose = recorded
+                    ? session?.checkpoint_estimates?.[configuredMarker.marker_id]
+                    : robot?.pose;
+                  return (
+                    <button
+                      className={recorded ? 'route-marker-locked' : 'route-marker-live'}
+                      disabled={checkpointCount >= 8 && !recorded}
+                      key={configuredMarker.marker_id}
+                      onClick={() => {
+                        if (!recorded) RecordCheckpoint(configuredMarker);
+                      }}
+                      onDoubleClick={(event) => {
+                        event.preventDefault();
+                        if (recorded) UnlockCheckpoint(configuredMarker);
+                      }}
+                      title={
+                        recorded
+                          ? 'Double-click to unlock this checkpoint'
+                          : 'Click to lock the current monitoring pose'
+                      }
+                    >
+                      <b>
+                        {recorded ? '🔒 LOCKED' : '● LIVE'} · {configuredMarker.marker_id}
+                      </b>
+                      <small>
+                        X {displayedPose?.x.toFixed(3) ?? '—'} · Y{' '}
+                        {displayedPose?.y.toFixed(3) ?? '—'}
+                      </small>
+                      <small>Yaw {displayedPose?.yaw.toFixed(6) ?? '—'} rad</small>
+                      <small>
+                        {recorded
+                          ? 'DOUBLE-CLICK TO UNLOCK'
+                          : `CLICK TO LOCK · SCORE ${displayedPose?.score.toFixed(3) ?? '—'}`}
+                      </small>
+                    </button>
+                  );
+                })}
               </div>
+              <p className="gate-message">
+                Locked {checkpointCount}/8. M1 is ROUTE START and M8 is ROUTE END automatically.
+                Green cards show live Monitoring X/Y/yaw-rad. Click to lock; double-click a locked
+                card to return it to live green. Current pose:{' '}
+                {robot?.pose.valid ? 'VALID' : 'INVALID'} · score{' '}
+                {robot?.pose.score.toFixed(3) ?? 'N/A'}.
+              </p>
             </>
           )}
           {runType === 'kidnapped' && (
@@ -1241,9 +1419,9 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
                 KIDNAP START
               </button>
               <button className="highlight" onClick={() => RecordEvent('KIDNAP_RELEASE', true)}>
-                KIDNAP RELEASE + REFERENCE
+                RELEASE + REF
               </button>
-              <button onClick={RecordCheckpoint}>FINAL CHECKPOINT</button>
+              <button onClick={() => RecordCheckpoint()}>FINAL CHECKPOINT</button>
             </div>
           )}
           {runType === 'resource' && (
@@ -1335,10 +1513,6 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
                   </button>
                 </div>
               </div>
-              <p className="resource-note">
-                Keep each interval between 55 and 65 seconds. Board telemetry records CPU, RAM,
-                processing time, update rate, and binary size automatically.
-              </p>
             </div>
           )}
         </div>
@@ -1347,13 +1521,8 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
       <div className="workflow-card">
         <div className="workflow-title">
           <b>5–8</b>
-          <span>Stop, analyze, and finalize results</span>
+          <span>Results</span>
         </div>
-        <p className="step-help">
-          {runType === 'ablation'
-            ? 'Analyze the replay outputs, review all four variants, then finalize the immutable result.'
-            : 'Stop the mission before capture, review the generated report after analysis, then finalize the immutable result.'}
-        </p>
         <div className="ordered-actions finish-actions">
           {runType !== 'ablation' && (
             <>
@@ -1388,26 +1557,14 @@ function ExperimentPanel({ robot, mission, setNotice }: ExperimentPanelProps) {
         </div>
         {session && (
           <div className="session-id">
-            <b>Output:</b> EXPERIMENTS/Ouputs/{session.experiment_id}
+            <b>Output:</b> EXPERIMENTS/Ouputs/
+            {session.output_relative_path || session.experiment_id}
           </div>
         )}
         {session?.error && <div className="experiment-error">{session.error}</div>}
       </div>
 
       {report && <pre className="report-preview">{JSON.stringify(report, null, 2)}</pre>}
-
-      <div className="campaign-progress">
-        <b>Campaign progress</b>
-        <span>Ground truth {RunProgress('ground_truth')}/1</span>
-        <span>Route nominal {Progress('nominal')}/10</span>
-        <span>Route occluded {Progress('lidar_occluded_90')}/10</span>
-        <span>Route furniture {Progress('furniture_changed')}/10</span>
-        <span>Dynamic occluded {RunProgress('dynamic_occluded')}/10</span>
-        <span>Kidnap same room {RunProgress('kidnapped', 'KIDNAP_SAME_ROOM')}/10</span>
-        <span>Kidnap cross room {RunProgress('kidnapped', 'KIDNAP_CROSS_ROOM')}/10</span>
-        <span>Ablation {RunProgress('ablation')}/10</span>
-        <span>Resource campaign {RunProgress('resource')}/1</span>
-      </div>
     </section>
   );
 }
@@ -1418,7 +1575,29 @@ function App() {
   const [robots, setRobots] = useState<Record<string, RobotStatus>>({});
   const [notice, setNotice] = useState('');
   const [mappingState, setMappingState] = useState<MappingState>('stopped');
-  const [savedMap, setSavedMap] = useState<string>();
+  const [mapCatalog, setMapCatalog] = useState<MapCatalogEntry[]>([]);
+  const [activeMap, setActiveMap] = useState<string>();
+  const [selectedMap, setSelectedMap] = useState('');
+  const [newMapName, setNewMapName] = useState('map_01');
+  const [mapActivationPending, setMapActivationPending] = useState(false);
+  const [experimentPreflight, setExperimentPreflight] = useState<ExperimentPreflight>();
+  const refreshMapCatalog = async () => {
+    const response = await fetch('/api/maps');
+    const result = (await response.json()) as {
+      active_map?: string;
+      maps?: MapCatalogEntry[];
+      error?: string;
+    };
+    if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    const maps = result.maps || [];
+    setMapCatalog(maps);
+    setActiveMap(result.active_map);
+    setSelectedMap((current) =>
+      current && maps.some((entry) => entry.name === current)
+        ? current
+        : result.active_map || maps[0]?.name || '',
+    );
+  };
   useEffect(() => {
     fetch('/api/map')
       .then((r) => r.json() as Promise<MapData>)
@@ -1426,20 +1605,20 @@ function App() {
       .catch((e) => setNotice(String(e)));
   }, []);
   useEffect(() => {
-    fetch('/api/mapping/status')
-      .then(
-        (response) => response.json() as Promise<{ state: MappingState; last_saved_map?: string }>,
-      )
+    Promise.all([fetch('/api/mapping/status'), refreshMapCatalog()])
+      .then(([response]) => response.json() as Promise<{ state: MappingState }>)
       .then((status) => {
         setMappingState(status.state);
-        setSavedMap(status.last_saved_map);
       })
       .catch((error) => setNotice(String(error)));
   }, []);
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    const socket = new WebSocket(`${protocol}://${location.host}/ws`);
-    socket.onmessage = (event) => {
+    let socket: WebSocket | undefined;
+    let reconnectTimer: number | undefined;
+    let disposed = false;
+
+    const handleMessage = (event: MessageEvent<string>) => {
       const msg = JSON.parse(event.data as string) as ServerMessage;
       if (msg.type === 'snapshot') {
         const list = msg.data as RobotStatus[];
@@ -1455,19 +1634,64 @@ function App() {
         setMappingState((msg.data as { state: MappingState }).state);
       if (msg.type === 'mapping_map') setMap(msg.data as MapData);
       if (msg.type === 'map_saved') {
-        setSavedMap((msg.data as { name: string }).name);
-        setNotice('Map saved, auto-aligned, and assigned metric X/Y coordinates');
+        const { name, replaced } = msg.data as { name: string; replaced?: boolean };
+        setSelectedMap(name);
+        refreshMapCatalog().catch((error) => setNotice(String(error)));
+        setNotice(
+          replaced
+            ? 'Map replaced; previous version archived and new map validated at origin 0,0'
+            : 'Map saved, aligned, cropped, rebased to 0,0, and refreshed in backend',
+        );
+      }
+      if (msg.type === 'map_deleted')
+        refreshMapCatalog().catch((error) => setNotice(String(error)));
+      if (msg.type === 'map_activated') {
+        const name = (msg.data as { name: string }).name;
+        setActiveMap(name);
+        setSelectedMap(name);
+        refreshMapCatalog().catch((error) => setNotice(String(error)));
       }
       if (msg.type === 'map_transfer_started')
         setNotice(`Sending map ${(msg.data as { name: string }).name}...`);
-      if (msg.type === 'map_transfer_ack')
+      if (msg.type === 'map_transfer_ack') {
+        const ack = msg.data as {
+          success: boolean;
+          name?: string;
+          activated?: boolean;
+          error?: string;
+        };
+        setMapActivationPending(false);
         setNotice(
-          (msg.data as { success: boolean }).success
-            ? 'Map installed on robot successfully'
-            : 'Robot rejected map: validation failed',
+          ack.success
+            ? ack.activated
+              ? `Map ${ack.name} is active in backend and robot`
+              : `Map ${ack.name || ''} installed on robot successfully`
+            : ack.error || 'Robot rejected map: validation failed',
         );
+      }
     };
-    return () => socket.close();
+
+    const connect = () => {
+      socket = new WebSocket(`${protocol}://${location.host}/ws`);
+      socket.onmessage = handleMessage;
+      socket.onopen = () => {
+        fetch('/api/map')
+          .then((response) => response.json() as Promise<MapData>)
+          .then(setMap)
+          .catch(() => undefined);
+      };
+      socket.onerror = () => socket?.close();
+      socket.onclose = () => {
+        if (!disposed) reconnectTimer = window.setTimeout(connect, 1000);
+      };
+    };
+
+    connect();
+    return () => {
+      disposed = true;
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
   }, []);
   const robot = Object.values(robots)[0];
   const mission = async (action: 'start' | 'stop') => {
@@ -1480,31 +1704,77 @@ function App() {
   };
   const mappingAction = async (action: 'start' | 'stop' | 'save') => {
     setNotice(`Mapping ${action}...`);
+    if (
+      action === 'save' &&
+      (!/^[a-zA-Z0-9_-]+$/.test(newMapName) ||
+        mapCatalog.some((entry) => entry.name === newMapName))
+    ) {
+      setNotice('Use a new map name containing only letters, numbers, underscore, or dash');
+      return;
+    }
     const response = await fetch(`/api/mapping/${action}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: action === 'save' ? JSON.stringify({ name: 'ruang_utama' }) : undefined,
+      body: action === 'save' ? JSON.stringify({ name: newMapName }) : undefined,
     });
     const result = (await response.json()) as { error?: string; state?: MappingState };
     if (!response.ok) setNotice(result.error ?? 'Mapping command failed');
     else if (action !== 'save') setNotice(`Mapping ${result.state}`);
   };
-  const transferMap = async () => {
-    if (!robot || !savedMap) return;
-    setNotice(`Preparing transfer for ${savedMap}...`);
-    const response = await fetch(`/api/maps/${savedMap}/transfer/${robot.robot_id}`, {
+  const activateMap = async () => {
+    if (!robot || !selectedMap) return;
+    setMapActivationPending(true);
+    setNotice(`Sending and activating ${selectedMap} on robot...`);
+    const response = await fetch(`/api/maps/${selectedMap}/activate/${robot.robot_id}`, {
       method: 'POST',
     });
     if (!response.ok) {
       const result = (await response.json()) as { error: string };
       setNotice(result.error);
+      setMapActivationPending(false);
     }
+  };
+  const replaceMap = async () => {
+    if (
+      !selectedMap ||
+      selectedMap === activeMap ||
+      !window.confirm(
+        `Replace ${selectedMap} with the current mapping result? The previous version will be archived.`,
+      )
+    )
+      return;
+    setNotice(`Replacing ${selectedMap}...`);
+    const response = await fetch('/api/mapping/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: selectedMap, replace: true }),
+    });
+    const result = (await response.json()) as { error?: string };
+    if (!response.ok) setNotice(result.error || 'Map replacement failed');
+  };
+  const deleteMap = async () => {
+    if (
+      !selectedMap ||
+      selectedMap === activeMap ||
+      !window.confirm(
+        `Delete ${selectedMap} from the catalog? It will be moved to a recoverable trash folder.`,
+      )
+    )
+      return;
+    setNotice(`Deleting ${selectedMap}...`);
+    const response = await fetch(`/api/maps/${selectedMap}`, { method: 'DELETE' });
+    const result = (await response.json()) as { error?: string; recoverable_path?: string };
+    if (!response.ok) {
+      setNotice(result.error || 'Map deletion failed');
+      return;
+    }
+    await refreshMapCatalog();
+    setNotice(`Map deleted from catalog; backup: maps/${result.recoverable_path}`);
   };
   return (
     <main>
       <header>
         <div>
-          <p className="eyebrow">AGV CONTROL</p>
           <div className="view-tabs">
             <button
               className={view === 'monitor' ? 'active' : ''}
@@ -1559,6 +1829,9 @@ function App() {
               <div>
                 <span>Yaw</span>
                 <b>{robot?.pose ? ((robot.pose.yaw * 180) / Math.PI).toFixed(1) : '—'}°</b>
+                <b className="metric-secondary">
+                  {robot?.pose ? robot.pose.yaw.toFixed(2) : '—'} rad
+                </b>
               </div>
               <div>
                 <span>Score</span>
@@ -1570,44 +1843,162 @@ function App() {
               <strong>{robot?.pose?.mode?.toUpperCase() || 'UNKNOWN'}</strong>
               <small>{robot?.pose?.valid ? 'Pose valid' : 'Pose not valid yet'}</small>
             </div>
-            <div className="controls">
-              <button
-                disabled={!robot?.online || robot?.mission_running}
-                onClick={() => mission('start')}
-              >
-                START MISSION
-              </button>
-              <button
-                className="stop"
-                disabled={!robot?.online || !robot?.mission_running}
-                onClick={() => mission('stop')}
-              >
-                STOP MISSION
-              </button>
-              <button
-                disabled={!robot?.online || mappingState !== 'stopped'}
-                onClick={() => mappingAction('start')}
-              >
-                START MAPPING
-              </button>
-              <button
-                className="stop"
-                disabled={mappingState === 'stopped' || mappingState === 'stopping'}
-                onClick={() => mappingAction('stop')}
-              >
-                STOP MAPPING
-              </button>
-              <button disabled={mappingState !== 'running'} onClick={() => mappingAction('save')}>
-                SAVE + AUTO ALIGN
-              </button>
-              <button disabled={!robot?.online || !savedMap} onClick={transferMap}>
-                TRANSFER MAP
-              </button>
+            <div className="control-groups">
+              <div className="control-group">
+                <div className="control-group-title">
+                  <span>MISSION CONTROL</span>
+                  <small>Localization and LiDAR</small>
+                </div>
+                <div className="controls mission-controls">
+                  <button
+                    disabled={!robot?.online || robot?.mission_running}
+                    onClick={() => mission('start')}
+                  >
+                    <span className="control-step">1</span>
+                    <span>START MISSION</span>
+                  </button>
+                  <button
+                    className="stop"
+                    disabled={!robot?.online || !robot?.mission_running}
+                    onClick={() => mission('stop')}
+                  >
+                    <span className="control-step">2</span>
+                    <span>STOP MISSION</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="control-group">
+                <div className="control-group-title">
+                  <span>MAPPING CONTROL</span>
+                  <small>Origin normalized to 0,0</small>
+                </div>
+                <div className="controls mapping-controls">
+                  <button
+                    disabled={!robot?.online || mappingState !== 'stopped'}
+                    onClick={() => mappingAction('start')}
+                  >
+                    <span className="control-step">1</span>
+                    <span>START MAPPING</span>
+                  </button>
+                  <button
+                    disabled={
+                      mappingState !== 'running' ||
+                      !/^[a-zA-Z0-9_-]+$/.test(newMapName) ||
+                      mapCatalog.some((entry) => entry.name === newMapName)
+                    }
+                    onClick={() => mappingAction('save')}
+                  >
+                    <span className="control-step">2</span>
+                    <span>SAVE + AUTO ALIGN</span>
+                  </button>
+                  <button
+                    className="stop"
+                    disabled={mappingState === 'stopped' || mappingState === 'stopping'}
+                    onClick={() => mappingAction('stop')}
+                  >
+                    <span className="control-step">3</span>
+                    <span>STOP MAPPING</span>
+                  </button>
+                </div>
+              </div>
+              <div className="control-group map-selection-card">
+                <div className="control-group-title">
+                  <span>MAPPING SELECTION</span>
+                  <small>{activeMap ? `Active: ${activeMap}` : 'No active map'}</small>
+                </div>
+                <label>
+                  Name for SAVE + AUTO ALIGN
+                  <input
+                    value={newMapName}
+                    placeholder="example: warehouse_floor_1"
+                    onChange={(event) => setNewMapName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Saved maps ({mapCatalog.length})
+                  <select
+                    value={selectedMap}
+                    onChange={(event) => setSelectedMap(event.target.value)}
+                  >
+                    {mapCatalog.length ? (
+                      mapCatalog.map((entry) => (
+                        <option key={entry.name} value={entry.name}>
+                          {entry.name}
+                          {entry.active ? ' — ACTIVE' : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">No saved map</option>
+                    )}
+                  </select>
+                </label>
+                {mapCatalog
+                  .filter((entry) => entry.name === selectedMap)
+                  .map((entry) => (
+                    <div className="selected-map-details" key={entry.name}>
+                      <b>{entry.name}</b>
+                      <span>
+                        {entry.width} × {entry.height} px · {entry.resolution.toFixed(3)} m/px
+                      </span>
+                      <span>{(entry.binary_bytes / 1024).toFixed(1)} KiB binary</span>
+                    </div>
+                  ))}
+                <button
+                  className="activate-map"
+                  disabled={
+                    !robot?.online ||
+                    Boolean(robot?.mission_running) ||
+                    mappingState !== 'stopped' ||
+                    !selectedMap ||
+                    mapActivationPending
+                  }
+                  onClick={activateMap}
+                >
+                  {mapActivationPending
+                    ? 'ACTIVATING…'
+                    : selectedMap === activeMap
+                      ? 'SYNC ACTIVE MAP TO ROBOT'
+                      : 'ACTIVATE MAP ON ROBOT'}
+                </button>
+                <div className="map-management-actions">
+                  <button
+                    className="replace-map"
+                    disabled={
+                      mappingState !== 'running' ||
+                      !selectedMap ||
+                      selectedMap === activeMap ||
+                      mapActivationPending
+                    }
+                    onClick={replaceMap}
+                  >
+                    REPLACE SELECTED MAP
+                  </button>
+                  <button
+                    className="delete-map"
+                    disabled={
+                      mappingState !== 'stopped' ||
+                      !selectedMap ||
+                      selectedMap === activeMap ||
+                      mapActivationPending
+                    }
+                    onClick={deleteMap}
+                  >
+                    DELETE SELECTED MAP
+                  </button>
+                </div>
+              </div>
             </div>
             <p className="notice">{notice}</p>
           </aside>
         ) : (
-          <ExperimentPanel robot={robot} mission={mission} setNotice={setNotice} />
+          <ExperimentPanel
+            robot={robot}
+            mission={mission}
+            setNotice={setNotice}
+            preflight={experimentPreflight}
+            setPreflight={setExperimentPreflight}
+          />
         )}
       </section>
       {view === 'experiment' && <p className="global-notice">{notice}</p>}

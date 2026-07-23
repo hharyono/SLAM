@@ -16,7 +16,7 @@ struct SearchOptions {
   float angular_window = 0.35F;
   float linear_step = 0.05F;
   float angular_step = 0.0174532925F;
-  float minimum_score = 0.35F;
+  float minimum_score = 0.90F;
   bool use_multi_resolution = true;
 };
 
