@@ -1,0 +1,91 @@
+INTERPRETASI HASIL ABLATION
+===========================
+
+Experiment ID:
+20260725T033549Z_nominal_ablation_01_198484089432
+
+Sumber:
+20260724T013212Z_nominal_kidnapped_01_198484089432
+
+Skenario:
+Kidnapped cross-room RV1106, dieksekusi ulang pada Host/PC.
+
+Status validasi:
+- Session finalized
+- Protocol valid
+- Validity errors: tidak ada
+- Keempat varian memproses 485 scan dan timestamp yang identik
+
+RINGKASAN HASIL
+---------------
+
+1. Local Only + Single Resolution
+   - Accepted scan: 35,26%
+   - Waktu rata-rata: 67,66 ms/scan
+   - Hasil setelah KIDNAP_RELEASE: FAILURE
+   - Sistem kehilangan posisi dan tidak dapat mencari kembali posisi yang jauh
+     dari pose sebelumnya.
+
+2. Local Only + Multi Resolution
+   - Accepted scan: 77,32%
+   - Waktu rata-rata: 3,02 ms/scan
+   - Hasil setelah KIDNAP_RELEASE: FAILURE
+   - Multi-resolution mempercepat tracking lokal, tetapi tanpa global
+     relocalization sistem tidak dapat memulihkan perpindahan cross-room.
+
+3. Global Relocalization + Single Resolution
+   - Accepted scan: 77,32%
+   - Waktu rata-rata: 769,40 ms/scan
+   - Waktu maksimum: 4,79 detik/scan
+   - Kandidat maksimum: 665.136
+   - Hasil setelah KIDNAP_RELEASE: FAILURE
+   - Pencarian global langsung pada F0 sangat mahal. Sampel yaw awal sekitar
+     10 derajat tidak mendapatkan tahap refinement, sehingga pose target tidak
+     mencapai minimum score 0,90 sebelum rekaman berakhir.
+
+4. Global Relocalization + Multi Resolution
+   - Accepted scan: 98,56%
+   - Waktu rata-rata: 3,80 ms/scan
+   - Waktu maksimum: 83,38 ms/scan
+   - Kandidat maksimum: 15.444
+   - Recovery setelah release: 365 ms
+   - Error posisi akhir: 0,05 m
+   - Error heading akhir: 1,94 derajat
+   - False recovery: 0
+   - Hasil setelah KIDNAP_RELEASE: SUCCESS
+
+INTERPRETASI
+------------
+
+Multi-resolution diperlukan untuk menekan jumlah kandidat dan biaya komputasi.
+Global relocalization diperlukan untuk mencari posisi baru setelah robot
+dipindahkan jauh dari pose sebelumnya. Pada skenario ini, mengaktifkan salah
+satunya saja tidak cukup.
+
+Global + Multi merupakan satu-satunya konfigurasi yang berhasil memulihkan
+tracking setelah kidnapped cross-room. Konfigurasi ini juga memberikan tingkat
+accepted scan tertinggi, recovery cepat, error akhir rendah, dan tidak
+menghasilkan false recovery.
+
+KESIMPULAN
+----------
+
+Konfigurasi yang didukung hasil ini untuk sistem produksi:
+
+  LUCKFOX_MULTI_RESOLUTION=1
+  LUCKFOX_ENABLE_GLOBAL_RELOCALIZATION=1
+
+Failure pada tiga varian lain bukan crash atau kegagalan pelaksanaan test.
+Failure tersebut merupakan hasil eksperimen yang menunjukkan bahwa varian itu
+tidak kembali ke state TRACKING setelah KIDNAP_RELEASE.
+
+Test layak berstatus Accepted karena seluruh protokol replay valid, data input
+identik pada empat varian, dan hasilnya memberikan pembeda yang jelas.
+
+BATASAN
+-------
+
+Hasil ini berasal dari satu rekaman RV1106 yang dieksekusi pada Host/PC.
+Kesimpulan perilaku algoritma dapat digunakan, tetapi angka latency, CPU, dan
+RAM pada perangkat produksi tetap perlu dikonfirmasi melalui replay langsung
+di RV1106 atau RV1103.

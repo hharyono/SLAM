@@ -145,7 +145,7 @@ StartRemoteAll() {
     EnsureRemotePaths
     PrepareRuntime
 
-    StartProcess "ScanBridge" "source '$RosSetup'; source '$ScanBridgeSetup'; exec ros2 run scan_tcp_bridge scan_tcp_bridge_node --ros-args -p port:=42010 -p frame_id:=laser_frame" || { StopAll; exit 1; }
+    StartProcess "ScanBridge" "source '$RosSetup'; source '$ScanBridgeSetup'; exec ros2 run scan_tcp_bridge scan_tcp_bridge_node --ros-args -p port:=42011 -p frame_id:=laser_frame" || { StopAll; exit 1; }
     sleep 1
     StartProcess "StaticTf" "source '$RosSetup'; exec ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 base_link laser_frame" || { StopAll; exit 1; }
     sleep 1

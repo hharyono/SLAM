@@ -147,11 +147,26 @@ Replay raw scan memakai state tracker dan matcher yang sama:
 Untuk ablation, pilih salah satu mode berikut:
 
 ```bash
-./build/localize_replay map.bin raw_scans.csv --mode local_only
-./build/localize_replay map.bin raw_scans.csv --mode local_global
-./build/localize_replay map.bin raw_scans.csv --mode single_resolution
-./build/localize_replay map.bin raw_scans.csv --mode multi_resolution
+./build/localize_replay map.bin raw_scans.csv --mode local_only_single --initial X Y YAW
+./build/localize_replay map.bin raw_scans.csv --mode local_only_multi --initial X Y YAW
+./build/localize_replay map.bin raw_scans.csv --mode local_global_single --initial X Y YAW
+./build/localize_replay map.bin raw_scans.csv --mode local_global_multi --initial X Y YAW
 ```
+
+Keempat mode membentuk desain faktorial 2×2 dan selalu dimulai dari pose yang
+sama. Output menyertakan faktor aktif dan execution target agar timing host
+tidak keliru diklaim sebagai performa RV1106.
+
+Dashboard menjalankan keempat mode hanya untuk target Host/PC. Untuk target
+RV1103 atau RV1106, firmware replay menjalankan satu metode produksi yang telah
+dipilih, yaitu `local_global_multi`, sebagai validasi latency, CPU, RAM, dan
+recovery pada hardware board.
+
+Resource Replay RV1103 memakai data Accepted yang sama, tetapi menambahkan
+`LUCKFOX_REPLAY_PACING=recorded`. Firmware menunggu timestamp relatif asli
+setiap scan sehingga pengukuran deadline dan beban board mencerminkan laju
+sensor saat eksperimen direkam. Mode board tetap menolak semua varian selain
+`local_global_multi`.
 
 Saat mission berhenti, aplikasi menulis heartbeat resource satu kali per detik
 dengan schema `luckfox.localization.resource.v1`. Heartbeat ini menyediakan

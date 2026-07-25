@@ -1,0 +1,44 @@
+RV1103 KIDNAPPED / RELOCALIZATION TEST INTERPRETATION
+Date: 2026-07-25
+Route reference: RV1103_marker_r1
+Accepted trials: 4
+
+VERDICT
+PASS / ACCEPTED.
+
+All four trials completed successfully. Each trial has a valid main manifest
+and capture manifest, complete raw scan data, no scan sequence gaps, no board
+timestamp regression, no runtime error, one successful relocalization event,
+and no timeout.
+
+RESULTS
+
+Trial (UTC)       Transfer   First recovered   Stable tracking   Position error   Heading error
+01:33:25          M2 -> M3          529 ms            778 ms        0.000189 m        0.419903 deg
+01:35:28          M3 -> M5          790 ms           1034 ms        0.000192 m        0.266896 deg
+01:37:06          M6 -> M2          952 ms           1201 ms        0.050006 m        0.267999 deg
+01:38:52          M2 -> M1          970 ms           1132 ms        0.000143 m        0.166157 deg
+
+AGGREGATE
+
+- Relocalization success: 4/4 (100%)
+- Timeout: 0/4
+- First recovered: mean 810.25 ms, median 871 ms, maximum 970 ms
+- Stable tracking: mean 1036.25 ms, median 1083 ms, maximum 1201 ms
+- Final position error: mean 0.012632 m, median 0.000190 m, maximum 0.050006 m
+- Final heading error: mean 0.280239 deg, maximum 0.419903 deg
+- Raw capture: 2,023 frames / 809,200 points in total
+
+INTERPRETATION
+
+RV1103 recovered localization in every tested kidnapping scenario and reached
+stable tracking in at most 1.201 seconds. Three trials converged with
+sub-millimetre position error. The M6 -> M2 trial retained a 5.0 cm final
+position error; this is the batch maximum, but relocalization still succeeded,
+heading error stayed below 0.27 degree, and the trial data is internally valid.
+
+The four accepted samples demonstrate reliable recovery for this route
+reference. Because the batch is small and contains only one observation per
+transfer pair, it establishes functional acceptance rather than a broad
+statistical guarantee. The M6 -> M2 transfer is the best candidate for repeated
+testing if a tighter position-error threshold is required.

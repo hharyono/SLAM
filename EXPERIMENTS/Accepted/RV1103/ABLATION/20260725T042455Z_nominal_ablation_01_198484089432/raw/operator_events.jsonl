@@ -1,0 +1,1 @@
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784953503120,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}

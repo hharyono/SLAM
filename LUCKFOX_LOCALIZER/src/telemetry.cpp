@@ -1,8 +1,11 @@
 #include "luckfox/telemetry.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <stdexcept>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -10,6 +13,12 @@
 
 namespace luckfox {
 namespace {
+
+constexpr float kPi = 3.14159265358979323846F;
+constexpr float kObstacleCenterHalfAngleDegrees = 10.0F;
+constexpr float kObstacleSideLimitAngleDegrees = 65.0F;
+constexpr float kObstacleNearMinimumM = 0.30F;
+constexpr float kObstacleNearMaximumM = 0.80F;
 
 std::string EscapeJson(const std::string& input) {
   std::string output;
@@ -50,6 +59,37 @@ std::uint64_t UnixMs() {
   return static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::system_clock::now().time_since_epoch()).count());
+}
+
+struct FrontObstacleSignature {
+  std::uint32_t left_near_points = 0;
+  std::uint32_t center_near_points = 0;
+  std::uint32_t right_near_points = 0;
+  float minimum_range_m = std::numeric_limits<float>::infinity();
+};
+
+FrontObstacleSignature MeasureFrontObstacle(const CapturedScan& scan) {
+  constexpr float kCenterHalfAngle =
+      kObstacleCenterHalfAngleDegrees * kPi / 180.0F;
+  constexpr float kSideLimitAngle =
+      kObstacleSideLimitAngleDegrees * kPi / 180.0F;
+  FrontObstacleSignature signature;
+  for (const auto& sample : scan.samples) {
+    if (!std::isfinite(sample.range) || sample.range <= 0.0F) continue;
+    const float angle = std::atan2(std::sin(sample.angle), std::cos(sample.angle));
+    if (std::abs(angle) > kSideLimitAngle) continue;
+    signature.minimum_range_m = std::min(signature.minimum_range_m, sample.range);
+    if (sample.range < kObstacleNearMinimumM ||
+        sample.range > kObstacleNearMaximumM)
+      continue;
+    if (angle > kCenterHalfAngle)
+      ++signature.left_near_points;
+    else if (angle < -kCenterHalfAngle)
+      ++signature.right_near_points;
+    else
+      ++signature.center_near_points;
+  }
+  return signature;
 }
 
 }  // namespace
@@ -95,6 +135,12 @@ void TelemetryLogger::LogConfiguration(const UartLidarConfig& lidar,
     << ",\"scan_frequency_hz_configured\":" << lidar.scan_frequency
     << ",\"minimum_range_m\":" << lidar.minimum_range
     << ",\"maximum_range_m\":" << lidar.maximum_range
+    << ",\"front_obstacle_center_half_angle_deg\":"
+    << kObstacleCenterHalfAngleDegrees
+    << ",\"front_obstacle_side_limit_angle_deg\":"
+    << kObstacleSideLimitAngleDegrees
+    << ",\"front_obstacle_near_minimum_m\":" << kObstacleNearMinimumM
+    << ",\"front_obstacle_near_maximum_m\":" << kObstacleNearMaximumM
     << ",\"linear_window_m\":" << search.linear_window
     << ",\"angular_window_rad\":" << search.angular_window
     << ",\"linear_step_m\":" << search.linear_step
@@ -140,6 +186,7 @@ void TelemetryLogger::LogResource(const char* operating_state) {
 void TelemetryLogger::Log(std::uint64_t sequence, const CapturedScan& scan,
                           const LocalizationResult& result,
                           std::uint64_t scan_cycle_us) {
+  const FrontObstacleSignature obstacle = MeasureFrontObstacle(scan);
   rusage usage{};
   getrusage(RUSAGE_SELF, &usage);
   const std::uint64_t cpu_us = TimevalUs(usage.ru_utime) + TimevalUs(usage.ru_stime);
@@ -173,6 +220,15 @@ void TelemetryLogger::Log(std::uint64_t sequence, const CapturedScan& scan,
       << ",\"candidate_count\":" << result.evaluated
       << ",\"valid_scan_points\":" << result.valid_scan_points
       << ",\"raw_scan_points\":" << scan.samples.size()
+      << ",\"front_near_left_points\":" << obstacle.left_near_points
+      << ",\"front_near_center_points\":" << obstacle.center_near_points
+      << ",\"front_near_right_points\":" << obstacle.right_near_points
+      << ",\"front_minimum_range_m\":";
+    if (std::isfinite(obstacle.minimum_range_m))
+      telemetry_ << obstacle.minimum_range_m;
+    else
+      telemetry_ << "null";
+    telemetry_
       << ",\"matcher_execution_us\":" << result.execution_time_us
       << ",\"scan_cycle_us\":" << scan_cycle_us
       << ",\"transition_reason\":\"" << EscapeJson(result.transition_reason) << "\""

@@ -1,0 +1,208 @@
+{
+  "summary": {
+    "schema": "luckfox.experiment.summary.v1",
+    "experiment_id": "20260724T012545Z_nominal_kidnapped_01_198484089432",
+    "generated_unix_ms": 1784856470582,
+    "accuracy": {
+      "checkpoint_count": 1,
+      "successful_checkpoints": 1,
+      "success_rate": 1,
+      "position_error_m": {
+        "n": 1,
+        "mean": 0.049992800495707944,
+        "median": 0.049992800495707944,
+        "rmse": 0.049992800495707944,
+        "standard_deviation": 0,
+        "p95": 0.049992800495707944,
+        "maximum": 0.049992800495707944,
+        "confidence_interval_95_lower": 0.049992800495707944,
+        "confidence_interval_95_upper": 0.049992800495707944
+      },
+      "heading_error_deg": {
+        "n": 1,
+        "mean": 2.3923215681211563,
+        "median": 2.3923215681211563,
+        "rmse": 2.3923215681211563,
+        "standard_deviation": 0,
+        "p95": 2.3923215681211563,
+        "maximum": 2.3923215681211563,
+        "confidence_interval_95_lower": 2.3923215681211563,
+        "confidence_interval_95_upper": 2.3923215681211563
+      }
+    },
+    "ground_truth_repeatability": {
+      "marker_count": 1,
+      "placement_count": 1,
+      "estimate_center": {
+        "x": 3.25,
+        "y": 1.4999998807907104,
+        "yaw": 1.1360245943069458
+      },
+      "position_spread_m": {
+        "n": 1,
+        "mean": 0,
+        "median": 0,
+        "rmse": 0,
+        "standard_deviation": 0,
+        "p95": 0,
+        "maximum": 0,
+        "confidence_interval_95_lower": 0,
+        "confidence_interval_95_upper": 0
+      },
+      "heading_spread_deg": {
+        "n": 1,
+        "mean": 0,
+        "median": 0,
+        "rmse": 0,
+        "standard_deviation": 0,
+        "p95": 0,
+        "maximum": 0,
+        "confidence_interval_95_lower": 0,
+        "confidence_interval_95_upper": 0
+      }
+    },
+    "relocalization": {
+      "trials": 1,
+      "successes": 1,
+      "timeouts": 0,
+      "success_rate": 1,
+      "first_recovered_ms": {
+        "n": 1,
+        "mean": 438,
+        "median": 438,
+        "rmse": 438,
+        "standard_deviation": 0,
+        "p95": 438,
+        "maximum": 438,
+        "confidence_interval_95_lower": 438,
+        "confidence_interval_95_upper": 438
+      },
+      "stable_tracking_ms": {
+        "n": 1,
+        "mean": 622,
+        "median": 622,
+        "rmse": 622,
+        "standard_deviation": 0,
+        "p95": 622,
+        "maximum": 622,
+        "confidence_interval_95_lower": 622,
+        "confidence_interval_95_upper": 622
+      }
+    },
+    "dynamic_occlusion": null,
+    "resources": {
+      "idle": {
+        "samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0
+      },
+      "normal_tracking": {
+        "samples": 998,
+        "cpu_percent": {
+          "n": 998,
+          "mean": 51.79013217354711,
+          "median": 59.3425788,
+          "rmse": 53.23389876659169,
+          "standard_deviation": 12.313820988558053,
+          "p95": 62.239180605,
+          "maximum": 99.2451004,
+          "confidence_interval_95_lower": 51.025766231370646,
+          "confidence_interval_95_upper": 52.55449811572357
+        },
+        "peak_rss_kb": 2076,
+        "processing_time_ms": {
+          "n": 998,
+          "mean": 35.59298897795592,
+          "median": 43.396,
+          "rmse": 37.59626294439073,
+          "standard_deviation": 12.10859706980442,
+          "p95": 46.20715,
+          "maximum": 85.458,
+          "confidence_interval_95_lower": 34.841362068948854,
+          "confidence_interval_95_upper": 36.344615886962984
+        },
+        "scan_cycle_ms": {
+          "n": 998,
+          "mean": 85.53289979959933,
+          "median": 85.76650000000001,
+          "rmse": 85.67642667084205,
+          "standard_deviation": 4.957130112866893,
+          "p95": 87.61394999999999,
+          "maximum": 125.164,
+          "confidence_interval_95_lower": 85.22519178331962,
+          "confidence_interval_95_upper": 85.84060781587905
+        }
+      },
+      "global_relocalization": {
+        "samples": 4,
+        "cpu_percent": {
+          "n": 4,
+          "mean": 77.0192051,
+          "median": 95.07491765,
+          "rmse": 84.07391071387761,
+          "standard_deviation": 33.71148926537062,
+          "p95": 98.620559515,
+          "maximum": 99.2238373,
+          "confidence_interval_95_lower": 38.871063791795976,
+          "confidence_interval_95_upper": 115.16734640820401
+        },
+        "peak_rss_kb": 2076,
+        "processing_time_ms": {
+          "n": 4,
+          "mean": 744.74625,
+          "median": 838.1379999999999,
+          "rmse": 765.9924747853271,
+          "standard_deviation": 179.1577364745589,
+          "p95": 863.20075,
+          "maximum": 867.574,
+          "confidence_interval_95_lower": 542.0101859332584,
+          "confidence_interval_95_upper": 947.4823140667417
+        },
+        "scan_cycle_ms": {
+          "n": 4,
+          "mean": 777.8364999999999,
+          "median": 884.1605,
+          "rmse": 802.6159229117623,
+          "standard_deviation": 197.8956770100095,
+          "p95": 904.6809,
+          "maximum": 907.512,
+          "confidence_interval_95_lower": 553.8964601093431,
+          "confidence_interval_95_upper": 1001.7765398906566
+        }
+      },
+      "update_rate_hz": {
+        "n": 1001,
+        "mean": 10.061888981010775,
+        "median": 10,
+        "rmse": 10.102988683165426,
+        "standard_deviation": 0.9103683133667879,
+        "p95": 10.204081632653061,
+        "maximum": 27.027027027027028,
+        "confidence_interval_95_lower": 10.00546376836503,
+        "confidence_interval_95_upper": 10.11831419365652
+      },
+      "binary_size_bytes": 348268,
+      "measurement_windows": {
+        "idle": [],
+        "normal_tracking": [],
+        "global_relocalization": []
+      }
+    }
+  },
+  "recovery_trials": [
+    {
+      "release_timestamp_ms": 1784856422272,
+      "first_scan_after_release_ms": 438,
+      "first_recovered_ms": 438,
+      "stable_tracking_ms": 622,
+      "success": true,
+      "timeout": false,
+      "final_position_error_m": 0.049992799704997565,
+      "final_heading_error_deg": 2.3923218148909795,
+      "final_score": 0.988438487,
+      "final_state": "TRACKING"
+    }
+  ]
+}

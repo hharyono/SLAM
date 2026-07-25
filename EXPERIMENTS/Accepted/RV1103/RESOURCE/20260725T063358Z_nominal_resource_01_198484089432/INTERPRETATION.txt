@@ -1,0 +1,34 @@
+RESOURCE LIVE IDLE + TRACKING — INTERPRETATION
+Experiment: 20260725T063358Z_nominal_resource_01_198484089432
+Platform: RV1103
+Decision: ACCEPTED
+
+Protocol completeness
+- Session finalized and all files listed by manifest.sha256 pass checksum verification.
+- Idle duration: 63.119 s.
+- Tracking R1 duration: 61.432 s.
+- Tracking R2 duration: 62.437 s.
+- All three intervals are within the accepted 55–70 s window.
+
+Localization quality
+- R1: 582 scans, 582 accepted, 0 rejected, no LOST/DEGRADED state.
+- R2: 626 scans, 626 accepted, 0 rejected, no LOST/DEGRADED state.
+- R1 score: mean 0.9790, minimum 0.9153, tracking-sample rate 99.83%.
+- R2 score: mean 0.9776, minimum 0.9299, tracking-sample rate 100%.
+- The production localizer therefore maintained stable, high-confidence tracking in both directions.
+
+RV1103 resource performance
+- Idle CPU mean: 0.57%; peak RSS: 1,688 KiB.
+- R1 CPU mean/P95: 60.89% / 64.79%; peak RSS: 2,076 KiB.
+- R2 CPU mean/P95: 60.96% / 65.17%; peak RSS: 2,076 KiB.
+- Matcher time mean/P95: R1 57.59/62.93 ms; R2 58.00/62.93 ms.
+- Scan-cycle mean/P95: R1 98.39/105.31 ms; R2 98.68/105.53 ms.
+- Scan cycles above 100 ms: R1 123/582 (21.13%); R2 134/626 (21.41%).
+
+Publication interpretation
+The experiment demonstrates reliable localization quality on RV1103 with a 100% accepted-scan
+rate and no loss/degradation during both route directions. CPU and memory use are stable and
+bounded. However, scan-cycle P95 is slightly above the nominal 100 ms period and roughly one
+fifth of cycles exceed 100 ms. This is a valid resource-capacity finding: the method remains
+functionally stable, but RV1103 operates close to its real-time scheduling limit. Report this
+latency margin explicitly rather than treating it as a protocol failure.

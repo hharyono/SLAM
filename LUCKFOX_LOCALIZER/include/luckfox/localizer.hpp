@@ -60,6 +60,10 @@ class PoseTracker {
 
   LocalizationResult Update(const SlamMap& map,
                             const std::vector<Point2f>& scan);
+  // Starts deterministic offline replay from a known source pose. This avoids
+  // leaking a later ground-truth pose while ensuring every ablation variant
+  // receives exactly the same initial state.
+  void Initialize(const Pose2f& pose);
   void Reset(const char* reason = "tracker_reset");
   LocalizationState state() const noexcept { return state_; }
   bool has_pose() const noexcept { return has_pose_; }

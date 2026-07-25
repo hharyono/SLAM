@@ -39,6 +39,18 @@ void KeepBest(std::vector<Candidate>* candidates, std::size_t count) {
   if (candidates->size() > count) candidates->resize(count);
 }
 
+void ConsiderBest(std::vector<Candidate>* candidates, const Candidate& candidate,
+                  std::size_t count) {
+  if (candidates->size() < count) {
+    candidates->push_back(candidate);
+    return;
+  }
+  const auto worst = std::min_element(
+      candidates->begin(), candidates->end(),
+      [](const Candidate& a, const Candidate& b) { return a.score < b.score; });
+  if (candidate.score > worst->score) *worst = candidate;
+}
+
 }  // namespace
 
 const char* LocalizationStateName(LocalizationState state) noexcept {
@@ -103,7 +115,7 @@ LocalizationResult GlobalLocalize(const SlamMap& map,
   const float coarse_yaw_step = 10.0F * kPi / 180.0F;
   const float co = std::cos(map.origin_yaw), so = std::sin(map.origin_yaw);
   std::vector<Candidate> candidates;
-  candidates.reserve(static_cast<std::size_t>(coarse.width) * coarse.height * 36);
+  candidates.reserve(kKeep);
 
   for (float yaw = -kPi; yaw < kPi - 0.5F * coarse_yaw_step; yaw += coarse_yaw_step)
     for (std::uint32_t iy = 0; iy < coarse.height; ++iy)
@@ -112,8 +124,10 @@ LocalizationResult GlobalLocalize(const SlamMap& map,
         const float my = (static_cast<float>(iy) + 0.5F) * coarse.resolution;
         const Pose2f pose{map.origin_x + co * mx - so * my,
                           map.origin_y + so * mx + co * my, yaw};
-        candidates.push_back({pose, Score(coarse, map.origin_x, map.origin_y,
-                                          map.origin_yaw, scan, pose)});
+        ConsiderBest(&candidates,
+                     {pose, Score(coarse, map.origin_x, map.origin_y,
+                                  map.origin_yaw, scan, pose)},
+                     kKeep);
         ++result.evaluated;
       }
   KeepBest(&candidates, kKeep);
@@ -125,6 +139,7 @@ LocalizationResult GlobalLocalize(const SlamMap& map,
     const float xy_step = std::max(options.linear_step, level.resolution);
     const float yaw_step = std::max(options.angular_step, previous_yaw_step * 0.5F);
     std::vector<Candidate> refined;
+    refined.reserve(kKeep);
     for (const auto& parent : candidates)
       for (float dyaw = -previous_yaw_step; dyaw <= previous_yaw_step + 0.5F * yaw_step;
            dyaw += yaw_step)
@@ -135,8 +150,10 @@ LocalizationResult GlobalLocalize(const SlamMap& map,
             Pose2f pose{parent.pose.x + dx, parent.pose.y + dy, parent.pose.yaw + dyaw};
             while (pose.yaw > kPi) pose.yaw -= 2.0F * kPi;
             while (pose.yaw < -kPi) pose.yaw += 2.0F * kPi;
-            refined.push_back({pose, Score(level, map.origin_x, map.origin_y,
-                                            map.origin_yaw, scan, pose)});
+            ConsiderBest(&refined,
+                         {pose, Score(level, map.origin_x, map.origin_y,
+                                      map.origin_yaw, scan, pose)},
+                         kKeep);
             ++result.evaluated;
           }
     KeepBest(&refined, kKeep);
@@ -238,6 +255,16 @@ void PoseTracker::Reset(const char* reason) {
   consecutive_rejections_ = 0;
   recovery_confirmations_ = 0;
   reset_reason_ = reason ? reason : "tracker_reset";
+}
+
+void PoseTracker::Initialize(const Pose2f& pose) {
+  last_pose_ = pose;
+  state_ = LocalizationState::Tracking;
+  has_pose_ = true;
+  ever_had_pose_ = true;
+  consecutive_rejections_ = 0;
+  recovery_confirmations_ = 0;
+  reset_reason_ = "replay_initial_pose";
 }
 
 }  // namespace luckfox

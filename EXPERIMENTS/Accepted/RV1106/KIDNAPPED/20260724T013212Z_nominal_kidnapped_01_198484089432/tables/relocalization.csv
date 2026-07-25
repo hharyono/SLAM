@@ -1,0 +1,2 @@
+release_timestamp_ms,first_scan_after_release_ms,first_recovered_ms,stable_tracking_ms,success,timeout,final_position_error_m,final_heading_error_deg,final_score,final_state
+1784856796405,344,344,530,true,false,0.049992799704997565,1.6423257906426711,0.985584259,TRACKING

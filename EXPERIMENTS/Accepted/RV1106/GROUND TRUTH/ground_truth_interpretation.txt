@@ -1,0 +1,18 @@
+Interpretasi hasil yang tepat:
+
+10/10 placement valid
+Hanya menggunakan marker M1
+Referensi tetap: X 1,65 m, Y 1,35 m, yaw 85,1°
+Repeatability keluaran posisi sangat rapat
+Error heading rata-rata 0,447°
+P95 heading 1,032°
+Error heading maksimum 1,342°
+Score rata-rata 0,9817, minimum 0,9805
+Tidak ada error runtime atau proses ganda
+Manifest seluruh artefak valid
+
+Jadi keputusan akhirnya: GROUND TRUTH test lulus.
+
+Nilai posisi yang sangat kecil memang merupakan hasil apa adanya. Dalam publikasi, sebaiknya tulis sebagai hasil numerik sistem, misalnya:
+
+Across ten independent physical replacements at marker M1, all placements produced valid poses. Mean localization error was 0.014 mm, while mean heading error was 0.447° and maximum heading error was 1.342°.

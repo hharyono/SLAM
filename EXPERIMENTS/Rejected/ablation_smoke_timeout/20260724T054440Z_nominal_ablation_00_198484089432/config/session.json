@@ -1,0 +1,32 @@
+{
+  "schema": "luckfox.experiment.session.v1",
+  "experiment_id": "20260724T054440Z_nominal_ablation_00_198484089432",
+  "condition": "nominal",
+  "run_type": "ablation",
+  "trial": 0,
+  "route_id": "ABLATION_REPLAY",
+  "zone": "cross_room",
+  "ground_truth_method": "surveyed_floor_markers",
+  "robot_id": "AGV-001",
+  "state": "error",
+  "created_unix_ms": 1784871880145,
+  "status_count": 0,
+  "raw_scan_capture_enabled": false,
+  "checkpoint_count": 0,
+  "route_started": false,
+  "route_ended": false,
+  "recorded_marker_ids": [],
+  "checkpoint_estimates": {},
+  "output_relative_path": "ABLATION/20260724T054440Z_nominal_ablation_00_198484089432",
+  "dynamic_occlusion_completed_marker_ids": [],
+  "dynamic_occlusion_durations_ms": {},
+  "dynamic_object_detection_required": false,
+  "source_experiment_id": "20260724T013212Z_nominal_kidnapped_01_198484089432",
+  "ablation_execution_target": "host",
+  "ablation_completed_variants": [
+    "local_only_single",
+    "local_only_multi"
+  ],
+  "started_unix_ms": 1784871884944,
+  "error": "Command failed: /root/DATA/SLAM/LUCKFOX_LOCALIZER/build/localize_replay /root/DATA/SLAM/maps/ruang_utama.bin /root/DATA/SLAM/EXPERIMENTS/Accepted/KIDNAPPED/20260724T013212Z_nominal_kidnapped_01_198484089432/raw/raw_scans.csv --mode local_global_single --initial 3.79999995 4.55000019 1.17809689\n"
+}

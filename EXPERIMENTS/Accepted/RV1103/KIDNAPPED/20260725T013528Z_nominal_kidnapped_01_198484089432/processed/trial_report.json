@@ -1,0 +1,208 @@
+{
+  "summary": {
+    "schema": "luckfox.experiment.summary.v1",
+    "experiment_id": "20260725T013528Z_nominal_kidnapped_01_198484089432",
+    "generated_unix_ms": 1784943408381,
+    "accuracy": {
+      "checkpoint_count": 1,
+      "successful_checkpoints": 1,
+      "success_rate": 1,
+      "position_error_m": {
+        "n": 1,
+        "mean": 0.00019229311992100917,
+        "median": 0.00019229311992100917,
+        "rmse": 0.00019229311992100917,
+        "standard_deviation": 0,
+        "p95": 0.00019229311992100917,
+        "maximum": 0.00019229311992100917,
+        "confidence_interval_95_lower": 0.00019229311992100917,
+        "confidence_interval_95_upper": 0.00019229311992100917
+      },
+      "heading_error_deg": {
+        "n": 1,
+        "mean": 0.2668964720074183,
+        "median": 0.2668964720074183,
+        "rmse": 0.2668964720074183,
+        "standard_deviation": 0,
+        "p95": 0.2668964720074183,
+        "maximum": 0.2668964720074183,
+        "confidence_interval_95_lower": 0.2668964720074183,
+        "confidence_interval_95_upper": 0.2668964720074183
+      }
+    },
+    "ground_truth_repeatability": {
+      "marker_count": 1,
+      "placement_count": 1,
+      "estimate_center": {
+        "x": 3.950000286102295,
+        "y": 4.450000286102295,
+        "yaw": -0.049865260720253
+      },
+      "position_spread_m": {
+        "n": 1,
+        "mean": 0,
+        "median": 0,
+        "rmse": 0,
+        "standard_deviation": 0,
+        "p95": 0,
+        "maximum": 0,
+        "confidence_interval_95_lower": 0,
+        "confidence_interval_95_upper": 0
+      },
+      "heading_spread_deg": {
+        "n": 1,
+        "mean": 3.975693351829396e-16,
+        "median": 3.975693351829396e-16,
+        "rmse": 3.975693351829396e-16,
+        "standard_deviation": 0,
+        "p95": 3.975693351829396e-16,
+        "maximum": 3.975693351829396e-16,
+        "confidence_interval_95_lower": 3.975693351829396e-16,
+        "confidence_interval_95_upper": 3.975693351829396e-16
+      }
+    },
+    "relocalization": {
+      "trials": 1,
+      "successes": 1,
+      "timeouts": 0,
+      "success_rate": 1,
+      "first_recovered_ms": {
+        "n": 1,
+        "mean": 790,
+        "median": 790,
+        "rmse": 790,
+        "standard_deviation": 0,
+        "p95": 790,
+        "maximum": 790,
+        "confidence_interval_95_lower": 790,
+        "confidence_interval_95_upper": 790
+      },
+      "stable_tracking_ms": {
+        "n": 1,
+        "mean": 1034,
+        "median": 1034,
+        "rmse": 1034,
+        "standard_deviation": 0,
+        "p95": 1034,
+        "maximum": 1034,
+        "confidence_interval_95_lower": 1034,
+        "confidence_interval_95_upper": 1034
+      }
+    },
+    "dynamic_occlusion": null,
+    "resources": {
+      "idle": {
+        "samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0
+      },
+      "normal_tracking": {
+        "samples": 560,
+        "cpu_percent": {
+          "n": 560,
+          "mean": 48.366018723214246,
+          "median": 41.998975200000004,
+          "rmse": 49.756726321163725,
+          "standard_deviation": 11.68161149263556,
+          "p95": 64.281597285,
+          "maximum": 98.8883725,
+          "confidence_interval_95_lower": 47.397622859507095,
+          "confidence_interval_95_upper": 49.3344145869214
+        },
+        "peak_rss_kb": 2084,
+        "processing_time_ms": {
+          "n": 560,
+          "mean": 43.15000714285712,
+          "median": 36.997,
+          "rmse": 44.71514678782953,
+          "standard_deviation": 11.726944863370019,
+          "p95": 60.238099999999996,
+          "maximum": 66.871,
+          "confidence_interval_95_lower": 42.177853180471985,
+          "confidence_interval_95_upper": 44.122161105242256
+        },
+        "scan_cycle_ms": {
+          "n": 560,
+          "mean": 98.49615714285724,
+          "median": 99.03450000000001,
+          "rmse": 98.64427303597726,
+          "standard_deviation": 5.403668280531328,
+          "p95": 105.10000000000001,
+          "maximum": 112.767,
+          "confidence_interval_95_lower": 98.04819754284735,
+          "confidence_interval_95_upper": 98.94411674286714
+        }
+      },
+      "global_relocalization": {
+        "samples": 2,
+        "cpu_percent": {
+          "n": 2,
+          "mean": 59.0731833,
+          "median": 59.0731833,
+          "rmse": 68.50960723729156,
+          "standard_deviation": 34.6976267,
+          "p95": 90.30104733,
+          "maximum": 93.77081,
+          "confidence_interval_95_lower": -8.934165031999996,
+          "confidence_interval_95_upper": 127.08053163199999
+        },
+        "peak_rss_kb": 2084,
+        "processing_time_ms": {
+          "n": 2,
+          "mean": 910.7085,
+          "median": 910.7085,
+          "rmse": 910.7179988407498,
+          "standard_deviation": 4.159500000000037,
+          "p95": 914.45205,
+          "maximum": 914.868,
+          "confidence_interval_95_lower": 902.5558799999999,
+          "confidence_interval_95_upper": 918.86112
+        },
+        "scan_cycle_ms": {
+          "n": 2,
+          "mean": 948.0495000000001,
+          "median": 948.0495000000001,
+          "rmse": 948.077209515396,
+          "standard_deviation": 7.248499999999979,
+          "p95": 954.57315,
+          "maximum": 955.298,
+          "confidence_interval_95_lower": 933.8424400000001,
+          "confidence_interval_95_upper": 962.25656
+        }
+      },
+      "update_rate_hz": {
+        "n": 561,
+        "mean": 10.083312276306055,
+        "median": 10,
+        "rmse": 10.123642435134661,
+        "standard_deviation": 0.9027456413378183,
+        "p95": 10.869565217391305,
+        "maximum": 20,
+        "confidence_interval_95_lower": 10.008542262974055,
+        "confidence_interval_95_upper": 10.158082289638054
+      },
+      "binary_size_bytes": 263524,
+      "measurement_windows": {
+        "idle": [],
+        "normal_tracking": [],
+        "global_relocalization": []
+      }
+    }
+  },
+  "recovery_trials": [
+    {
+      "release_timestamp_ms": 1784943389120,
+      "first_scan_after_release_ms": 790,
+      "first_recovered_ms": 790,
+      "stable_tracking_ms": 1034,
+      "success": true,
+      "timeout": false,
+      "final_position_error_m": 0.00019229075198691882,
+      "final_heading_error_deg": 0.21337169559749147,
+      "final_score": 0.994528055,
+      "final_state": "TRACKING"
+    }
+  ]
+}

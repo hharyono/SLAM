@@ -1,0 +1,58 @@
+{
+  "schema": "luckfox.dynamic_occlusion.config.v1",
+  "source": "Global route reference: RV1103_marker_r1 (rv1103-marker-r1)",
+  "markers": [
+    {
+      "marker_id": "M2",
+      "zone": "room_1",
+      "x": 3.2499942779541016,
+      "y": 2.0501694679260254,
+      "yaw": -0.06170693039894104
+    },
+    {
+      "marker_id": "M3",
+      "zone": "room_1",
+      "x": 2.949988842010498,
+      "y": 1.4501882791519165,
+      "yaw": -0.07371307164430618
+    },
+    {
+      "marker_id": "M4",
+      "zone": "room_2",
+      "x": 3.349961519241333,
+      "y": 3.850177764892578,
+      "yaw": -0.04468156397342682
+    },
+    {
+      "marker_id": "M5",
+      "zone": "room_2",
+      "x": 3.9499359130859375,
+      "y": 4.450181484222412,
+      "yaw": -0.05452348291873932
+    },
+    {
+      "marker_id": "M6",
+      "zone": "room_2",
+      "x": 5.099859237670898,
+      "y": 3.8001699447631836,
+      "yaw": -0.05684579908847809
+    },
+    {
+      "marker_id": "M7",
+      "zone": "room_2",
+      "x": 6.349771976470947,
+      "y": 3.7501683235168457,
+      "yaw": -0.06698396801948547
+    }
+  ],
+  "obstacle": {
+    "shape": "upright_rectangular_prism",
+    "width_cm": 13,
+    "depth_cm": 13,
+    "height_cm": 30,
+    "distance_from_lidar_cm": 50,
+    "movement": "left_to_right",
+    "duration_target_ms": 4000,
+    "duration_tolerance_ms": 500
+  }
+}

@@ -1,0 +1,2 @@
+timestamp_ms,marker_id,zone,truth_x_m,truth_y_m,truth_yaw_rad,estimate_x_m,estimate_y_m,estimate_yaw_rad,score,valid,position_error_m,heading_error_deg
+1784856423066,M3,room_1,3.2499914169311523,1.4500070810317993,1.1777784824371338,3.25,1.4999998807907104,1.1360245943069458,0.9884384870529175,true,0.049992800495707944,2.3923215681211563

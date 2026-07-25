@@ -1,0 +1,95 @@
+HEADING OFFSET SENSITIVITY ANALYSIS
+Furniture-Changed Route Test R1 and R2
+Date: 23 July 2026
+
+SESSIONS
+
+- R1: 20260723T074715Z_furniture_changed_route_01_08969e7150d9
+- R2: 20260723T075138Z_furniture_changed_route_01_08969e7150d9
+- Total checkpoint: 16
+- Valid checkpoint: 16/16
+
+OBSERVATION
+
+The raw heading differences were approximately 111 degrees at nearly every
+checkpoint in both route directions. The direction and magnitude of the error
+were consistent rather than randomly distributed.
+
+Temuan ini menunjukkan bahwa error sekitar 111° adalah offset penempatan yang
+sistematis, bukan variasi heading acak dari localizer.
+
+The common circular-mean offset calculated across all 16 checkpoints was:
+
+- 1.937710538 rad
+- 111.022636 degrees
+
+RESULT AFTER REMOVING THE UNIFORM OFFSET
+
+R1 corrected heading residual:
+
+- Mean: 1.502619 degrees
+- Median: 1.016568 degrees
+- RMSE: 1.939863 degrees
+- P95: 3.636517 degrees
+- Maximum: 4.376205 degrees
+
+R2 corrected heading residual:
+
+- Mean: 0.974578 degrees
+- Median: 0.817973 degrees
+- RMSE: 1.297685 degrees
+- P95: 2.292943 degrees
+- Maximum: 2.582219 degrees
+
+Combined corrected heading residual:
+
+- Mean: 1.238598 degrees
+- Median: 1.016568 degrees
+- RMSE: 1.650311 degrees
+- P95: 3.030715 degrees
+- Maximum: 4.376205 degrees
+
+INTERPRETATION
+
+Keseragaman offset pada R1 dan R2 menunjukkan bahwa robot ditempatkan dengan
+orientasi yang berubah secara konsisten terhadap yaw referensi marker. Jika
+penyebabnya adalah ketidakstabilan estimasi heading localizer, error seharusnya
+menyebar dengan arah dan besar yang lebih acak pada setiap checkpoint.
+
+Setelah common offset dihilangkan, residual heading menjadi kecil dan memenuhi
+batas P95 5 derajat serta maksimum 10 derajat. Hal ini menunjukkan repeatability
+heading localizer tetap baik di bawah kondisi furniture changed, meskipun
+absolute heading comparison awal terpengaruh oleh perubahan orientasi
+penempatan.
+
+SCIENTIFIC VALUE
+
+Hasil ini memberi nilai tambah sebagai heading-offset sensitivity analysis:
+
+1. Sistem dapat membedakan common placement bias dari residual localization
+   error.
+2. Konsistensi residual terjaga pada dua arah perjalanan.
+3. Perubahan furnitur tidak menghasilkan penyebaran heading acak yang besar
+   setelah common placement offset dikendalikan.
+
+LIMITATION
+
+Offset 111.022636 degrees dihitung secara post-hoc dari observasi localizer yang
+sama, bukan dari alat ukur heading independen. Karena itu hasil ini mendukung
+analisis konsistensi dan sensitivitas, tetapi tidak boleh diklaim sebagai
+validasi absolute heading yang independen.
+
+Untuk eksperimen lanjutan, rotasi penempatan sebaiknya diukur sebelum capture
+dengan sudut yang telah ditentukan, misalnya 0, +/-30, +/-60, dan +/-90 derajat,
+kemudian diulang beberapa kali pada setiap sudut.
+
+PUBLICATION-READY STATEMENT
+
+The approximately 111-degree raw heading error was consistent across both route
+directions, indicating a systematic placement-orientation offset rather than
+random heading variation in the localizer. After removing the common circular
+offset, the combined mean residual heading error was 1.239 degrees, with a P95
+of 3.031 degrees and a maximum of 4.376 degrees. This post-hoc analysis supports
+good heading repeatability under the furniture-changed condition, while
+independent angle measurements remain necessary for absolute-heading
+validation.

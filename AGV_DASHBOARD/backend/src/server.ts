@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ExperimentManager, type CreateSessionInput } from './experiments.js';
+import { RouteReferenceStore } from './route-references.js';
 
 type Pose = {
   x: number;
@@ -75,10 +76,16 @@ const saveMapScript = path.join(root, 'LUCKFOX_LOCALIZER/scripts/save_and_conver
 const portProxyScript = path.join(root, 'AGV_DASHBOARD/scripts/setup-wsl-portproxy.ps1');
 const experimentOutputDir =
   process.env.EXPERIMENT_OUTPUT_DIR || path.join(root, 'EXPERIMENTS', 'Ouputs');
-const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.24';
+const routeReferences = new RouteReferenceStore(experimentOutputDir);
+const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.231';
+const rv1103SshTarget = process.env.RV1103_SSH_TARGET || boardSshTarget;
+const rv1106SshTarget = process.env.RV1106_SSH_TARGET || 'root@192.168.1.24';
 const boardSshKey = process.env.BOARD_SSH_KEY || '/root/.ssh/luckfox_experiment_ed25519';
 const boardAddress = process.env.BOARD_ADDRESS || boardSshTarget.split('@').at(-1)!;
 const scanStreamPort = Number(process.env.SCAN_STREAM_TCP_PORT || 42010);
+const scanRelayPort = Number(process.env.SCAN_RELAY_TCP_PORT || 42011);
+const SCAN_PROTOCOL_MAGIC = 0x53434e31; // ASCII: SCN1
+const SCAN_MAX_PAYLOAD_BYTES = 40 + 10_000 * 12;
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 let lastSavedMap: string | undefined;
@@ -153,6 +160,10 @@ const experiments = new ExperimentManager({
   outputRoot: experimentOutputDir,
   boardSshTarget,
   boardSshKey,
+  ablationBoardTargets: {
+    rv1103: rv1103SshTarget,
+    rv1106: rv1106SshTarget,
+  },
   notify: (session) => broadcastToDashboards({ type: 'experiment_session', data: session }),
 });
 function parseYamlMap(name = mapName): MapMetadata {
@@ -420,6 +431,25 @@ function logRobotArrival(status: RobotStatus): void {
   );
 }
 
+function ReadPublicMarkers(filename: string) {
+  const markers = JSON.parse(
+    fs.readFileSync(path.join(experimentOutputDir, 'Global', filename), 'utf8'),
+  ) as Array<{ marker_id: string; zone: string; x: number; y: number; yaw: number }>;
+  if (
+    !Array.isArray(markers) ||
+    markers.length !== 8 ||
+    new Set(markers.map((marker) => marker.marker_id)).size !== 8 ||
+    markers.some(
+      (marker) =>
+        !marker.marker_id ||
+        !marker.zone ||
+        ![marker.x, marker.y, marker.yaw].every(Number.isFinite),
+    )
+  )
+    throw new Error(`Invalid public marker data in ${filename}`);
+  return markers;
+}
+
 app.get('/api/map', (_req, res) => {
   try {
     const selected = activeMapName || mapName;
@@ -449,6 +479,33 @@ app.post('/api/robots/:id/mission/:action', (req, res) => {
 
 app.get('/api/experiments', (_req, res) => res.json(experiments.List()));
 app.get('/api/experiments/active', (_req, res) => res.json(experiments.GetActive() ?? null));
+app.get('/api/experiments/ablation-sources', (_req, res) =>
+  res.json(experiments.ListAblationSources()),
+);
+app.get('/api/experiments/resource-replay-sources', (_req, res) =>
+  res.json(experiments.ListResourceReplaySources()),
+);
+app.get('/api/experiments/ablation-targets', async (_req, res) => {
+  try {
+    res.json(await experiments.ListAblationTargets());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+app.get('/api/experiments/route-references', (_req, res) => {
+  try {
+    res.json(routeReferences.List());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/route-references', (req, res) => {
+  try {
+    res.status(201).json(routeReferences.Create(req.body as { name?: unknown; markers?: unknown }));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
 app.get('/api/experiments/route-markers/:routeId', (req, res) => {
   const filename = {
     R1_ROOM_1_TO_2: 'markers_R1.json',
@@ -456,22 +513,21 @@ app.get('/api/experiments/route-markers/:routeId', (req, res) => {
   }[req.params.routeId];
   if (!filename) return res.status(400).json({ error: 'Unsupported public route marker set' });
   try {
-    const markers = JSON.parse(
-      fs.readFileSync(path.join(experimentOutputDir, 'Global', filename), 'utf8'),
-    ) as Array<{ marker_id: string; zone: string; x: number; y: number; yaw: number }>;
-    if (
-      !Array.isArray(markers) ||
-      markers.length !== 8 ||
-      new Set(markers.map((marker) => marker.marker_id)).size !== 8 ||
-      markers.some(
-        (marker) =>
-          !marker.marker_id ||
-          !marker.zone ||
-          ![marker.x, marker.y, marker.yaw].every(Number.isFinite),
-      )
-    )
-      throw new Error(`Invalid public marker data in ${filename}`);
-    return res.json(markers);
+    return res.json(ReadPublicMarkers(filename));
+  } catch (error) {
+    return res.status(500).json({ error: (error as Error).message });
+  }
+});
+app.get('/api/experiments/kidnap-markers', (_req, res) => {
+  try {
+    return res.json(ReadPublicMarkers('markers_R1.json'));
+  } catch (error) {
+    return res.status(500).json({ error: (error as Error).message });
+  }
+});
+app.get('/api/experiments/dynamic-markers', (_req, res) => {
+  try {
+    return res.json(ReadPublicMarkers('markers_R1.json'));
   } catch (error) {
     return res.status(500).json({ error: (error as Error).message });
   }
@@ -507,7 +563,38 @@ app.get('/api/experiments/:id', (req, res) => {
 });
 app.post('/api/experiments', (req, res) => {
   try {
-    res.status(201).json(experiments.Create(req.body as CreateSessionInput));
+    const input = { ...(req.body as CreateSessionInput) };
+    if (
+      input.run_type !== 'ablation' &&
+      !(
+        input.run_type === 'resource' &&
+        ['replay', 'live_endurance'].includes(String(input.resource_mode))
+      )
+    ) {
+      const reference = routeReferences
+        .List()
+        .find((item) => item.reference_id === input.route_reference_id);
+      if (!reference) throw new Error('Select a valid Global route reference');
+      input.route_reference_id = reference.reference_id;
+      input.route_reference_name = reference.name;
+      if (input.run_type === 'route' || input.run_type === 'dynamic_occluded')
+        input.route_markers = reference.markers;
+      if (input.run_type === 'kidnapped') {
+        const startId = input.kidnap_start_marker?.marker_id;
+        const targetId = input.kidnap_target_marker?.marker_id;
+        input.kidnap_start_marker = reference.markers.find(
+          (marker) => marker.marker_id === startId,
+        );
+        input.kidnap_target_marker = reference.markers.find(
+          (marker) => marker.marker_id === targetId,
+        );
+      }
+      if (input.run_type === 'ground_truth') {
+        const markerId = input.reference_marker?.marker_id;
+        input.reference_marker = reference.markers.find((marker) => marker.marker_id === markerId);
+      }
+    }
+    res.status(201).json(experiments.Create(input));
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
@@ -521,7 +608,14 @@ app.post('/api/experiments/:id/start', async (req, res) => {
 });
 app.post('/api/experiments/:id/event', (req, res) => {
   try {
-    res.json(experiments.RecordEvent(req.params.id, req.body as Record<string, unknown>));
+    const session = experiments.Get(req.params.id);
+    res.json(
+      experiments.RecordEvent(
+        req.params.id,
+        req.body as Record<string, unknown>,
+        robots.get(session.robot_id)?.status,
+      ),
+    );
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
@@ -554,6 +648,13 @@ app.post('/api/experiments/:id/ablation', async (req, res) => {
     res.status(409).json({ error: (error as Error).message });
   }
 });
+app.post('/api/experiments/:id/resource-replay', async (req, res) => {
+  try {
+    res.json(await experiments.RunAblation(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
 app.post('/api/experiments/:id/stop', async (req, res) => {
   try {
     const session = experiments.Get(req.params.id);
@@ -564,6 +665,27 @@ app.post('/api/experiments/:id/stop', async (req, res) => {
       await new Promise((resolve) => setTimeout(resolve, 600));
     }
     res.json(await experiments.Stop(req.params.id));
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+app.post('/api/experiments/:id/cancel', async (req, res) => {
+  try {
+    const session = experiments.Get(req.params.id);
+    const robot = robots.get(session.robot_id);
+    if (
+      ['capturing', 'starting', 'stopping'].includes(session.state) &&
+      robot?.status.mission_running
+    ) {
+      const commandId = sendMissionCommand(robot, MissionCommand.Stop);
+      experiments.RecordSystemEvent('MISSION_STOP_SENT', {
+        robot_id: session.robot_id,
+        command_id: commandId,
+        reason: 'test_cancelled',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    res.json(await experiments.Cancel(req.params.id));
   } catch (error) {
     res.status(409).json({ error: (error as Error).message });
   }
@@ -909,6 +1031,66 @@ const robotServer = net.createServer((socket) => {
   socket.on('error', (error: Error) => console.warn('Robot TCP:', error.message));
 });
 
+let scanRelaySocket: Socket | undefined;
+let scanRelayConnecting = false;
+let nextScanRelayAttemptMs = 0;
+
+function RelayScanFrame(frame: Buffer): void {
+  if (scanRelaySocket && !scanRelaySocket.destroyed) {
+    scanRelaySocket.write(frame);
+    return;
+  }
+  if (scanRelayConnecting || Date.now() < nextScanRelayAttemptMs) return;
+  scanRelayConnecting = true;
+  nextScanRelayAttemptMs = Date.now() + 1_000;
+  const relay = net.createConnection({ host: '127.0.0.1', port: scanRelayPort });
+  relay.setNoDelay(true);
+  relay.once('connect', () => {
+    scanRelayConnecting = false;
+    scanRelaySocket = relay;
+    relay.write(frame);
+  });
+  relay.once('error', () => {
+    scanRelayConnecting = false;
+    relay.destroy();
+  });
+  relay.once('close', () => {
+    scanRelayConnecting = false;
+    if (scanRelaySocket === relay) scanRelaySocket = undefined;
+  });
+}
+
+const scanServer = net.createServer((socket) => {
+  let incoming = Buffer.alloc(0);
+  socket.setNoDelay(true);
+  socket.setKeepAlive(true, 1_000);
+  socket.on('data', (chunk: Buffer) => {
+    incoming = Buffer.concat([incoming, chunk]);
+    while (incoming.length >= FRAME_HEADER_BYTES) {
+      if (
+        incoming.readUInt32BE(0) !== SCAN_PROTOCOL_MAGIC ||
+        incoming.readUInt16BE(4) !== PROTOCOL_VERSION
+      ) {
+        incoming = incoming.subarray(1);
+        continue;
+      }
+      const type = incoming.readUInt16BE(6);
+      const payloadLength = incoming.readUInt32BE(8);
+      const sequence = incoming.readUInt32BE(12);
+      if (payloadLength > SCAN_MAX_PAYLOAD_BYTES) return socket.destroy();
+      const frameLength = FRAME_HEADER_BYTES + payloadLength;
+      if (incoming.length < frameLength) break;
+      const frame = incoming.subarray(0, frameLength);
+      if (type === 1) {
+        experiments.RecordStreamedRawScan(sequence, frame.subarray(FRAME_HEADER_BYTES));
+        RelayScanFrame(frame);
+      }
+      incoming = incoming.subarray(frameLength);
+    }
+  });
+  socket.on('error', (error) => console.warn(`Scan stream socket error: ${error.message}`));
+});
+
 const mapServer = net.createServer((socket) => {
   let incoming = Buffer.alloc(0);
   socket.on('data', (chunk: Buffer) => {
@@ -965,6 +1147,11 @@ setInterval(() => {
 robotServer.listen(robotPort, '0.0.0.0', () => {
   console.log(`Robot TCP binary listening on :${robotPort}`);
   ensureWslPortProxy();
+});
+scanServer.listen(scanStreamPort, '0.0.0.0', () => {
+  console.log(
+    `ScanFrame recorder listening on :${scanStreamPort}; ROS relay target 127.0.0.1:${scanRelayPort}`,
+  );
 });
 mapServer.listen(mapBridgePort, '127.0.0.1', () =>
   console.log(`ROS map bridge listening on 127.0.0.1:${mapBridgePort}`),

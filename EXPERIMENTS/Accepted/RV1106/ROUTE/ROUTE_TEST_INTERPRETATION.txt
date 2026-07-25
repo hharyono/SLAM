@@ -1,0 +1,139 @@
+INTERPRETASI HASIL ROUTE TEST R1 DAN R2
+Tanggal analisis: 23 Juli 2026
+
+DATA YANG DIGUNAKAN
+
+1. R1 — Room 1 ke Room 2
+   Session: 20260723T051806Z_nominal_route_01_08969e7150d9
+   Status: ANALYZED
+   Trial: 1
+   Checkpoint valid: 8/8
+
+2. R2 — Room 2 ke Room 1
+   Session: 20260723T060439Z_nominal_route_01_08969e7150d9
+   Status: FINALIZED
+   Trial: 1
+   Checkpoint valid: 8/8
+
+Session 20260723T060330Z_nominal_route_01_08969e7150d9 tidak digunakan karena
+capture gagal dimulai saat /tmp board penuh. Session tersebut memiliki 0/8
+checkpoint, tidak mempunyai telemetry/raw scan eksperimen, hasil analisis, atau
+manifest.
+
+HASIL PER ARAH
+
+R1 — ROOM 1 KE ROOM 2
+
+- Success rate checkpoint: 100% (8/8)
+- Mean position error: 0,031398 m (31,398 mm)
+- Median position error: 0,049964 m
+- RMSE position: 0,039615 m
+- P95 position error: 0,050313 m
+- Maximum position error: 0,050319 m
+- Mean heading error: 1,310°
+- Median heading error: 0,813°
+- RMSE heading: 1,697°
+- P95 heading error: 3,081°
+- Maximum heading error: 3,348°
+- Mean checkpoint score: 0,9831
+- Minimum checkpoint score: 0,9699
+- Telemetry scan: 2.522
+- Scan accepted: 2.522/2.522 (100%)
+- State telemetry: TRACKING 2.519 dan RECOVERED 3
+- Tidak terdapat LOST atau DEGRADED pada scan R1.
+
+R2 — ROOM 2 KE ROOM 1
+
+- Success rate checkpoint: 100% (8/8)
+- Mean position error: 0,031350 m (31,350 mm)
+- Median position error: 0,049756 m
+- RMSE position: 0,039555 m
+- P95 position error: 0,050281 m
+- Maximum position error: 0,050340 m
+- Mean heading error: 2,348°
+- Median heading error: 2,449°
+- RMSE heading: 2,588°
+- P95 heading error: 3,812°
+- Maximum heading error: 4,118°
+- Mean checkpoint score: 0,9864
+- Minimum checkpoint score: 0,9728
+- Telemetry scan: 1.571
+- Scan accepted: 1.568/1.571 (99,81%)
+- State telemetry: TRACKING 1.562, RECOVERED 6, DEGRADED 2, dan LOST 1
+- LOST bersifat sementara karena seluruh delapan checkpoint akhirnya valid.
+- Tidak ditemukan error pada runtime log.
+
+HASIL GABUNGAN DUA ARAH
+
+- Total checkpoint valid: 16/16
+- Combined checkpoint success rate: 100%
+- Mean position error: 0,031374 m (31,374 mm)
+- Median position error: 0,049888 m
+- RMSE position: 0,039585 m
+- P95 position error: 0,050324 m
+- Maximum position error: 0,050340 m
+- Mean heading error: 1,829°
+- Median heading error: 1,739°
+- RMSE heading: 2,189°
+- P95 heading error: 3,541°
+- Maximum heading error: 4,118°
+- Mean checkpoint score: 0,9847
+- Minimum checkpoint score: 0,9699
+
+INTERPRETASI
+
+Kinerja posisi konsisten terhadap arah perjalanan. Perbedaan mean position error
+antara R1 dan R2 hanya 0,000048 m atau sekitar 0,048 mm. P95 dan error maksimum
+kedua arah juga sama-sama berada di sekitar 0,0503 m. Hasil ini menunjukkan tidak
+ada bias posisi yang berarti antara perjalanan Room 1 ke Room 2 dan perjalanan
+balik Room 2 ke Room 1 pada dua trial ini.
+
+Error heading menunjukkan pengaruh arah yang lebih terlihat. Mean heading error R2
+lebih besar 1,038° daripada R1, yaitu 2,348° berbanding 1,310°. P95 heading R2
+juga naik menjadi 3,812° dari 3,081°. Meskipun demikian, error heading maksimum
+dua arah masih 4,118° dan seluruh checkpoint tetap menghasilkan pose valid.
+
+R2 mengalami satu state LOST, dua DEGRADED, dan enam RECOVERED selama perjalanan.
+Karena acceptance rate tetap 99,81%, checkpoint score minimum 0,9728, dan 8/8
+checkpoint valid, gangguan tersebut bersifat singkat dan sistem berhasil pulih.
+Namun kejadian ini tetap perlu dilaporkan dan diamati pada pengulangan berikutnya,
+terutama untuk menentukan apakah transisi menuju Room 1 lebih menantang secara
+konsisten.
+
+KESIMPULAN
+
+Secara operasional, kedua route test ini berhasil: 16/16 checkpoint menghasilkan
+pose valid dan akurasi posisi dua arah sangat konsisten. Hasil awal mendukung bahwa
+localizer dapat menjalankan rute bolak-balik tanpa bias posisi yang material.
+Performa heading R2 lebih lemah daripada R1 dan perlu dikonfirmasi pada trial
+tambahan.
+
+Hasil ini belum cukup untuk menyimpulkan performa populasi atau menyelesaikan
+campaign publikasi karena baru terdapat satu trial R1 dan satu trial R2. Kesimpulan
+statistik akhir harus dibuat setelah jumlah pengulangan yang direncanakan selesai.
+
+CATATAN INTEGRITAS DAN METODOLOGI
+
+- R2 sudah FINALIZED. Manifest utama dan capture_manifest.sha256 berhasil
+  diverifikasi, termasuk telemetry, raw scan, runtime log, system info, dan
+  runtime configuration.
+- R1 masih berstatus ANALYZED dan belum mempunyai manifest final.
+- Telemetry R1 mempunyai satu baris terakhir yang terpotong akibat penghentian
+  recorder. Baris tidak lengkap tersebut tidak digunakan dalam perhitungan.
+- R2 memakai referensi R1 dalam urutan terbalik: R1 M8 menjadi R2 M1 sampai R1 M1
+  menjadi R2 M8. Karena itu perbandingan ini terutama mengukur konsistensi
+  bidirectional terhadap snapshot referensi R1, bukan survei ground-truth absolut
+  yang dilakukan secara independen untuk R2.
+- Nama "_route_01_" pada dua session berarti run type ROUTE dan Trial 01. Identitas
+  arah disimpan pada route_id, yaitu R1_ROOM_1_TO_2 atau R2_ROOM_2_TO_1.
+
+PUBLICATION-READY SUMMARY
+
+Across two opposite-direction route trials, all 16 checkpoints produced valid
+localization poses. The combined mean position error was 0.0314 m, with a P95 of
+0.0503 m and a maximum of 0.0503 m. Mean heading error was 1.829°, with a P95 of
+3.541° and a maximum of 4.118°. Position accuracy was nearly identical in both
+directions, whereas the reverse route showed a higher mean heading error
+(2.348° versus 1.310°). One transient LOST state occurred during the reverse
+route, but the system recovered and completed all checkpoints successfully.
+These results are preliminary because only one trial per direction was evaluated.

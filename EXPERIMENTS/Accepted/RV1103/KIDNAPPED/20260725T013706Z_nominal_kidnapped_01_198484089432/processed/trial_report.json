@@ -1,0 +1,208 @@
+{
+  "summary": {
+    "schema": "luckfox.experiment.summary.v1",
+    "experiment_id": "20260725T013706Z_nominal_kidnapped_01_198484089432",
+    "generated_unix_ms": 1784943506495,
+    "accuracy": {
+      "checkpoint_count": 1,
+      "successful_checkpoints": 1,
+      "success_rate": 1,
+      "position_error_m": {
+        "n": 1,
+        "mean": 0.05000596087652047,
+        "median": 0.05000596087652047,
+        "rmse": 0.05000596087652047,
+        "standard_deviation": 0,
+        "p95": 0.05000596087652047,
+        "maximum": 0.05000596087652047,
+        "confidence_interval_95_lower": 0.05000596087652047,
+        "confidence_interval_95_upper": 0.05000596087652047
+      },
+      "heading_error_deg": {
+        "n": 1,
+        "mean": 0.2679986937847291,
+        "median": 0.2679986937847291,
+        "rmse": 0.2679986937847291,
+        "standard_deviation": 0,
+        "p95": 0.2679986937847291,
+        "maximum": 0.2679986937847291,
+        "confidence_interval_95_lower": 0.2679986937847291,
+        "confidence_interval_95_upper": 0.2679986937847291
+      }
+    },
+    "ground_truth_repeatability": {
+      "marker_count": 1,
+      "placement_count": 1,
+      "estimate_center": {
+        "x": 3.299999952316284,
+        "y": 2.0500001907348633,
+        "yaw": -0.06638438999652864
+      },
+      "position_spread_m": {
+        "n": 1,
+        "mean": 0,
+        "median": 0,
+        "rmse": 0,
+        "standard_deviation": 0,
+        "p95": 0,
+        "maximum": 0,
+        "confidence_interval_95_lower": 0,
+        "confidence_interval_95_upper": 0
+      },
+      "heading_spread_deg": {
+        "n": 1,
+        "mean": 7.951386703658792e-16,
+        "median": 7.951386703658792e-16,
+        "rmse": 7.951386703658792e-16,
+        "standard_deviation": 0,
+        "p95": 7.951386703658792e-16,
+        "maximum": 7.951386703658792e-16,
+        "confidence_interval_95_lower": 7.951386703658792e-16,
+        "confidence_interval_95_upper": 7.951386703658792e-16
+      }
+    },
+    "relocalization": {
+      "trials": 1,
+      "successes": 1,
+      "timeouts": 0,
+      "success_rate": 1,
+      "first_recovered_ms": {
+        "n": 1,
+        "mean": 952,
+        "median": 952,
+        "rmse": 952,
+        "standard_deviation": 0,
+        "p95": 952,
+        "maximum": 952,
+        "confidence_interval_95_lower": 952,
+        "confidence_interval_95_upper": 952
+      },
+      "stable_tracking_ms": {
+        "n": 1,
+        "mean": 1201,
+        "median": 1201,
+        "rmse": 1201,
+        "standard_deviation": 0,
+        "p95": 1201,
+        "maximum": 1201,
+        "confidence_interval_95_lower": 1201,
+        "confidence_interval_95_upper": 1201
+      }
+    },
+    "dynamic_occlusion": null,
+    "resources": {
+      "idle": {
+        "samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0
+      },
+      "normal_tracking": {
+        "samples": 572,
+        "cpu_percent": {
+          "n": 572,
+          "mean": 51.62424070437058,
+          "median": 57.1863502,
+          "rmse": 53.062509301898,
+          "standard_deviation": 12.270601660522333,
+          "p95": 63.92952884,
+          "maximum": 99.055667,
+          "confidence_interval_95_lower": 50.6177636574171,
+          "confidence_interval_95_upper": 52.630717751324056
+        },
+        "peak_rss_kb": 2088,
+        "processing_time_ms": {
+          "n": 572,
+          "mean": 46.54347027972026,
+          "median": 51.763999999999996,
+          "rmse": 48.189312730871904,
+          "standard_deviation": 12.486602251796567,
+          "p95": 60.24780000000001,
+          "maximum": 96.541,
+          "confidence_interval_95_lower": 45.51927611968134,
+          "confidence_interval_95_upper": 47.567664439759184
+        },
+        "scan_cycle_ms": {
+          "n": 572,
+          "mean": 98.28256468531458,
+          "median": 98.8725,
+          "rmse": 98.56070280687415,
+          "standard_deviation": 7.399298389840736,
+          "p95": 105.2955,
+          "maximum": 142.216,
+          "confidence_interval_95_lower": 97.67564872479619,
+          "confidence_interval_95_upper": 98.88948064583298
+        }
+      },
+      "global_relocalization": {
+        "samples": 4,
+        "cpu_percent": {
+          "n": 4,
+          "mean": 78.0685382,
+          "median": 94.99917785,
+          "rmse": 84.28867269255912,
+          "standard_deviation": 31.778667177660278,
+          "p95": 98.5756493,
+          "maximum": 99.169865,
+          "confidence_interval_95_lower": 42.10759098296102,
+          "confidence_interval_95_upper": 114.02948541703898
+        },
+        "peak_rss_kb": 2088,
+        "processing_time_ms": {
+          "n": 4,
+          "mean": 795.079,
+          "median": 899.0799999999999,
+          "rmse": 816.0260763630657,
+          "standard_deviation": 183.70612690789602,
+          "p95": 904.91655,
+          "maximum": 905.193,
+          "confidence_interval_95_lower": 587.1959476287676,
+          "confidence_interval_95_upper": 1002.9620523712323
+        },
+        "scan_cycle_ms": {
+          "n": 4,
+          "mean": 819.658,
+          "median": 925.9385,
+          "rmse": 843.3290482311752,
+          "standard_deviation": 198.40525856564386,
+          "p95": 948.9467,
+          "maximum": 949.457,
+          "confidence_interval_95_lower": 595.1413142946369,
+          "confidence_interval_95_upper": 1044.1746857053631
+        }
+      },
+      "update_rate_hz": {
+        "n": 575,
+        "mean": 10.148509273470466,
+        "median": 10,
+        "rmse": 10.334569994771446,
+        "standard_deviation": 1.9522029871695787,
+        "p95": 10.989010989010989,
+        "maximum": 38.46153846153846,
+        "confidence_interval_95_lower": 9.988801851918153,
+        "confidence_interval_95_upper": 10.30821669502278
+      },
+      "binary_size_bytes": 263524,
+      "measurement_windows": {
+        "idle": [],
+        "normal_tracking": [],
+        "global_relocalization": []
+      }
+    }
+  },
+  "recovery_trials": [
+    {
+      "release_timestamp_ms": 1784943487984,
+      "first_scan_after_release_ms": 2,
+      "first_recovered_ms": 952,
+      "stable_tracking_ms": 1201,
+      "success": true,
+      "timeout": false,
+      "final_position_error_m": 0.05000548694284401,
+      "final_heading_error_deg": 0.6249529185669362,
+      "final_score": 0.980291069,
+      "final_state": "TRACKING"
+    }
+  ]
+}

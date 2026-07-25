@@ -1,0 +1,14 @@
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961241879,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961242026,"event":"ROBOT_CONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961249684,"event":"RESOURCE_IDLE_START","source":"operator","data":{"repetition":1},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961312803,"event":"RESOURCE_IDLE_END","source":"operator","data":{"repetition":1},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961315469,"event":"MISSION_START_SENT","source":"backend","data":{"robot_id":"AGV-001","command_id":1}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961315472,"event":"MISSION_ACK","source":"backend","data":{"robot_id":"AGV-001","command":"START_MISSION","command_id":1,"sequence":1}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961315712,"event":"RESOURCE_TRACKING_R1_START","source":"operator","data":{"repetition":1},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961377144,"event":"RESOURCE_TRACKING_R1_END","source":"operator","data":{"repetition":1},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961379409,"event":"RESOURCE_TRACKING_R2_START","source":"operator","data":{"repetition":1},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961441846,"event":"RESOURCE_TRACKING_R2_END","source":"operator","data":{"repetition":1},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961444415,"event":"MISSION_STOP_SENT","source":"backend","data":{"robot_id":"AGV-001","command_id":2}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961444512,"event":"MISSION_ACK","source":"backend","data":{"robot_id":"AGV-001","command":"STOP_MISSION","command_id":2,"sequence":2}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961447796,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784961458557,"event":"ROBOT_CONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}

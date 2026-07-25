@@ -1,0 +1,84 @@
+{
+  "schema": "luckfox.experiment.ablation.v1",
+  "experiment_id": "20260725T041838Z_nominal_ablation_01_198484089432",
+  "source_experiment_id": "20260725T013852Z_nominal_kidnapped_01_198484089432",
+  "source_raw_scan_sha256": "bfbaabd227753f2438acaae7d7f03ff742029c131b73d23ed1c82cbb9ea21553",
+  "source_map_name": "map_rv1103",
+  "source_map_sha256": "5725b2e348bcebc0bf990b91a1c2d33496ad14bc0607561413a767f5b5148135",
+  "replay_binary_sha256": "12576a64ad3f253185db9653f2508c2da20a2524c12bd053061223af0efab499",
+  "initial_pose": {
+    "x": 3.29999995,
+    "y": 2.04999995,
+    "yaw": -0.0436336212
+  },
+  "execution_target": "rv1103",
+  "validation_mode": "selected_method_board",
+  "generated_unix_ms": 1784953324153,
+  "protocol_valid": true,
+  "validity_errors": [],
+  "variants": [
+    {
+      "variant": "local_global_multi",
+      "global_relocalization": true,
+      "multi_resolution": true,
+      "execution_target": "rv1103",
+      "scans": 395,
+      "accepted_scans": 388,
+      "rejected_scans": 7,
+      "accepted_scan_rate": 0.9822784810126582,
+      "rejected_scan_rate": 0.017721518987341773,
+      "success": true,
+      "success_rate": 1,
+      "execution_time_ms": {
+        "n": 395,
+        "mean": 42.9699063291139,
+        "median": 47.551,
+        "rmse": 83.27626280372117,
+        "standard_deviation": 71.33388463151017,
+        "p95": 50.0582,
+        "maximum": 1076.793,
+        "confidence_interval_95_lower": 35.92615791684187,
+        "confidence_interval_95_upper": 50.01365474138592
+      },
+      "scan_cycle_time_ms": {
+        "n": 395,
+        "mean": 42.99586582278482,
+        "median": 47.584,
+        "rmse": 83.28986831139255,
+        "standard_deviation": 71.33412707448096,
+        "p95": 50.085699999999996,
+        "maximum": 1076.813,
+        "confidence_interval_95_lower": 35.95209347087599,
+        "confidence_interval_95_upper": 50.03963817469366
+      },
+      "cpu_percent": {
+        "n": 395,
+        "mean": 98.71681418531641,
+        "median": 99.6856437,
+        "rmse": 98.88049860779005,
+        "standard_deviation": 5.68714357361185,
+        "p95": 100.0014133,
+        "maximum": 100.36583,
+        "confidence_interval_95_lower": 98.15524644336708,
+        "confidence_interval_95_upper": 99.27838192726574
+      },
+      "peak_rss_kb": 1420,
+      "candidate_count": {
+        "n": 395,
+        "mean": 928.526582278481,
+        "median": 807,
+        "rmse": 1573.1515156332655,
+        "standard_deviation": 1269.8992389719351,
+        "p95": 831,
+        "maximum": 15444,
+        "confidence_interval_95_lower": 803.1324474369469,
+        "confidence_interval_95_upper": 1053.920717120015
+      },
+      "recovery_time_ms": 985,
+      "final_position_error_m": 0.0001277934638288848,
+      "final_heading_error_deg": 0.0988302781631552,
+      "false_recovery_count": 0
+    }
+  ],
+  "factorial_comparisons": null
+}

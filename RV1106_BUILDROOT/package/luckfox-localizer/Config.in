@@ -4,7 +4,8 @@ config BR2_PACKAGE_LUCKFOX_LOCALIZER
 	select BR2_PACKAGE_YDLIDAR_SDK
 	help
 	  Lightweight occupancy-grid scan localizer for Luckfox Pico RV1106.
-	  Installs map_inspect, localize_scan and localize_uart in /usr/bin.
+	  Installs map_inspect, localize_scan, localize_replay and
+	  localize_uart in /usr/bin.
 
 comment "luckfox-localizer needs C++ support"
 	depends on !BR2_INSTALL_LIBSTDCPP

@@ -1,0 +1,11 @@
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943428555,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943428701,"event":"ROBOT_CONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943434063,"event":"MISSION_START_SENT","source":"backend","data":{"robot_id":"AGV-001","command_id":7}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943434094,"event":"MISSION_ACK","source":"backend","data":{"robot_id":"AGV-001","command":"START_MISSION","command_id":7,"sequence":7}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943455351,"event":"KIDNAP_START","source":"operator","reference":{"x":5.099859237670898,"y":3.8001699447631836,"yaw":-0.05684579908847809,"marker_id":"M6"},"data":{},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943487984,"event":"KIDNAP_RELEASE","source":"operator","reference":{"x":3.2499942779541016,"y":2.0501694679260254,"yaw":-0.06170693039894104,"marker_id":"M2"},"data":{},"notes":""}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943489155,"event":"KIDNAP_AUTO_CHECKPOINT","source":"backend","data":{"marker_id":"M2","robot_sequence":225}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943497180,"event":"MISSION_STOP_SENT","source":"backend","data":{"robot_id":"AGV-001","command_id":8}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943497254,"event":"MISSION_ACK","source":"backend","data":{"robot_id":"AGV-001","command":"STOP_MISSION","command_id":8,"sequence":8}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943500284,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784943504394,"event":"ROBOT_CONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}

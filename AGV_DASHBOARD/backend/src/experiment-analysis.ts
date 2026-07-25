@@ -17,6 +17,7 @@ type TelemetryRow = {
   schema?: string;
   sequence: number;
   timestamp_unix_ms: number;
+  scan_timestamp_ns?: number;
   x_m: number;
   y_m: number;
   yaw_rad: number;
@@ -25,6 +26,10 @@ type TelemetryRow = {
   state: string;
   accepted: boolean;
   candidate_count: number;
+  front_near_left_points?: number;
+  front_near_center_points?: number;
+  front_near_right_points?: number;
+  front_minimum_range_m?: number | null;
   matcher_execution_us: number;
   scan_cycle_us: number;
   process_cpu_percent: number;
@@ -46,7 +51,11 @@ type EventRow = {
   reference?: { x: number; y: number; yaw: number; marker_id?: string };
   data?: {
     trigger_marker?: string;
-    pedestrian_direction?: string;
+    occluder_direction?: string;
+    obstacle_width_cm?: number;
+    obstacle_depth_cm?: number;
+    obstacle_height_cm?: number;
+    obstacle_distance_from_lidar_cm?: number;
     repetition?: number;
   };
   notes?: string;
@@ -61,7 +70,16 @@ type ResourceRow = {
   peak_rss_kb: number;
 };
 
-type ReplayRow = TelemetryRow & { variant: string };
+type ReplayRow = TelemetryRow & {
+  variant: string;
+  global_relocalization: boolean;
+  multi_resolution: boolean;
+  execution_target: 'host' | 'rv1103' | 'rv1106';
+  replay_pacing?: 'unpaced' | 'recorded';
+};
+
+type ObstacleSectorKey =
+  'front_near_left_points' | 'front_near_center_points' | 'front_near_right_points';
 
 export function ReadJsonLines<T>(file: string): T[] {
   if (!fs.existsSync(file)) return [];
@@ -141,6 +159,97 @@ function SummaryValues(summary: NumericSummary): unknown[] {
     summary.confidence_interval_95_lower,
     summary.confidence_interval_95_upper,
   ];
+}
+
+function DetectObjectPassing(
+  telemetry: TelemetryRow[],
+  startedUnixMs: number,
+  endedUnixMs: number,
+): {
+  available: boolean;
+  detected: boolean;
+  observed_direction: 'LEFT_TO_RIGHT' | 'RIGHT_TO_LEFT' | 'UNRESOLVED';
+  baseline_scan_count: number;
+  left_excess_points: number | null;
+  center_excess_points: number | null;
+  right_excess_points: number | null;
+  minimum_front_range_m: number | null;
+} {
+  const baseline = telemetry.filter(
+    (row) =>
+      row.timestamp_unix_ms >= startedUnixMs - 1_000 && row.timestamp_unix_ms < startedUnixMs,
+  );
+  const during = telemetry.filter(
+    (row) => row.timestamp_unix_ms >= startedUnixMs && row.timestamp_unix_ms <= endedUnixMs,
+  );
+  const keys: ObstacleSectorKey[] = [
+    'front_near_left_points',
+    'front_near_center_points',
+    'front_near_right_points',
+  ];
+  const baselineWithSignature = baseline.filter((row) =>
+    keys.every((key) => Number.isFinite(row[key])),
+  );
+  const available =
+    baselineWithSignature.length >= 5 &&
+    during.some((row) => keys.every((key) => Number.isFinite(row[key])));
+  if (!available)
+    return {
+      available: false,
+      detected: false,
+      observed_direction: 'UNRESOLVED',
+      baseline_scan_count: baselineWithSignature.length,
+      left_excess_points: null,
+      center_excess_points: null,
+      right_excess_points: null,
+      minimum_front_range_m: null,
+    };
+
+  const sectors = keys.map((key) => {
+    const baselineValues = baselineWithSignature
+      .map((row) => Number(row[key]))
+      .filter(Number.isFinite);
+    const baselineMedian = baselineValues.length ? Percentile(baselineValues, 50) : 0;
+    const peak = during.reduce(
+      (best, row) => {
+        const value = Number(row[key]);
+        return Number.isFinite(value) && value > best.value
+          ? { value, timestamp: row.timestamp_unix_ms }
+          : best;
+      },
+      { value: 0, timestamp: startedUnixMs },
+    );
+    return {
+      excess: Math.max(0, peak.value - baselineMedian),
+      peak_timestamp_ms: peak.timestamp,
+    };
+  });
+  const [left, center, right] = sectors;
+  const leftToRight =
+    left!.peak_timestamp_ms < center!.peak_timestamp_ms &&
+    center!.peak_timestamp_ms < right!.peak_timestamp_ms;
+  const rightToLeft =
+    right!.peak_timestamp_ms < center!.peak_timestamp_ms &&
+    center!.peak_timestamp_ms < left!.peak_timestamp_ms;
+  const detected =
+    left!.excess >= 3 && center!.excess >= 3 && right!.excess >= 3 && (leftToRight || rightToLeft);
+  const ranges = during
+    .map((row) => Number(row.front_minimum_range_m))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return {
+    available: true,
+    detected,
+    observed_direction: leftToRight
+      ? 'LEFT_TO_RIGHT'
+      : rightToLeft
+        ? 'RIGHT_TO_LEFT'
+        : 'UNRESOLVED',
+    baseline_scan_count: baselineWithSignature.length,
+    left_excess_points: left!.excess,
+    center_excess_points: center!.excess,
+    right_excess_points: right!.excess,
+    minimum_front_range_m: ranges.length ? Math.min(...ranges) : null,
+  };
 }
 
 export function AngleErrorDegrees(estimate: number, reference: number): number {
@@ -282,7 +391,20 @@ function AnalyzeAblation(directory: string, experimentId: string): unknown {
     throw new Error('Analysis output already exists; raw data will not be analyzed again');
   const sourceConfig = JSON.parse(
     fs.readFileSync(path.join(directory, 'config', 'ablation_source.json'), 'utf8'),
-  ) as { source_experiment_id: string; source_raw_scan: string };
+  ) as {
+    source_experiment_id: string;
+    source_run_type: string;
+    source_raw_scan: string;
+    source_raw_scan_sha256: string;
+    source_map_name: string;
+    source_map_sha256: string;
+    initial_pose: { x: number; y: number; yaw: number };
+    execution_target: 'host' | 'rv1103' | 'rv1106';
+    replay_binary_sha256: string;
+    validation_mode?: 'factorial_ablation' | 'selected_method_board' | 'resource_replay_board';
+    replay_pacing?: 'unpaced' | 'recorded';
+    variants: string[];
+  };
   const sourceRawDirectory = path.dirname(sourceConfig.source_raw_scan);
   const checkpoints = ReadJsonLines<CheckpointRow>(
     path.join(sourceRawDirectory, 'ground_truth.jsonl'),
@@ -293,66 +415,290 @@ function AnalyzeAblation(directory: string, experimentId: string): unknown {
     .find((row) => row.event === 'KIDNAP_RELEASE')?.reference;
   const checkpointReference = checkpoints.at(-1)?.reference;
   const reference = releaseReference || checkpointReference;
-  const variants = ['local_only', 'local_global', 'single_resolution', 'multi_resolution'];
+  const releaseTimestampMs =
+    sourceConfig.source_run_type === 'kidnapped'
+      ? [...events].reverse().find((row) => row.event === 'KIDNAP_RELEASE')?.timestamp_ms
+      : undefined;
+  const factorialVariants = [
+    'local_only_single',
+    'local_only_multi',
+    'local_global_single',
+    'local_global_multi',
+  ];
+  const variants =
+    sourceConfig.execution_target === 'host' ? factorialVariants : ['local_global_multi'];
+  const resourceReplay = sourceConfig.validation_mode === 'resource_replay_board';
+  const validationMode = resourceReplay
+    ? 'resource_replay_board'
+    : sourceConfig.execution_target === 'host'
+      ? 'factorial_ablation'
+      : 'selected_method_board';
+  const expectedConfiguration = new Map([
+    ['local_only_single', { global: false, multi: false }],
+    ['local_only_multi', { global: false, multi: true }],
+    ['local_global_single', { global: true, multi: false }],
+    ['local_global_multi', { global: true, multi: true }],
+  ]);
+  let expectedScanSignature: string | undefined;
+  const validityErrors: string[] = [];
   const rows = variants.map((variant) => {
     const replay = ReadJsonLines<ReplayRow>(path.join(raw, `replay_${variant}.jsonl`));
     if (!replay.length) throw new Error(`Replay output is empty for ${variant}`);
-    const initialTracking = replay.findIndex((row) => row.state === 'TRACKING');
-    const lostIndex = replay.findIndex(
-      (row, index) =>
-        index > initialTracking && (row.state === 'LOST' || row.state === 'GLOBAL_SEARCH'),
+    const configuration = expectedConfiguration.get(variant)!;
+    if (
+      replay.some(
+        (row) =>
+          row.variant !== variant ||
+          row.global_relocalization !== configuration.global ||
+          row.multi_resolution !== configuration.multi ||
+          row.execution_target !== sourceConfig.execution_target ||
+          (resourceReplay && row.replay_pacing !== 'recorded'),
+      )
+    )
+      validityErrors.push(`${variant} contains inconsistent configuration metadata`);
+    const scanSignature = replay
+      .map((row) => `${row.sequence}:${row.scan_timestamp_ns ?? ''}`)
+      .join('|');
+    if (expectedScanSignature === undefined) expectedScanSignature = scanSignature;
+    else if (scanSignature !== expectedScanSignature)
+      validityErrors.push(`${variant} did not replay the identical scan sequence and timestamps`);
+    const evaluationStartMs = releaseTimestampMs ?? replay[0]!.timestamp_unix_ms;
+    const evaluated = replay.filter((row) => row.timestamp_unix_ms >= evaluationStartMs);
+    const precedingLoss = releaseTimestampMs
+      ? [...replay]
+          .reverse()
+          .find(
+            (row) =>
+              row.timestamp_unix_ms <= releaseTimestampMs &&
+              row.timestamp_unix_ms >= releaseTimestampMs - 5_000 &&
+              (row.state === 'LOST' || row.state === 'GLOBAL_SEARCH'),
+          )
+      : undefined;
+    const lostIndex = evaluated.findIndex(
+      (row) => row.state === 'LOST' || row.state === 'GLOBAL_SEARCH',
     );
-    const recovered = replay.find(
-      (row, index) => index > lostIndex && lostIndex >= 0 && row.state === 'TRACKING',
-    );
-    const lost = lostIndex >= 0 ? replay[lostIndex] : undefined;
+    const recoveryWindow = precedingLoss
+      ? evaluated
+      : lostIndex >= 0
+        ? evaluated.slice(lostIndex + 1)
+        : [];
+    const recovered = recoveryWindow.find((row) => row.state === 'TRACKING' && row.accepted);
+    const globalCandidate = recoveryWindow.find((row) => row.mode === 'global' && row.accepted);
+    const accepted = replay.filter((row) => row.accepted);
+    const trackingReplay = replay.filter((row) => row.mode === 'tracking');
+    const globalReplay = replay.filter((row) => row.mode === 'global');
+    const deadlineMissCount = replay.filter((row) => row.scan_cycle_us > 100_000).length;
+    const rejectedCount = replay.length - accepted.length;
+    const finalAccepted = [...evaluated].reverse().find((row) => row.accepted);
+    let recoveryPending = false;
+    let falseRecoveryCount = 0;
+    for (const row of evaluated) {
+      if (row.state === 'RECOVERED') recoveryPending = true;
+      if (recoveryPending && row.state === 'TRACKING') recoveryPending = false;
+      if (recoveryPending && row.state === 'LOST') {
+        ++falseRecoveryCount;
+        recoveryPending = false;
+      }
+    }
+    if (recoveryPending) ++falseRecoveryCount;
     return {
       variant,
+      global_relocalization: configuration.global,
+      multi_resolution: configuration.multi,
+      execution_target: sourceConfig.execution_target,
       scans: replay.length,
-      success: Boolean(recovered),
-      success_rate: recovered ? 1 : 0,
+      accepted_scans: accepted.length,
+      rejected_scans: rejectedCount,
+      accepted_scan_rate: accepted.length / replay.length,
+      rejected_scan_rate: rejectedCount / replay.length,
+      success:
+        sourceConfig.source_run_type === 'kidnapped'
+          ? Boolean(recovered)
+          : Boolean(finalAccepted && finalAccepted.state === 'TRACKING'),
+      success_rate:
+        sourceConfig.source_run_type === 'kidnapped'
+          ? recovered
+            ? 1
+            : 0
+          : finalAccepted?.state === 'TRACKING'
+            ? 1
+            : 0,
       execution_time_ms: Summarize(replay.map((row) => row.matcher_execution_us / 1000)),
+      scan_cycle_time_ms: Summarize(replay.map((row) => row.scan_cycle_us / 1000)),
+      tracking_execution_time_ms: Summarize(
+        trackingReplay.map((row) => row.matcher_execution_us / 1000),
+      ),
+      global_execution_time_ms: Summarize(
+        globalReplay.map((row) => row.matcher_execution_us / 1000),
+      ),
+      global_scan_count: globalReplay.length,
+      deadline_miss_count: deadlineMissCount,
+      deadline_miss_rate: deadlineMissCount / replay.length,
+      cpu_percent: Summarize(replay.map((row) => row.process_cpu_percent)),
+      peak_rss_kb: Math.max(0, ...replay.map((row) => Number(row.peak_rss_kb) || 0)),
+      candidate_count: Summarize(replay.map((row) => row.candidate_count)),
+      global_candidate_acquisition_ms:
+        releaseTimestampMs && globalCandidate
+          ? globalCandidate.timestamp_unix_ms - evaluationStartMs
+          : undefined,
       recovery_time_ms:
-        recovered && lost ? recovered.timestamp_unix_ms - lost.timestamp_unix_ms : undefined,
+        releaseTimestampMs && recovered
+          ? recovered.timestamp_unix_ms - evaluationStartMs
+          : undefined,
       final_position_error_m:
-        recovered && reference
-          ? Math.hypot(recovered.x_m - reference.x, recovered.y_m - reference.y)
+        finalAccepted && reference
+          ? Math.hypot(finalAccepted.x_m - reference.x, finalAccepted.y_m - reference.y)
           : undefined,
       final_heading_error_deg:
-        recovered && reference ? AngleErrorDegrees(recovered.yaw_rad, reference.yaw) : undefined,
+        finalAccepted && reference
+          ? AngleErrorDegrees(finalAccepted.yaw_rad, reference.yaw)
+          : undefined,
+      false_recovery_count: falseRecoveryCount,
     };
   });
+  if (sourceConfig.variants.join('|') !== variants.join('|'))
+    validityErrors.push(
+      sourceConfig.execution_target === 'host'
+        ? 'orchestrator variant manifest does not match the required 2x2 design'
+        : 'board validation must replay only the selected local_global_multi method',
+    );
+  if (sourceConfig.validation_mode && sourceConfig.validation_mode !== validationMode)
+    validityErrors.push('replay validation mode does not match its execution target');
+  if (new Set(rows.map((row) => row.scans)).size !== 1)
+    validityErrors.push('replay scan counts differ between variants');
+  const byVariant = Object.fromEntries(rows.map((row) => [row.variant, row]));
+  const delta = (left: string, right: string, metric: 'success_rate' | 'recovery_time_ms') => {
+    const leftValue = byVariant[left]![metric];
+    const rightValue = byVariant[right]![metric];
+    return typeof leftValue === 'number' && typeof rightValue === 'number'
+      ? rightValue - leftValue
+      : null;
+  };
+  const comparisons =
+    sourceConfig.execution_target === 'host'
+      ? {
+          multi_resolution_effect_local_only: {
+            success_rate_delta: delta('local_only_single', 'local_only_multi', 'success_rate'),
+            recovery_time_delta_ms: delta(
+              'local_only_single',
+              'local_only_multi',
+              'recovery_time_ms',
+            ),
+          },
+          multi_resolution_effect_local_global: {
+            success_rate_delta: delta('local_global_single', 'local_global_multi', 'success_rate'),
+            recovery_time_delta_ms: delta(
+              'local_global_single',
+              'local_global_multi',
+              'recovery_time_ms',
+            ),
+          },
+          global_relocalization_effect_single: {
+            success_rate_delta: delta('local_only_single', 'local_global_single', 'success_rate'),
+            recovery_time_delta_ms: delta(
+              'local_only_single',
+              'local_global_single',
+              'recovery_time_ms',
+            ),
+          },
+          global_relocalization_effect_multi: {
+            success_rate_delta: delta('local_only_multi', 'local_global_multi', 'success_rate'),
+            recovery_time_delta_ms: delta(
+              'local_only_multi',
+              'local_global_multi',
+              'recovery_time_ms',
+            ),
+          },
+        }
+      : null;
   WriteCsv(
-    path.join(tables, 'ablation.csv'),
+    path.join(tables, resourceReplay ? 'resource_replay.csv' : 'ablation.csv'),
     [
       'variant',
+      'global_relocalization',
+      'multi_resolution',
+      'execution_target',
       'scans',
+      'accepted_scans',
+      'rejected_scans',
+      'accepted_scan_rate',
+      'rejected_scan_rate',
       'success',
       'success_rate',
       'execution_time_mean_ms',
       'execution_time_p95_ms',
+      'scan_cycle_mean_ms',
+      'tracking_time_mean_ms',
+      'tracking_time_p95_ms',
+      'tracking_time_maximum_ms',
+      'global_scan_count',
+      'global_time_mean_ms',
+      'global_time_maximum_ms',
+      'deadline_miss_count',
+      'deadline_miss_rate',
+      'cpu_mean_percent',
+      'peak_rss_kb',
+      'candidate_count_mean',
+      'candidate_count_p95',
+      'global_candidate_acquisition_ms',
       'recovery_time_ms',
       'final_position_error_m',
       'final_heading_error_deg',
+      'false_recovery_count',
     ],
     rows.map((row) => [
       row.variant,
+      row.global_relocalization,
+      row.multi_resolution,
+      row.execution_target,
       row.scans,
+      row.accepted_scans,
+      row.rejected_scans,
+      row.accepted_scan_rate,
+      row.rejected_scan_rate,
       row.success,
       row.success_rate,
       row.execution_time_ms.mean,
       row.execution_time_ms.p95,
+      row.scan_cycle_time_ms.mean,
+      row.tracking_execution_time_ms.mean,
+      row.tracking_execution_time_ms.p95,
+      row.tracking_execution_time_ms.maximum,
+      row.global_scan_count,
+      row.global_execution_time_ms.mean,
+      row.global_execution_time_ms.maximum,
+      row.deadline_miss_count,
+      row.deadline_miss_rate,
+      row.cpu_percent.mean,
+      row.peak_rss_kb,
+      row.candidate_count.mean,
+      row.candidate_count.p95,
+      row.global_candidate_acquisition_ms,
       row.recovery_time_ms,
       row.final_position_error_m,
       row.final_heading_error_deg,
+      row.false_recovery_count,
     ]),
   );
   const summary = {
-    schema: 'luckfox.experiment.ablation.v1',
+    schema: resourceReplay
+      ? 'luckfox.experiment.resource-replay.v1'
+      : 'luckfox.experiment.ablation.v1',
     experiment_id: experimentId,
     source_experiment_id: sourceConfig.source_experiment_id,
+    source_raw_scan_sha256: sourceConfig.source_raw_scan_sha256,
+    source_map_name: sourceConfig.source_map_name,
+    source_map_sha256: sourceConfig.source_map_sha256,
+    replay_binary_sha256: sourceConfig.replay_binary_sha256,
+    initial_pose: sourceConfig.initial_pose,
+    execution_target: sourceConfig.execution_target,
+    validation_mode: validationMode,
+    replay_pacing: sourceConfig.replay_pacing || 'unpaced',
     generated_unix_ms: Date.now(),
+    protocol_valid: validityErrors.length === 0,
+    validity_errors: validityErrors,
     variants: rows,
+    factorial_comparisons: comparisons,
   };
   fs.writeFileSync(summaryFile, `${JSON.stringify(summary, null, 2)}\n`, { flag: 'wx' });
   fs.writeFileSync(
@@ -368,7 +714,12 @@ export function AnalyzeExperiment(
   experimentId: string,
   runType: string,
 ): unknown {
-  if (runType === 'ablation') return AnalyzeAblation(directory, experimentId);
+  if (
+    runType === 'ablation' ||
+    (runType === 'resource' &&
+      fs.existsSync(path.join(directory, 'config', 'ablation_source.json')))
+  )
+    return AnalyzeAblation(directory, experimentId);
   const raw = path.join(directory, 'raw');
   const processed = path.join(directory, 'processed');
   const tables = path.join(directory, 'tables');
@@ -388,58 +739,173 @@ export function AnalyzeExperiment(
   const checkpoints = ReadJsonLines<CheckpointRow>(path.join(raw, 'ground_truth.jsonl'));
   const events = ReadJsonLines<EventRow>(path.join(raw, 'operator_events.jsonl'));
 
-  const dynamicStart = events.find((row) => row.event === 'DYNAMIC_OCCLUSION_START');
-  const dynamicEnd = events.find((row) => row.event === 'DYNAMIC_OCCLUSION_END');
-  const dynamicTelemetry =
-    dynamicStart && dynamicEnd
-      ? telemetry.filter(
-          (row) =>
-            row.timestamp_unix_ms >= dynamicStart.timestamp_ms &&
-            row.timestamp_unix_ms <= dynamicEnd.timestamp_ms,
+  const dynamicStarts = events.filter((row) => row.event === 'DYNAMIC_OCCLUSION_START');
+  const dynamicEnds = events.filter((row) => row.event === 'DYNAMIC_OCCLUSION_END');
+  const dynamicEvents = dynamicStarts.flatMap((start) => {
+    const markerId = start.data?.trigger_marker;
+    const end = dynamicEnds.find((candidate) => candidate.data?.trigger_marker === markerId);
+    if (!markerId || !end) return [];
+    const during = telemetry.filter(
+      (row) =>
+        row.timestamp_unix_ms >= start.timestamp_ms && row.timestamp_unix_ms <= end.timestamp_ms,
+    );
+    const recovered = telemetry.find(
+      (row) =>
+        row.timestamp_unix_ms >= end.timestamp_ms &&
+        row.accepted &&
+        row.state.toUpperCase() === 'TRACKING',
+    );
+    const checkpoint = checkpoints.find((row) => row.marker_id === markerId);
+    const scores = during.map((row) => row.score).filter(Number.isFinite);
+    const objectPassing = DetectObjectPassing(telemetry, start.timestamp_ms, end.timestamp_ms);
+    const firstPose = during[0];
+    const maximumPositionDriftM = firstPose
+      ? Math.max(
+          ...during.map((row) => Math.hypot(row.x_m - firstPose.x_m, row.y_m - firstPose.y_m)),
         )
-      : [];
-  const dynamicOcclusion =
-    dynamicStart && dynamicEnd
-      ? {
-          trigger_marker: dynamicStart.data?.trigger_marker,
-          pedestrian_direction: dynamicStart.data?.pedestrian_direction,
-          started_unix_ms: dynamicStart.timestamp_ms,
-          ended_unix_ms: dynamicEnd.timestamp_ms,
-          duration_ms: dynamicEnd.timestamp_ms - dynamicStart.timestamp_ms,
-          scan_count: dynamicTelemetry.length,
-          accepted_scan_rate: dynamicTelemetry.length
-            ? dynamicTelemetry.filter((row) => row.accepted).length / dynamicTelemetry.length
-            : null,
-          localization_score: Summarize(dynamicTelemetry.map((row) => row.score)),
-        }
       : null;
-  if (dynamicOcclusion)
+    const maximumHeadingDriftDeg = firstPose
+      ? Math.max(...during.map((row) => AngleErrorDegrees(row.yaw_rad, firstPose.yaw_rad)))
+      : null;
+    return [
+      {
+        trigger_marker: markerId,
+        occluder_direction: start.data?.occluder_direction,
+        started_unix_ms: start.timestamp_ms,
+        ended_unix_ms: end.timestamp_ms,
+        duration_ms: end.timestamp_ms - start.timestamp_ms,
+        duration_valid:
+          end.timestamp_ms - start.timestamp_ms >= 3_500 &&
+          end.timestamp_ms - start.timestamp_ms <= 4_500,
+        scan_count: during.length,
+        accepted_scan_rate: during.length
+          ? during.filter((row) => row.accepted).length / during.length
+          : null,
+        score_minimum: scores.length ? Math.min(...scores) : null,
+        localization_score: Summarize(scores),
+        degraded_scan_count: during.filter((row) => row.state.toUpperCase() === 'DEGRADED').length,
+        lost_scan_count: during.filter((row) => row.state.toUpperCase() === 'LOST').length,
+        recovered_scan_count: during.filter((row) => row.state.toUpperCase() === 'RECOVERED')
+          .length,
+        recovery_tracking_ms: recovered ? recovered.timestamp_unix_ms - end.timestamp_ms : null,
+        checkpoint_position_error_m: checkpoint
+          ? Math.hypot(
+              checkpoint.estimate.x - checkpoint.reference.x,
+              checkpoint.estimate.y - checkpoint.reference.y,
+            )
+          : null,
+        checkpoint_heading_error_deg: checkpoint
+          ? AngleErrorDegrees(checkpoint.estimate.yaw, checkpoint.reference.yaw)
+          : null,
+        maximum_position_drift_m: maximumPositionDriftM,
+        maximum_heading_drift_deg: maximumHeadingDriftDeg,
+        robot_stationary:
+          maximumPositionDriftM !== null &&
+          maximumHeadingDriftDeg !== null &&
+          maximumPositionDriftM <= 0.1 &&
+          maximumHeadingDriftDeg <= 10,
+        object_passing: objectPassing,
+      },
+    ];
+  });
+  const dynamicOcclusion = dynamicEvents.length
+    ? {
+        event_count: dynamicEvents.length,
+        completed_marker_count: new Set(dynamicEvents.map((row) => row.trigger_marker)).size,
+        valid_duration_count: dynamicEvents.filter((row) => row.duration_valid).length,
+        duration_ms: Summarize(dynamicEvents.map((row) => row.duration_ms)),
+        accepted_scan_rate: Summarize(
+          dynamicEvents.flatMap((row) =>
+            row.accepted_scan_rate === null ? [] : [row.accepted_scan_rate],
+          ),
+        ),
+        recovery_tracking_ms: Summarize(
+          dynamicEvents.flatMap((row) =>
+            row.recovery_tracking_ms === null ? [] : [row.recovery_tracking_ms],
+          ),
+        ),
+        object_detection_available_count: dynamicEvents.filter(
+          (row) => row.object_passing.available,
+        ).length,
+        object_passing_detected_count: dynamicEvents.filter((row) => row.object_passing.detected)
+          .length,
+        object_passing_detection_rate: dynamicEvents.some((row) => row.object_passing.available)
+          ? dynamicEvents.filter((row) => row.object_passing.detected).length /
+            dynamicEvents.filter((row) => row.object_passing.available).length
+          : null,
+        stationary_event_count: dynamicEvents.filter((row) => row.robot_stationary).length,
+        events: dynamicEvents,
+      }
+    : null;
+  if (
+    runType === 'dynamic_occluded' &&
+    dynamicEvents.length &&
+    dynamicEvents.some((row) => !row.object_passing.available)
+  )
+    throw new Error(
+      'Dynamic object-passing telemetry is unavailable for one or more markers; verify the board firmware before repeating the trial',
+    );
+  if (dynamicEvents.length)
     WriteCsv(
       path.join(tables, 'dynamic_occlusion.csv'),
       [
         'trigger_marker',
-        'pedestrian_direction',
+        'occluder_direction',
         'started_unix_ms',
         'ended_unix_ms',
         'duration_ms',
+        'duration_valid',
         'scan_count',
         'accepted_scan_rate',
+        'score_minimum',
         'score_mean',
         'score_p95',
+        'degraded_scan_count',
+        'lost_scan_count',
+        'recovered_scan_count',
+        'recovery_tracking_ms',
+        'checkpoint_position_error_m',
+        'checkpoint_heading_error_deg',
+        'maximum_position_drift_m',
+        'maximum_heading_drift_deg',
+        'robot_stationary',
+        'object_detection_available',
+        'object_passing_detected',
+        'observed_pass_direction',
+        'left_excess_points',
+        'center_excess_points',
+        'right_excess_points',
+        'minimum_front_range_m',
       ],
-      [
-        [
-          dynamicOcclusion.trigger_marker,
-          dynamicOcclusion.pedestrian_direction,
-          dynamicOcclusion.started_unix_ms,
-          dynamicOcclusion.ended_unix_ms,
-          dynamicOcclusion.duration_ms,
-          dynamicOcclusion.scan_count,
-          dynamicOcclusion.accepted_scan_rate,
-          dynamicOcclusion.localization_score.mean,
-          dynamicOcclusion.localization_score.p95,
-        ],
-      ],
+      dynamicEvents.map((row) => [
+        row.trigger_marker,
+        row.occluder_direction,
+        row.started_unix_ms,
+        row.ended_unix_ms,
+        row.duration_ms,
+        row.duration_valid,
+        row.scan_count,
+        row.accepted_scan_rate,
+        row.score_minimum,
+        row.localization_score.mean,
+        row.localization_score.p95,
+        row.degraded_scan_count,
+        row.lost_scan_count,
+        row.recovered_scan_count,
+        row.recovery_tracking_ms,
+        row.checkpoint_position_error_m,
+        row.checkpoint_heading_error_deg,
+        row.maximum_position_drift_m,
+        row.maximum_heading_drift_deg,
+        row.robot_stationary,
+        row.object_passing.available,
+        row.object_passing.detected,
+        row.object_passing.observed_direction,
+        row.object_passing.left_excess_points,
+        row.object_passing.center_excess_points,
+        row.object_passing.right_excess_points,
+        row.object_passing.minimum_front_range_m,
+      ]),
     );
 
   const aligned = checkpoints.map((row) => ({
@@ -578,8 +1044,6 @@ export function AnalyzeExperiment(
     recoveryRows.map((row) => Object.values(row)),
   );
 
-  const tracking = telemetry.filter((row) => row.mode === 'tracking');
-  const global = telemetry.filter((row) => row.mode === 'global');
   const EventWindow = (prefix: string): { start: number; end: number }[] => {
     const starts = events.filter((row) => row.event === `${prefix}_START`);
     const ends = events.filter((row) => row.event === `${prefix}_END`);
@@ -593,14 +1057,25 @@ export function AnalyzeExperiment(
   const Within = (timestamp: number, windows: { start: number; end: number }[]) =>
     windows.some((window) => timestamp >= window.start && timestamp <= window.end);
   const idleWindows = EventWindow('RESOURCE_IDLE');
-  const trackingWindows = EventWindow('RESOURCE_TRACKING');
-  const globalWindows = EventWindow('RESOURCE_GLOBAL');
+  const trackingR1Windows = EventWindow('RESOURCE_TRACKING_R1');
+  const trackingR2Windows = EventWindow('RESOURCE_TRACKING_R2');
+  const enduranceWindows = EventWindow('RESOURCE_ENDURANCE');
+  const enduranceStartEvent = events.find((row) => row.event === 'RESOURCE_ENDURANCE_START');
+  const enduranceEndEvent = events.find((row) => row.event === 'RESOURCE_ENDURANCE_END');
   const idleSamples = idleResources.filter((row) => Within(row.timestamp_unix_ms, idleWindows));
-  const trackingSamples = tracking.filter((row) =>
-    trackingWindows.length ? Within(row.timestamp_unix_ms, trackingWindows) : true,
+  const trackingR1AllSamples = telemetry.filter((row) =>
+    Within(row.timestamp_unix_ms, trackingR1Windows),
   );
-  const globalSamples = global.filter((row) =>
-    globalWindows.length ? Within(row.timestamp_unix_ms, globalWindows) : true,
+  const trackingR2AllSamples = telemetry.filter((row) =>
+    Within(row.timestamp_unix_ms, trackingR2Windows),
+  );
+  const trackingR1Samples = trackingR1AllSamples.filter((row) => row.mode === 'tracking');
+  const trackingR2Samples = trackingR2AllSamples.filter((row) => row.mode === 'tracking');
+  const enduranceTelemetry = telemetry.filter((row) =>
+    Within(row.timestamp_unix_ms, enduranceWindows),
+  );
+  const enduranceResources = idleResources.filter((row) =>
+    Within(row.timestamp_unix_ms, enduranceWindows),
   );
   const systemText = fs.existsSync(path.join(raw, 'system.txt'))
     ? fs.readFileSync(path.join(raw, 'system.txt'), 'utf8')
@@ -612,19 +1087,59 @@ export function AnalyzeExperiment(
       cpu_percent: Summarize(idleSamples.map((row) => row.process_cpu_percent)),
       peak_rss_kb: Math.max(...idleSamples.map((row) => row.peak_rss_kb), 0),
     },
-    normal_tracking: {
-      samples: trackingSamples.length,
-      cpu_percent: Summarize(trackingSamples.map((row) => row.process_cpu_percent)),
-      peak_rss_kb: Math.max(...trackingSamples.map((row) => row.peak_rss_kb), 0),
-      processing_time_ms: Summarize(trackingSamples.map((row) => row.matcher_execution_us / 1000)),
-      scan_cycle_ms: Summarize(trackingSamples.map((row) => row.scan_cycle_us / 1000)),
+    tracking_r1: {
+      samples: trackingR1Samples.length,
+      cpu_percent: Summarize(trackingR1Samples.map((row) => row.process_cpu_percent)),
+      peak_rss_kb: Math.max(...trackingR1Samples.map((row) => row.peak_rss_kb), 0),
+      processing_time_ms: Summarize(
+        trackingR1Samples.map((row) => row.matcher_execution_us / 1000),
+      ),
+      scan_cycle_ms: Summarize(trackingR1Samples.map((row) => row.scan_cycle_us / 1000)),
+      localization_score: Summarize(trackingR1AllSamples.map((row) => row.score)),
+      tracking_sample_rate:
+        trackingR1AllSamples.length > 0
+          ? trackingR1Samples.length / trackingR1AllSamples.length
+          : 0,
     },
-    global_relocalization: {
-      samples: globalSamples.length,
-      cpu_percent: Summarize(globalSamples.map((row) => row.process_cpu_percent)),
-      peak_rss_kb: Math.max(...globalSamples.map((row) => row.peak_rss_kb), 0),
-      processing_time_ms: Summarize(globalSamples.map((row) => row.matcher_execution_us / 1000)),
-      scan_cycle_ms: Summarize(globalSamples.map((row) => row.scan_cycle_us / 1000)),
+    tracking_r2: {
+      samples: trackingR2Samples.length,
+      cpu_percent: Summarize(trackingR2Samples.map((row) => row.process_cpu_percent)),
+      peak_rss_kb: Math.max(...trackingR2Samples.map((row) => row.peak_rss_kb), 0),
+      processing_time_ms: Summarize(
+        trackingR2Samples.map((row) => row.matcher_execution_us / 1000),
+      ),
+      scan_cycle_ms: Summarize(trackingR2Samples.map((row) => row.scan_cycle_us / 1000)),
+      localization_score: Summarize(trackingR2AllSamples.map((row) => row.score)),
+      tracking_sample_rate:
+        trackingR2AllSamples.length > 0
+          ? trackingR2Samples.length / trackingR2AllSamples.length
+          : 0,
+    },
+    endurance: {
+      started_unix_ms: enduranceStartEvent?.timestamp_ms ?? null,
+      ended_unix_ms: enduranceEndEvent?.timestamp_ms ?? null,
+      duration_ms:
+        enduranceStartEvent && enduranceEndEvent
+          ? enduranceEndEvent.timestamp_ms - enduranceStartEvent.timestamp_ms
+          : null,
+      samples: enduranceTelemetry.length,
+      resource_samples: enduranceResources.length,
+      cpu_percent: Summarize(enduranceResources.map((row) => row.process_cpu_percent)),
+      peak_rss_kb: Math.max(...enduranceResources.map((row) => row.peak_rss_kb), 0),
+      processing_time_ms: Summarize(
+        enduranceTelemetry.map((row) => row.matcher_execution_us / 1000),
+      ),
+      scan_cycle_ms: Summarize(enduranceTelemetry.map((row) => row.scan_cycle_us / 1000)),
+      localization_score: Summarize(enduranceTelemetry.map((row) => row.score)),
+      tracking_sample_rate:
+        enduranceTelemetry.length > 0
+          ? enduranceTelemetry.filter((row) => row.mode === 'tracking').length /
+            enduranceTelemetry.length
+          : 0,
+      accepted_scan_rate:
+        enduranceTelemetry.length > 0
+          ? enduranceTelemetry.filter((row) => row.accepted).length / enduranceTelemetry.length
+          : 0,
     },
     update_rate_hz: Summarize(
       telemetry.slice(1).flatMap((row, index) => {
@@ -635,8 +1150,9 @@ export function AnalyzeExperiment(
     binary_size_bytes: binarySize || null,
     measurement_windows: {
       idle: idleWindows.map((window) => window.end - window.start),
-      normal_tracking: trackingWindows.map((window) => window.end - window.start),
-      global_relocalization: globalWindows.map((window) => window.end - window.start),
+      tracking_r1: trackingR1Windows.map((window) => window.end - window.start),
+      tracking_r2: trackingR2Windows.map((window) => window.end - window.start),
+      endurance: enduranceWindows.map((window) => window.end - window.start),
     },
   };
   WriteCsv(

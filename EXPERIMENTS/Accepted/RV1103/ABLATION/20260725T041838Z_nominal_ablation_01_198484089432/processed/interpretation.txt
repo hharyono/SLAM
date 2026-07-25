@@ -1,0 +1,99 @@
+INTERPRETASI SELECTED-METHOD BOARD VALIDATION
+=============================================
+
+Experiment ID:
+20260725T041838Z_nominal_ablation_01_198484089432
+
+Execution target:
+RV1103 (root@192.168.1.231)
+
+Sumber replay:
+20260725T013852Z_nominal_kidnapped_01_198484089432
+
+Skenario:
+Kidnapped same-room dengan map map_rv1103.
+
+Metode firmware yang divalidasi:
+  Global Relocalization = ON
+  Multi Resolution      = ON
+  Replay mode           = local_global_multi
+
+VALIDITAS
+---------
+
+- Session state: finalized
+- Validation mode: selected_method_board
+- Protocol valid: true
+- Validity errors: tidak ada
+- Seluruh checksum manifest: cocok
+- Hash raw scan sumber: cocok
+- Hash map sumber: cocok
+- Hash binary replay sama dengan binary yang terpasang di RV1103
+- Jumlah scan: 395
+
+HASIL LOKALISASI
+----------------
+
+- Success: true
+- Accepted scan: 388 dari 395 (98,23%)
+- Rejected scan: 7 dari 395 (1,77%)
+- Global-search scan: 3
+- Recovery time setelah KIDNAP_RELEASE: 985 ms
+- State akhir: TRACKING
+- Score akhir: 0,9814
+- Error posisi akhir: 0,000128 m
+- Error heading akhir: 0,099 derajat
+- False recovery: 0
+
+Hasil tersebut menunjukkan bahwa firmware Global + Multi berhasil mendeteksi
+kehilangan posisi, menjalankan global relocalization, dan kembali ke tracking
+yang stabil pada RV1103 tanpa false recovery.
+
+HASIL PERFORMA RV1103
+---------------------
+
+- Matcher mean seluruh scan: 42,97 ms
+- Matcher P95 seluruh scan: 50,06 ms
+- Matcher maksimum: 1.076,79 ms
+- Tracking mean: 37,26 ms
+- Global-search mean: 788,48 ms
+- Global-search maksimum: 1.076,79 ms
+- Scan di atas deadline 100 ms: 4 dari 395
+- CPU proses mean: 98,72%
+- Peak RSS: 1.420 KiB (sekitar 1,39 MiB)
+
+Replay dijalankan tanpa pacing dan memproses scan berikutnya segera setelah
+scan sebelumnya selesai. Oleh karena itu, CPU sekitar 99% menunjukkan bahwa
+benchmark menggunakan satu core secara penuh; angka ini tidak sama dengan
+rata-rata CPU saat input LiDAR live dibatasi 10 Hz.
+
+INTERPRETASI DEADLINE
+--------------------
+
+Normal tracking memiliki waktu rata-rata 37,26 ms dan P95 keseluruhan 50,06 ms,
+sehingga mayoritas scan berada di bawah periode 100 ms untuk operasi 10 Hz.
+
+Empat scan melampaui 100 ms. Tiga di antaranya merupakan global search, dengan
+waktu rata-rata 788,48 ms dan maksimum 1,077 detik. Artinya firmware tidak
+mempertahankan update 10 Hz ketika global relocalization aktif. Kondisi tersebut
+dapat diterima sebagai mode recovery sementara karena sistem berhasil kembali
+ke TRACKING dalam 985 ms, tetapi tidak boleh diklaim sebagai hard real-time
+selama global search.
+
+KESIMPULAN
+----------
+
+Test dinyatakan layak Accepted sebagai validasi firmware metode produksi pada
+RV1103 karena:
+
+1. protokol dan seluruh artefak valid;
+2. localization recovery berhasil;
+3. final pose sangat dekat dengan referensi;
+4. tidak terjadi false recovery, crash, atau OOM;
+5. penggunaan RAM tetap rendah;
+6. tracking normal memiliki headroom terhadap periode 100 ms.
+
+Catatan batasannya adalah global relocalization masih menyebabkan jeda hingga
+sekitar 1,1 detik. Pengujian Resource Live tetap diperlukan untuk mengukur CPU,
+latency, dan interaksi UART/network pada sistem produksi dengan pacing sensor
+10 Hz.

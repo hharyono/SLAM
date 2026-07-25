@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
+<rect width="100%" height="100%" fill="white"/>
+<text x="60" y="28" font-family="sans-serif" font-size="17">Checkpoint position error — 20260725T014601Z_dynamic_occluded_dynamic_occluded_01_198484089432</text>
+<line x1="60" y1="460" x2="840" y2="460" stroke="#334155"/>
+<line x1="60" y1="60" x2="60" y2="460" stroke="#334155"/>
+<rect x="60.00" y="459.14" width="93.50" height="0.86" fill="#2563eb"><title>position=0.0001 m, heading=1.60 deg</title></rect><rect x="157.50" y="60.89" width="93.50" height="399.11" fill="#2563eb"><title>position=0.0500 m, heading=0.02 deg</title></rect><rect x="255.00" y="60.00" width="93.50" height="400.00" fill="#2563eb"><title>position=0.0501 m, heading=1.30 deg</title></rect><rect x="352.50" y="459.37" width="93.50" height="0.63" fill="#2563eb"><title>position=0.0001 m, heading=0.96 deg</title></rect><rect x="450.00" y="459.44" width="93.50" height="0.56" fill="#2563eb"><title>position=0.0001 m, heading=0.34 deg</title></rect><rect x="547.50" y="60.77" width="93.50" height="399.23" fill="#2563eb"><title>position=0.0500 m, heading=0.29 deg</title></rect><rect x="645.00" y="459.13" width="93.50" height="0.87" fill="#2563eb"><title>position=0.0001 m, heading=0.22 deg</title></rect><rect x="742.50" y="60.88" width="93.50" height="399.12" fill="#2563eb"><title>position=0.0500 m, heading=1.35 deg</title></rect>
+<text x="60" y="502" font-family="sans-serif" font-size="13">Checkpoint index; bar unit: metre</text>
+</svg>

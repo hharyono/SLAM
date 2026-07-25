@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
+<rect width="100%" height="100%" fill="white"/>
+<text x="60" y="28" font-family="sans-serif" font-size="17">Checkpoint position error — 20260724T001753Z_lidar_occluded_90_route_01_198484089432</text>
+<line x1="60" y1="460" x2="840" y2="460" stroke="#334155"/>
+<line x1="60" y1="60" x2="60" y2="460" stroke="#334155"/>
+<rect x="60.00" y="60.00" width="93.50" height="400.00" fill="#2563eb"><title>position=0.0710 m, heading=0.98 deg</title></rect><rect x="157.50" y="177.78" width="93.50" height="282.22" fill="#2563eb"><title>position=0.0501 m, heading=0.13 deg</title></rect><rect x="255.00" y="178.70" width="93.50" height="281.30" fill="#2563eb"><title>position=0.0499 m, heading=1.56 deg</title></rect><rect x="352.50" y="63.33" width="93.50" height="396.67" fill="#2563eb"><title>position=0.0704 m, heading=1.97 deg</title></rect><rect x="450.00" y="63.80" width="93.50" height="396.20" fill="#2563eb"><title>position=0.0703 m, heading=2.18 deg</title></rect><rect x="547.50" y="61.38" width="93.50" height="398.62" fill="#2563eb"><title>position=0.0707 m, heading=1.90 deg</title></rect><rect x="645.00" y="176.23" width="93.50" height="283.77" fill="#2563eb"><title>position=0.0504 m, heading=0.45 deg</title></rect><rect x="742.50" y="458.44" width="93.50" height="1.56" fill="#2563eb"><title>position=0.0003 m, heading=3.76 deg</title></rect>
+<text x="60" y="502" font-family="sans-serif" font-size="13">Checkpoint index; bar unit: metre</text>
+</svg>

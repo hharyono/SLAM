@@ -1,0 +1,34 @@
+{
+  "source_experiment_id": "20260725T013852Z_nominal_kidnapped_01_198484089432",
+  "source_run_type": "kidnapped",
+  "source_condition": "nominal",
+  "source_route_id": "KIDNAP_SAME_ROOM",
+  "source_raw_scan": "/root/DATA/SLAM/EXPERIMENTS/Accepted/RV1103/KIDNAPPED/20260725T013852Z_nominal_kidnapped_01_198484089432/raw/raw_scans.csv",
+  "source_raw_scan_sha256": "bfbaabd227753f2438acaae7d7f03ff742029c131b73d23ed1c82cbb9ea21553",
+  "source_map": "/root/DATA/SLAM/maps/map_rv1103.bin",
+  "source_map_name": "map_rv1103",
+  "source_map_sha256": "5725b2e348bcebc0bf990b91a1c2d33496ad14bc0607561413a767f5b5148135",
+  "source_parameters": {
+    "minimum_range_m": 0.0500000007,
+    "maximum_range_m": 12,
+    "linear_window_m": 0.5,
+    "angular_window_rad": 0.349999994,
+    "linear_step_m": 0.0500000007,
+    "angular_step_rad": 0.0174532924,
+    "minimum_score": 0.899999976,
+    "lost_after_rejections": 3,
+    "recovery_confirmations": 3
+  },
+  "initial_pose": {
+    "x": 3.29999995,
+    "y": 2.04999995,
+    "yaw": -0.0436336212
+  },
+  "execution_target": "rv1103",
+  "execution_host": "root@192.168.1.231",
+  "replay_binary_sha256": "12576a64ad3f253185db9653f2508c2da20a2524c12bd053061223af0efab499",
+  "validation_mode": "selected_method_board",
+  "variants": [
+    "local_global_multi"
+  ]
+}

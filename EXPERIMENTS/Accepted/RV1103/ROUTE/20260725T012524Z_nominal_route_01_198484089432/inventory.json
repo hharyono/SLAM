@@ -1,0 +1,117 @@
+[
+  {
+    "path": "config/localizer.env",
+    "bytes": 1458,
+    "sha256": "1cac1f66140d807d93088e7e1ef8f5db8713a1f42e4370c081af5b1713a66746"
+  },
+  {
+    "path": "config/map.json",
+    "bytes": 174,
+    "sha256": "62e6fcc0e6a1b7feaea5d6750b0991bc94c327a3a16dd56e929bdba544799bc2"
+  },
+  {
+    "path": "config/markers.json",
+    "bytes": 1169,
+    "sha256": "a68622a5a112526f7d557a3cd72bdaf3207b3cf9bffbe71e0a2128eb9c1641f9"
+  },
+  {
+    "path": "config/session.json",
+    "bytes": 4159,
+    "sha256": "b5d3ce56de62074144c286008df736e13f0e8b5c263d3b333c7a6a26dab774da"
+  },
+  {
+    "path": "plots/checkpoint_comparison.svg",
+    "bytes": 1921,
+    "sha256": "4bf5c63f9a8ec0e637fb822c584c10a74c43339e985bb7a96e36d9e4b2bacc4f"
+  },
+  {
+    "path": "plots/error_distribution.svg",
+    "bytes": 1508,
+    "sha256": "66a70c8e1f529e196ec359891d00b4c3a821db6e421954ffe0dc4963bde77dec"
+  },
+  {
+    "path": "plots/state_timeline.svg",
+    "bytes": 98948,
+    "sha256": "dd8211301f48f440064f115d256e379c6e03fdcc31088485b7c90b93a5ab5122"
+  },
+  {
+    "path": "processed/aligned_samples.csv",
+    "bytes": 1798,
+    "sha256": "859c9b4f025c9b800d2a3b52c86fb8b16ecdd09be463aea3378e066899a30310"
+  },
+  {
+    "path": "processed/summary.json",
+    "bytes": 5310,
+    "sha256": "6cc66edd25e3b022bc3652622a009f8a76281cf16614044e70e0a991090f07c9"
+  },
+  {
+    "path": "processed/trial_report.json",
+    "bytes": 5702,
+    "sha256": "91af6ae095a46550d0888bd8e5ef1c329caa4de00a7cfa655e1f8426acfee6a0"
+  },
+  {
+    "path": "raw/backend_arrival.jsonl",
+    "bytes": 102645,
+    "sha256": "6476e3a618271ad804c860265edfdd60fa701d5249aa0e48de4a9065b1ffe0ff"
+  },
+  {
+    "path": "raw/backend_status.jsonl",
+    "bytes": 187313,
+    "sha256": "73f4563c1b11d2d9e2d703128ba972376465a8cdc6f64325cc846e137050eaaa"
+  },
+  {
+    "path": "raw/capture_manifest.sha256",
+    "bytes": 403,
+    "sha256": "92f40f8c76662091310b542af7e4f6aa678b0cd164efc10221a665adcd6030b9"
+  },
+  {
+    "path": "raw/ground_truth.jsonl",
+    "bytes": 3659,
+    "sha256": "36ba5ef5bf1d12e580b387a9278d100c3e313ed29c8c1d395fafd48abfd175a3"
+  },
+  {
+    "path": "raw/operator_events.jsonl",
+    "bytes": 1300,
+    "sha256": "1b847bb799469fa80107593d65ec4168e48e406db100f32d71fedceb002382e1"
+  },
+  {
+    "path": "raw/raw_scans.csv",
+    "bytes": 35362754,
+    "sha256": "6995110ebcaf4b41698c7e7dafb86b3fbc977dadb706cbf149c7ab264bc4070c"
+  },
+  {
+    "path": "raw/runtime.log",
+    "bytes": 224371,
+    "sha256": "b629ee681c5784e533b7ccb90b4fa14e86de51a0b019813958d560a5b923c17d"
+  },
+  {
+    "path": "raw/runtime_default.env",
+    "bytes": 1458,
+    "sha256": "1cac1f66140d807d93088e7e1ef8f5db8713a1f42e4370c081af5b1713a66746"
+  },
+  {
+    "path": "raw/system.txt",
+    "bytes": 1331,
+    "sha256": "9aaab783b17db8e930c494a8976d9fc1ac5e9f0493b0fd9f0183c4e20db90619"
+  },
+  {
+    "path": "raw/telemetry.jsonl",
+    "bytes": 1396267,
+    "sha256": "ba62dfebaa3a3d1c856dbdb0bb5de9274fe44f7774724128a578daf58446e883"
+  },
+  {
+    "path": "tables/accuracy.csv",
+    "bytes": 475,
+    "sha256": "c9a7965e37b21996b5235617fc7327a78c6abf458281e90a8ad1d432a73d1954"
+  },
+  {
+    "path": "tables/relocalization.csv",
+    "bytes": 174,
+    "sha256": "0a50b8c610adbe641fd4bc96b0f72c60cd41533c79885e8d8a3ea228aedecbad"
+  },
+  {
+    "path": "tables/resources.csv",
+    "bytes": 2342,
+    "sha256": "798d3dac9329338908de21342dab01eeb48126d54dedc86cce3e732c5eed1d83"
+  }
+]

@@ -357,14 +357,15 @@
           <a href="#route"><small>02 · 30 trial</small><b>ROUTE</b></a>
           <a href="#kidnapped"><small>03 · 20 trial</small><b>KIDNAPPED</b></a>
           <a href="#dynamic-occluded"
-            ><small>04 · 10 trial</small><b>DYNAMIC OCCLUDED</b></a
+            ><small>04 · 10 trial</small><b>DYNAMIC OCCLUSION</b></a
           >
-          <a href="#ablation"><small>05 · ≥10 rekaman</small><b>ABLATION</b></a>
-          <a href="#resource"><small>06 · 15 interval</small><b>RESOURCE</b></a>
+          <a href="#ablation"><small>05 · Host / board</small><b>ABLATION</b></a>
+          <a href="#resource"><small>06 · 3 mode RV1103</small><b>RESOURCE</b></a>
         </nav>
         <div class="workflow" aria-label="Alur umum">
           <span>0 PREFLIGHT</span> → <span>1 CREATE SESSION</span> →
-          <span>2 START CAPTURE</span> → <span>3 START MISSION</span> →
+          <span>2 START CAPTURE</span> →
+          <span>3 START MISSION / AUTO RESOURCE</span> →
           <span>4 EXECUTE TEST</span> → <span>5 STOP MISSION</span> →
           <span>6 STOP CAPTURE</span> → <span>7 ANALYZE</span> →
           <span>8 FINALIZE</span>
@@ -694,13 +695,15 @@
       <section id="dynamic-occluded">
         <div class="section-heading">
           <div>
-            <h2>04 — DYNAMIC OCCLUDED</h2>
+            <h2>04 — DYNAMIC OCCLUSION</h2>
             <p>
-              Membuat gangguan gerakan manusia yang sederhana dan dapat diulang.
-              Satu orang melintasi jalur robot pada titik pemicu yang sama.
+              Menguji respons localization terhadap penghalang kecil yang
+              melintas di depan LiDAR pada enam checkpoint tengah.
             </p>
           </div>
-          <span class="count">10 TRIAL · DURASI 3 ± 0,5 DETIK</span>
+          <span class="count"
+            >10 TRIAL · 6 OCCLUSION/TRIAL · AUTO END 4 DETIK</span
+          >
         </div>
         <div class="table-wrap">
           <table>
@@ -723,24 +726,61 @@
             <tbody>
               <tr>
                 <td>
-                  <strong>Orang melintas</strong><code>dynamic_occluded</code
+                  <strong>Obstacle pass M2–M7</strong
+                  ><code>dynamic_occluded</code
                   ><br />5× R1 + 5× R2
                 </td>
                 <td>
                   Mengukur robustness checkpoint localization saat terjadi
-                  moving occlusion singkat dan terkendali.
+                  occlusion temporer berulang pada bagian tengah rute.
                 </td>
                 <td>
                   <ul>
                     <li>
-                      Tandai endpoint pejalan kaki <code>H1</code> dan
-                      <code>H2</code>.
+                      Gunakan delapan marker rute yang sudah dikunci:
+                      <code>M1</code> sampai <code>M8</code>.
                     </li>
-                    <li>Tandai titik pemicu robot <code>T0</code>.</li>
-                    <li>H1–H2 memotong rute robot secara tegak lurus.</li>
-                    <li>Pertahankan jarak aman minimal 1 meter.</li>
-                    <li>Gunakan orang dan kecepatan robot yang sama.</li>
-                    <li>Tidak ada orang lain di area pengujian.</li>
+                    <li>
+                      <code>M1</code> adalah awal rute dan <code>M8</code>
+                      adalah akhir rute; occlusion dilakukan pada
+                      <code>M2</code> sampai <code>M7</code>.
+                    </li>
+                    <li>
+                      Gunakan penghalang balok tegak berukuran 13 × 13 cm dengan
+                      tinggi 30 cm.
+                    </li>
+                    <li>
+                      Buat garis lintasan penghalang di lantai tepat di depan
+                      robot pada setiap marker, dengan jarak sekitar 50 cm dari
+                      pusat LiDAR ke pusat penghalang.
+                    </li>
+                    <li>
+                      Penghalang digerakkan menyilang dari kiri ke kanan
+                      relatif terhadap arah hadap robot.
+                    </li>
+                    <li>
+                      Robot menghadap marker berikutnya sesuai arah rute:
+                      contoh R1, <code>M2</code> menghadap <code>M3</code>;
+                      pada R2, <code>M7</code> menghadap <code>M6</code>.
+                    </li>
+                    <li>
+                      Posisi robot, arah hadap, jalur penghalang, durasi, map,
+                      dan parameter harus tetap sama pada seluruh pengulangan.
+                    </li>
+                    <li>
+                      Telemetry harus memuat
+                      <code>front_near_left_points</code>,
+                      <code>front_near_center_points</code>,
+                      <code>front_near_right_points</code>, dan
+                      <code>front_minimum_range_m</code>. Data ringkas ini
+                      menjadi bukti sensor bahwa objek melintas tanpa merekam
+                      raw scan berukuran besar.
+                    </li>
+                    <li>
+                      Dashboard dibuka pada ponsel/tablet agar satu operator
+                      dapat menggerakkan penghalang sekaligus menandai event.
+                    </li>
+                    <li>Robot wajib berhenti selama setiap occlusion.</li>
                   </ul>
                 </td>
                 <td>
@@ -752,30 +792,72 @@
                       Buat session, mulai capture/mission, lalu rekam
                       checkpoint pertama sebagai awal rute.
                     </li>
-                    <li>Untuk R1 orang menunggu di H1; untuk R2 di H2.</li>
                     <li>
-                      Saat robot mencapai T0, tekan
-                      <b>PERSON START</b> bersamaan dengan mulai berjalan.
+                      Jalankan robot ke <code>M2</code>, berhenti tepat pada
+                      marker, dan pertahankan capture/localization tetap aktif.
                     </li>
-                    <li>Berjalan normal tanpa berhenti.</li>
-                    <li>Di endpoint seberang, tekan <b>PERSON END</b>.</li>
-                    <li>Pastikan durasi yang tampil 2,5–3,5 detik.</li>
-                    <li>Rekam delapan checkpoint dan selesaikan route.</li>
+                    <li>
+                      Letakkan penghalang di sisi kiri garis lintasan tanpa
+                      menutup LiDAR. Pastikan pusat lintasannya tetap sekitar 50
+                      cm dari pusat LiDAR.
+                    </li>
+                    <li>
+                      Tekan <b>OCCLUSION START</b>, lalu gerakkan penghalang
+                      secara stabil melintasi bagian depan LiDAR. Backend akan
+                      langsung menyimpan checkpoint marker aktif dan
+                      merekam <b>OCCLUSION END</b> secara otomatis setelah 4
+                      detik.
+                    </li>
+                    <li>
+                      Selesaikan gerakan saat penghalang melewati sisi kanan;
+                      operator tidak perlu menekan tombol END.
+                    </li>
+                    <li>
+                      Tunggu pose valid/TRACKING sebelum menuju marker
+                      berikutnya; tidak perlu menekan kartu checkpoint di
+                      bagian bawah.
+                    </li>
+                    <li>
+                      Ulangi langkah yang sama pada <code>M3</code>,
+                      <code>M4</code>, <code>M5</code>, <code>M6</code>, dan
+                      <code>M7</code>.
+                    </li>
+                    <li>
+                      Lanjutkan ke <code>M8</code>, rekam checkpoint akhir, lalu
+                      stop, analyze, review, dan finalize.
+                    </li>
                     <li>Ulangi lima kali untuk setiap arah.</li>
                   </ol>
                 </td>
                 <td>
                   <ul>
                     <li><code>dynamic_occlusion.csv</code>.</li>
-                    <li>Arah dan durasi orang melintas.</li>
-                    <li>Scan count serta accepted-scan rate.</li>
-                    <li>Localization score selama crossing.</li>
+                    <li>Marker pemicu dan durasi setiap occlusion.</li>
+                    <li>
+                      Status <code>object_passing_detected</code>, arah angular
+                      yang teramati, excess point kiri–tengah–kanan, dan jarak
+                      minimum depan untuk setiap marker.
+                    </li>
+                    <li>
+                      Scan count, accepted-scan rate, dan minimum score pada
+                      setiap marker.
+                    </li>
+                    <li>Waktu kembali ke valid/TRACKING setelah occlusion.</li>
                     <li>Metrik akurasi route standar.</li>
                     <li class="pass">
-                      Lulus: satu PERSON START/END dan 8 checkpoint.
+                      Lulus: enam pasangan OCCLUSION START/END, seluruh durasi
+                      berada pada 4 ± 0,5 detik, 8 checkpoint valid, dan bukti
+                      object-passing tersedia pada keenam marker.
                     </li>
                     <li class="danger">
-                      Buat session baru jika durasi atau keselamatan gagal.
+                      Ulangi trial jika satu event terlewat, durasi di luar
+                      batas, penghalang jatuh, atau robot bergerak saat
+                      occlusion.
+                    </li>
+                    <li class="warning">
+                      Batas klaim: menguji moving-object occlusion saat robot
+                      berhenti pada checkpoint, bukan obstacle avoidance atau
+                      interaksi saat robot bergerak.
                     </li>
                   </ul>
                 </td>
@@ -790,11 +872,12 @@
           <div>
             <h2>05 — ABLATION</h2>
             <p>
-              Memutar raw scan yang sama melalui empat konfigurasi matcher.
-              Tidak memerlukan eksperimen fisik atau capture board baru.
+              Replay dataset Accepted untuk membandingkan faktor metode pada
+              Host/PC atau memvalidasi satu metode produksi pada hardware
+              board. Tidak memerlukan capture fisik baru.
             </p>
           </div>
-          <span class="count">≥10 REKAMAN SUMBER · 4 VARIAN</span>
+          <span class="count">HOST: 4 VARIAN · BOARD: 1 METODE TERPILIH</span>
         </div>
         <div class="table-wrap">
           <table>
@@ -816,71 +899,132 @@
             </thead>
             <tbody>
               <tr>
-                <td><strong>Local only</strong><code>local_only</code></td>
-                <td>Baseline tanpa recovery global search.</td>
-                <td rowspan="4">
+                <td>
+                  <strong>Host factorial replay</strong
+                  ><code>factorial_ablation</code>
+                </td>
+                <td>
+                  Mengukur kontribusi global relocalization dan
+                  multi-resolution melalui desain faktorial 2×2.
+                </td>
+                <td>
                   <ul>
                     <li>
-                      Pilih minimal sepuluh rekaman route/kidnapped yang
-                      finalized.
+                      Target eksekusi dipilih <b>PC / Host</b>.
                     </li>
                     <li>
-                      Wakili nominal, occlusion statis/dinamis, perubahan
-                      furnitur, dan kidnapped.
+                      Pilih satu dataset replay-ready dari katalog
+                      <code>EXPERIMENTS/Accepted</code>.
                     </li>
                     <li>
-                      Gunakan raw scan dan map yang sama pada seluruh varian.
+                      Dataset harus memiliki raw scan, telemetry, metadata map,
+                      hash, format firmware, dan replay binary yang valid.
                     </li>
-                    <li>Hanya komponen yang diuji yang boleh berubah.</li>
+                    <li>
+                      Semua varian memakai map, initial pose, urutan scan,
+                      timestamp, dan parameter dasar yang sama.
+                    </li>
                   </ul>
                 </td>
-                <td rowspan="4">
+                <td>
                   <ol>
-                    <li>
-                      Pilih source recording finalized yang memiliki raw scan.
-                    </li>
+                    <li>Pilih source Accepted dan target <b>PC / Host</b>.</li>
                     <li>Buat session <code>ablation</code>.</li>
-                    <li>Tekan <b>RUN ABLATION REPLAY</b>.</li>
-                    <li>BE menjalankan empat mode replay C++.</li>
-                    <li>Pastikan empat replay JSONL tersedia.</li>
-                    <li>Analyze dan bandingkan seluruh varian.</li>
+                    <li>Tekan <b>RUN 4 PC REPLAYS</b>.</li>
                     <li>
-                      Review, finalize, lalu lanjutkan ke rekaman berikutnya.
+                      Host menjalankan <code>local_only_single</code>,
+                      <code>local_only_multi</code>,
+                      <code>local_global_single</code>, dan
+                      <code>local_global_multi</code>.
+                    </li>
+                    <li>
+                      Analyzer memastikan keempat varian memakai sequence dan
+                      timestamp scan identik.
+                    </li>
+                    <li>Tekan <b>ANALYZE</b> dan periksa validitas 2×2.</li>
+                    <li>
+                      <b>FINALIZE</b> hanya aktif jika protocol replay valid.
                     </li>
                   </ol>
                 </td>
-                <td rowspan="4">
+                <td>
                   <ul>
-                    <li>Success rate.</li>
-                    <li>Mean/P95 execution time.</li>
-                    <li>Recovery time.</li>
-                    <li>Final position dan heading error.</li>
+                    <li>Hash raw scan, map, dan binary replay.</li>
+                    <li>Accepted/rejected scan count dan accepted-scan rate.</li>
+                    <li>Mean/P95 matcher time, scan cycle, dan candidate count.</li>
+                    <li>
+                      Recovery time, false recovery, final position error, dan
+                      heading error.
+                    </li>
                     <li><code>tables/ablation.csv</code>.</li>
                     <li class="pass">
-                      Lulus: keempat replay memakai source hash yang sama.
+                      Protocol valid jika empat konfigurasi unik, metadata
+                      faktor benar, dan input replay identik.
+                    </li>
+                    <li class="warning">
+                      Status FAILURE pada salah satu metode adalah hasil
+                      ilmiah, bukan otomatis kegagalan protocol. Jangan
+                      menghapus hasil hanya karena score/recovery buruk.
+                    </li>
+                    <li class="warning">
+                      Timing wajib dilabeli <b>HOST REPLAY</b> dan tidak boleh
+                      diklaim sebagai performa hardware RV.
                     </li>
                   </ul>
                 </td>
               </tr>
               <tr>
                 <td>
-                  <strong>Local + global</strong><code>local_global</code>
-                </td>
-                <td>Menunjukkan kontribusi existing global relocalization.</td>
-              </tr>
-              <tr>
-                <td>
-                  <strong>Single resolution</strong
-                  ><code>single_resolution</code>
-                </td>
-                <td>Baseline tanpa multi-resolution search.</td>
-              </tr>
-              <tr>
-                <td>
-                  <strong>Multi resolution</strong><code>multi_resolution</code>
+                  <strong>Selected method on board</strong
+                  ><code>selected_method_board</code>
                 </td>
                 <td>
-                  Menunjukkan kontribusi existing multi-resolution search.
+                  Memvalidasi performa metode produksi pada RV1103 atau RV1106,
+                  bukan mengulang studi faktorial.
+                </td>
+                <td>
+                  <ul>
+                    <li>Pilih target <b>RV1103</b> atau <b>RV1106</b>.</li>
+                    <li>Board dan replay binary harus berstatus READY.</li>
+                    <li>
+                      Firmware board hanya mengizinkan
+                      <code>local_global_multi</code>.
+                    </li>
+                    <li>
+                      <code>localize_uart</code> berhenti sementara dan harus
+                      hidup kembali otomatis setelah replay.
+                    </li>
+                  </ul>
+                </td>
+                <td>
+                  <ol>
+                    <li>Pilih source Accepted dan target board.</li>
+                    <li>Buat session <code>ablation</code>.</li>
+                    <li>
+                      Tekan <b>VALIDATE GLOBAL + MULTI ON RV...</b>.
+                    </li>
+                    <li>
+                      Board menjalankan satu replay
+                      <code>local_global_multi</code>.
+                    </li>
+                    <li>Analyze, periksa protocol, kemudian Finalize.</li>
+                  </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li>Matcher/scan-cycle latency pada hardware board.</li>
+                    <li>CPU, peak RSS, accepted-scan rate, dan recovery.</li>
+                    <li>Final position/heading error dan false recovery.</li>
+                    <li class="pass">
+                      Valid jika hanya satu varian
+                      <code>local_global_multi</code> dijalankan dengan
+                      execution target dan hash yang benar.
+                    </li>
+                    <li class="danger">
+                      Firmware wajib menolak varian single-resolution atau
+                      local-only pada target board.
+                    </li>
+                  </ul>
                 </td>
               </tr>
             </tbody>
@@ -893,12 +1037,11 @@
           <div>
             <h2>06 — RESOURCE</h2>
             <p>
-              Mengukur kelayakan komputasi menggunakan telemetry yang dihasilkan
-              langsung oleh aplikasi RV1106. Hanya metrik resource komputasi
-              yang dikumpulkan.
+              Mengukur kelayakan metode produksi khusus pada RV1103 melalui
+              LIVE Idle/Tracking, LIVE Endurance, atau replay dataset Accepted.
             </p>
           </div>
-          <span class="count">15 INTERVAL · MASING-MASING 60 DETIK</span>
+          <span class="count">RV1103 · 3 MODE TERPISAH</span>
         </div>
         <div class="table-wrap">
           <table>
@@ -921,91 +1064,178 @@
             <tbody>
               <tr>
                 <td>
-                  <strong>Idle</strong><code>idle</code><br />5 pengulangan
+                  <strong>LIVE — Idle + Tracking</strong
+                  ><code>live_tracking</code>
                 </td>
                 <td>
-                  Mengukur CPU dan memori proses saat mission dan pemrosesan
-                  LiDAR berhenti.
+                  Membandingkan resource steady-state saat robot diam dan saat
+                  tracking route R1/R2.
                 </td>
                 <td>
                   <ul>
-                    <li>Capture aktif.</li>
-                    <li>Mission berhenti.</li>
-                    <li>Tidak ada proses eksperimen lain.</li>
+                    <li>Target hanya RV1103.</li>
+                    <li>Run Preflight: robot ONLINE, mission STOPPED.</li>
+                    <li>Map dan binary harus MATCH.</li>
+                    <li>Pilih Global route reference RV1103.</li>
+                    <li>
+                      Satu session/folder berisi tiga fase; tidak ada pilihan
+                      repetition 1–5.
+                    </li>
                   </ul>
                 </td>
                 <td>
                   <ol>
-                    <li>Pilih repetition 1–5.</li>
-                    <li>Pastikan mission berhenti.</li>
-                    <li>Tekan START pada IDLE dan tunggu 60 detik.</li>
-                    <li>Tekan END pada IDLE.</li>
-                    <li>Ulangi sebanyak lima kali.</li>
+                    <li>Pilih <b>LIVE — Idle + Tracking R1/R2</b>.</li>
+                    <li>Create Session dan Start Capture.</li>
+                    <li>
+                      IDLE: mission berhenti, tekan START, amati counter, lalu
+                      END sekitar 60 detik.
+                    </li>
+                    <li>
+                      TRACKING R1: tekan START; dashboard otomatis mengirim
+                      START MISSION sehingga robot/LiDAR mulai tanpa tombol
+                      Mission terpisah. Jalankan R1 selama 60 detik, lalu END.
+                    </li>
+                    <li>
+                      TRACKING R2: START juga mengirim START MISSION bila
+                      mission belum aktif. Jalankan R2 selama 60 detik, lalu
+                      END.
+                    </li>
+                    <li>
+                      Stop Mission, Stop Capture, Analyze, lalu Finalize.
+                    </li>
                   </ol>
                 </td>
-                <td rowspan="3">
+                <td>
                   <ul>
-                    <li>CPU usage.</li>
-                    <li>RAM/RSS dan peak RAM/RSS.</li>
-                    <li>Processing time per scan.</li>
-                    <li>Scan/update rate.</li>
-                    <li>Binary size.</li>
-                    <li>Durasi interval yang direkam.</li>
+                    <li>Counter elapsed/remaining pada tiap fase.</li>
+                    <li>Mode, pose validity, dan score setiap detik.</li>
+                    <li>CPU, peak RSS, matcher time, dan scan-cycle time.</li>
+                    <li>Localization-score dan tracking-sample rate R1/R2.</li>
+                    <li>Update rate, binary size, dan durasi aktual.</li>
                     <li class="pass">
-                      Lulus: 5 interval/state dengan durasi 55–65 detik.
+                      Valid jika Idle, Tracking R1, dan Tracking R2 masing-masing
+                      memiliki satu pasangan START/END berdurasi 55–70 detik.
+                    </li>
+                    <li class="pass">
+                      <code>telemetry.jsonl</code> wajib memiliki scan
+                      localization pada fase R1/R2; heartbeat idle saja tidak
+                      dapat dianalisis sebagai Tracking.
+                    </li>
+                    <li>
+                      Untuk mengulang, buat session baru; jumlah folder
+                      menunjukkan jumlah run.
                     </li>
                   </ul>
                 </td>
               </tr>
               <tr>
                 <td>
-                  <strong>Normal tracking</strong><code>normal_tracking</code
-                  ><br />5 pengulangan
+                  <strong>LIVE — Endurance</strong
+                  ><code>live_endurance</code>
                 </td>
                 <td>
-                  Mengukur beban steady-state localization selama tracking
-                  normal.
+                  Mengamati kestabilan resource dan kualitas localization selama
+                  durasi bebas yang ditentukan operator.
                 </td>
                 <td>
                   <ul>
-                    <li>Mission berjalan.</li>
-                    <li>Pose stabil pada <code>TRACKING</code>.</li>
-                    <li>LiDAR dan ruangan pada kondisi nominal.</li>
+                    <li>Session/folder terpisah dari Idle + Tracking.</li>
+                    <li>Tidak memerlukan Global route reference.</li>
+                    <li>Preflight, map, binary, dan RV1103 tetap harus READY.</li>
+                    <li>
+                      START Endurance otomatis mengaktifkan mission/LiDAR.
+                      Gerak fisik robot tetap bebas: bergerak, diam, atau
+                      campuran.
+                    </li>
+                    <li>Tidak ada target atau batas menit.</li>
                   </ul>
                 </td>
                 <td>
                   <ol>
-                    <li>Pilih repetition 1–5 dan start mission.</li>
-                    <li>Tunggu <code>TRACKING</code> stabil.</li>
-                    <li>Tekan START pada NORMAL TRACKING.</li>
-                    <li>Jalankan localization normal selama 60 detik.</li>
-                    <li>Tekan END lalu ulangi lima kali.</li>
+                    <li>Pilih <b>LIVE — Endurance, duration bebas</b>.</li>
+                    <li>Create Session dan Start Capture.</li>
+                    <li>
+                      Tekan START pada ENDURANCE; dashboard otomatis mengirim
+                      START MISSION sehingga LiDAR dan localization aktif.
+                    </li>
+                    <li>
+                      Amati elapsed counter, mode, valid/invalid, dan score yang
+                      diperbarui setiap detik.
+                    </li>
+                    <li>Tekan END kapan pun pengujian dianggap cukup.</li>
+                    <li>Stop Mission, Stop Capture, lalu Analyze.</li>
                   </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li>Timestamp START dan END.</li>
+                    <li>Total durasi aktual dalam milidetik.</li>
+                    <li>CPU, peak RSS, matcher time, dan scan-cycle time.</li>
+                    <li>Localization-score, tracking rate, accepted-scan rate.</li>
+                    <li class="pass">
+                      Valid jika terdapat tepat satu pasangan START/END dan END
+                      terjadi setelah START; tidak ada syarat durasi minimum
+                      atau maksimum.
+                    </li>
+                    <li class="pass">
+                      Telemetry wajib berisi scan localization agar score,
+                      tracking rate, dan accepted-scan rate dapat dihitung.
+                    </li>
+                  </ul>
                 </td>
               </tr>
               <tr>
                 <td>
-                  <strong>Global relocalization</strong
-                  ><code>global_relocalization</code><br />5 pengulangan
+                  <strong>REPLAY — Accepted RV1103</strong
+                  ><code>resource_replay_board</code>
                 </td>
                 <td>
-                  Mengukur keadaan recovery dengan beban komputasi tertinggi.
+                  Mengukur performa metode produksi pada RV1103 menggunakan
+                  scan historis dengan laju waktu sensor aslinya.
                 </td>
                 <td>
                   <ul>
-                    <li>Mission berjalan.</li>
-                    <li>Global search dipicu dengan metode aman yang sama.</li>
-                    <li>Map dan parameter search tidak berubah.</li>
+                    <li>
+                      Dropdown hanya memuat dataset route/kidnapped replay-ready
+                      dari <code>EXPERIMENTS/Accepted/RV1103</code>.
+                    </li>
+                    <li>Board target RV1103 harus READY.</li>
+                    <li>Tidak memerlukan capture atau mission fisik.</li>
+                    <li>
+                      Firmware hanya menjalankan metode produksi
+                      <code>local_global_multi</code>.
+                    </li>
+                    <li>
+                      Pacing wajib <code>recorded</code>, mengikuti timestamp
+                      relatif scan sumber.
+                    </li>
                   </ul>
                 </td>
                 <td>
                   <ol>
-                    <li>Pilih repetition 1–5.</li>
-                    <li>Picu global relocalization.</li>
-                    <li>Tekan START pada GLOBAL RELOCALIZATION.</li>
-                    <li>Rekam 60 detik termasuk recovery jika terjadi.</li>
-                    <li>Tekan END lalu ulangi lima kali.</li>
+                    <li>Pilih mode REPLAY dan satu dataset Accepted RV1103.</li>
+                    <li>Create Session.</li>
+                    <li>Tekan <b>RUN PACED GLOBAL + MULTI ON RV1103</b>.</li>
+                    <li>
+                      Tunggu state STOPPED; localize_uart dipulihkan otomatis.
+                    </li>
+                    <li>Analyze, periksa protocol validity, lalu Finalize.</li>
                   </ol>
+                </td>
+                <td>
+                  <ul>
+                    <li>Tracking latency mean/P95/max.</li>
+                    <li>Global latency mean/max dan global scan count.</li>
+                    <li>Deadline miss count/rate terhadap siklus 100 ms.</li>
+                    <li>CPU, peak RSS, recovery, dan final error.</li>
+                    <li><code>tables/resource_replay.csv</code>.</li>
+                    <li class="pass">
+                      Valid jika execution target RV1103, pacing
+                      <code>recorded</code>, dan hanya varian
+                      <code>local_global_multi</code> yang dijalankan.
+                    </li>
+                  </ul>
                 </td>
               </tr>
             </tbody>

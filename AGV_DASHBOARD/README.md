@@ -43,6 +43,25 @@ cd AGV_DASHBOARD/frontend && npx tsc --noEmit
 cd ../backend && npm run check
 ```
 
+Untuk menjaga penggunaan `/tmp` board tetap aman, telemetry JSONL tetap direkam
+pada board, sedangkan `raw_scans.csv` untuk run type `route` dan `kidnapped`
+ditulis langsung di disk backend dari stream TCP `42010`. Setiap baris memakai
+`timestamp_ns` asli dari `ScanFrame` board, bukan waktu tiba di backend, sehingga
+tetap dapat dipakai sebagai sumber ablation replay. Backend juga meneruskan frame
+ke ROS scan bridge pada port lokal `42011` ketika mapping aktif. Ground truth,
+dynamic occlusion, dan resource menghasilkan file raw scan kosong sebagai
+penanda manifest tanpa menduplikasi setiap titik LiDAR. Sebelum START dan sesudah
+STOP, backend menghapus capture sementara yang stale, mengosongkan log runtime
+sementara, memeriksa kapasitas `/tmp`, dan menyimpan kapasitas tersisa ke metadata
+session.
+
+Telemetry scan juga menyimpan signature obstacle berukuran kecil:
+`front_near_left_points`, `front_near_center_points`,
+`front_near_right_points`, dan `front_minimum_range_m`. Analyzer membandingkan
+ketiga sektor dengan baseline satu detik sebelum event untuk melaporkan
+`object_passing_detected` dan arah angular yang teramati tanpa membutuhkan raw
+scan penuh.
+
 Buka `http://IP_BACKEND:8080`. Port TCP binary robot adalah `42000`. Atur
 `MAP_DIR`, `MAP_NAME`, `ROBOT_TCP_PORT`, atau
 `HTTP_PORT` melalui environment bila diperlukan.
@@ -53,14 +72,38 @@ Tab **TESTING** mengikuti skenario ringkas pada `EXPERIMENTS/INSTRUKSI.md`:
 2. dua route antarruangan pada kondisi nominal, occlusion 90°, dan perubahan
    furnitur;
 3. kidnapped relocation dalam ruangan atau antarruangan;
-4. `dynamic_occluded` sebagai test type tersendiri dengan satu orang melintas
-   pada marker pemicu `T0`;
-5. ablation replay empat konfigurasi tanpa eksperimen fisik baru;
-6. resource komputasi untuk idle, tracking, dan global relocalization.
+4. `dynamic_occluded` sebagai test type tersendiri pada marker fisik M2–M7
+   dari `markers_R1.json`: robot berhenti, lalu penghalang tegak 13×13×30 cm
+   dilewatkan dari kiri ke kanan sekitar 50 cm di depan LiDAR; backend merekam
+   checkpoint marker saat START dan `OCCLUSION END` otomatis 4 detik kemudian;
+5. ablation replay faktorial 2×2 (`global OFF/ON × multi-resolution OFF/ON`)
+   pada backend host; jika target RV1103/RV1106 dipilih, replay hanya
+   memvalidasi metode produksi `global ON + multi-resolution ON`;
+6. resource RV1103 dengan dua skenario baru:
+   - **LIVE IDLE + TRACKING**: satu interval idle 60 detik, tracking route R1
+     60 detik, dan tracking route R2 60 detik. START Tracking R1/R2 otomatis
+     mengirim START MISSION; tidak ada tombol Mission manual untuk mode ini;
+   - **LIVE ENDURANCE**: session terpisah tanpa batas durasi. UI menampilkan
+     elapsed counter serta mode/score localization setiap detik. Robot boleh
+     bergerak, diam, atau campuran. START Endurance otomatis mengaktifkan
+     mission/LiDAR. Waktu START, END, dan durasi aktual disimpan dalam hasil;
+   - **REPLAY**: pilih satu dataset route/kidnapped dari
+     `EXPERIMENTS/Accepted/RV1103`, lalu RV1103 menjalankan hanya metode
+     produksi `global ON + multi-resolution ON` mengikuti timestamp sensor
+     yang direkam. Analyzer melaporkan latency tracking/global, deadline miss,
+     CPU, peak RAM, recovery, dan error akhir.
 
 Setiap trial mengikuti lifecycle preflight, session, capture/replay, analyze,
 dan finalize. Output immutable dikelompokkan berdasarkan tipe test, misalnya
 `EXPERIMENTS/Ouputs/GROUND TRUTH/<experiment_id>`.
+
+Referensi marker route disimpan sebagai katalog bernama hanya di
+`EXPERIMENTS/Ouputs/Global/routes/`. Pada tab **TESTING**, gunakan **RESET ALL
+MARKERS**, rekam dan lock M1–M8, beri nama referensi, lalu pilih **SAVE TO
+GLOBAL**. Semua test fisik memilih **Global route reference** yang sama; ID dan
+nama referensi tersebut ikut disimpan dalam metadata session. File lama
+`Global/markers_R1.json` dan `markers_R2.json` tetap tersedia sebagai pilihan
+legacy, tetapi referensi baru tidak lagi disimpan di browser.
 
 STOP pada dashboard hanya menghentikan LiDAR/localization dan bukan pengganti
 emergency stop motor penggerak robot yang fail-safe.
@@ -96,7 +139,7 @@ powershell -ExecutionPolicy Bypass -File \
 ```
 
 Script mendeteksi IP WSL dan alamat adapter Windows yang memiliki rute ke board
-(`BOARD_SSH_TARGET`, default `192.168.1.24`), kemudian membuat port forwarding
+(`BOARD_SSH_TARGET`, default `192.168.1.231`), kemudian membuat port forwarding
 TCP `42000` (status/command) dan `42010` (ScanFrame). Saat rule belum sehat,
 backend meminta izin Administrator melalui UAC dan menunggu hasil aktivasi.
 Gunakan IP Windows yang dicetak script sebagai `LUCKFOX_BACKEND_HOST` pada

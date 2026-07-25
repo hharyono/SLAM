@@ -1,0 +1,82 @@
+[
+  {
+    "path": "config/ablation_source.json",
+    "bytes": 1317,
+    "sha256": "ac03da8af6210d754392e583e71604b108c613ec1cdcf79de0f852d6f99fd99c"
+  },
+  {
+    "path": "config/localizer.env",
+    "bytes": 1458,
+    "sha256": "1cac1f66140d807d93088e7e1ef8f5db8713a1f42e4370c081af5b1713a66746"
+  },
+  {
+    "path": "config/map.json",
+    "bytes": 174,
+    "sha256": "62e6fcc0e6a1b7feaea5d6750b0991bc94c327a3a16dd56e929bdba544799bc2"
+  },
+  {
+    "path": "config/markers.json",
+    "bytes": 3,
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  {
+    "path": "config/session.json",
+    "bytes": 1290,
+    "sha256": "dee7977d1289b0f4d6b2be871eed2727dd2ec6842b314519b1d22b7f45f45512"
+  },
+  {
+    "path": "processed/summary.json",
+    "bytes": 9083,
+    "sha256": "c83bee1bba7aa5ef83e63704973f08cd07f6662ef25fd2fa01cfeab9df36a7aa"
+  },
+  {
+    "path": "processed/trial_report.json",
+    "bytes": 9083,
+    "sha256": "c83bee1bba7aa5ef83e63704973f08cd07f6662ef25fd2fa01cfeab9df36a7aa"
+  },
+  {
+    "path": "raw/backend_arrival.jsonl",
+    "bytes": 258400,
+    "sha256": "f91ee92c6b5203f15442128d85c23faa1be46f3c723b9cf7e0c275a157117647"
+  },
+  {
+    "path": "raw/backend_status.jsonl",
+    "bytes": 376960,
+    "sha256": "7afceb43b8688e3dc1c6bf421258cacf68ec16bafb9a43c98369008c9b608b2d"
+  },
+  {
+    "path": "raw/ground_truth.jsonl",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "raw/operator_events.jsonl",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "raw/replay_local_global_multi.jsonl",
+    "bytes": 356672,
+    "sha256": "ccb05cdddab6e782311aab4c193f9ceabbe2dc1f463761729665d6add371e783"
+  },
+  {
+    "path": "raw/replay_local_global_single.jsonl",
+    "bytes": 361433,
+    "sha256": "934d802d157c20a319fff1ecd4711c618fecd450b98200894e2588a3ec9b32f1"
+  },
+  {
+    "path": "raw/replay_local_only_multi.jsonl",
+    "bytes": 356203,
+    "sha256": "aba23916da97d9a85e28b4d5d2e0c9690b35a2231e0a6196e02e9eed47c74f39"
+  },
+  {
+    "path": "raw/replay_local_only_single.jsonl",
+    "bytes": 358800,
+    "sha256": "3669d2978ceddb814842214b45b29960504700e444fd917422da7eef7f3e066d"
+  },
+  {
+    "path": "tables/ablation.csv",
+    "bytes": 1231,
+    "sha256": "c2ac1773dc7332368af295d821e95ab4d0cfd995fb83e0924cefb8f061b64e1f"
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "schema": "luckfox.experiment.session.v1",
+  "experiment_id": "20260724T013212Z_nominal_kidnapped_01_198484089432",
+  "condition": "nominal",
+  "run_type": "kidnapped",
+  "trial": 1,
+  "route_id": "KIDNAP_CROSS_ROOM",
+  "zone": "cross_room",
+  "ground_truth_method": "surveyed_floor_markers",
+  "robot_id": "AGV-001",
+  "state": "finalized",
+  "created_unix_ms": 1784856732756,
+  "status_count": 1,
+  "checkpoint_count": 1,
+  "route_started": false,
+  "route_ended": false,
+  "recorded_marker_ids": [
+    "M3"
+  ],
+  "checkpoint_estimates": {},
+  "output_relative_path": "KIDNAPPED/20260724T013212Z_nominal_kidnapped_01_198484089432",
+  "kidnap_start_marker": {
+    "marker_id": "M5",
+    "zone": "room_2",
+    "x": 3.7999744415283203,
+    "y": 4.499975204467773,
+    "yaw": 1.2112151384353638
+  },
+  "kidnap_target_marker": {
+    "marker_id": "M3",
+    "zone": "room_1",
+    "x": 3.2499914169311523,
+    "y": 1.4500070810317993,
+    "yaw": 1.1777784824371338
+  },
+  "started_unix_ms": 1784856737086,
+  "kidnap_release_unix_ms": 1784856796405,
+  "kidnap_recovery_observed": true,
+  "kidnap_auto_checkpoint_unix_ms": 1784856797098,
+  "stopped_unix_ms": 1784856814166,
+  "analyzed_unix_ms": 1784856815597,
+  "finalized_unix_ms": 1784856817175
+}

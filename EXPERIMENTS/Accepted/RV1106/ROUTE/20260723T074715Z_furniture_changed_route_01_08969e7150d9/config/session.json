@@ -1,0 +1,156 @@
+{
+  "schema": "luckfox.experiment.session.v1",
+  "experiment_id": "20260723T074715Z_furniture_changed_route_01_08969e7150d9",
+  "condition": "furniture_changed",
+  "run_type": "route",
+  "trial": 1,
+  "route_id": "R1_ROOM_1_TO_2",
+  "zone": "cross_room",
+  "ground_truth_method": "surveyed_floor_markers",
+  "robot_id": "AGV-001",
+  "state": "finalized",
+  "created_unix_ms": 1784792835120,
+  "status_count": 0,
+  "checkpoint_count": 8,
+  "route_started": true,
+  "route_ended": true,
+  "recorded_marker_ids": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7",
+    "M8"
+  ],
+  "checkpoint_estimates": {
+    "M1": {
+      "x": 0.8499999642372131,
+      "y": 2.5,
+      "yaw": -0.06383215636014938,
+      "score": 0.9808027744293213,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M2": {
+      "x": 3.2499985694885254,
+      "y": 2.0999999046325684,
+      "yaw": 3.093034505844116,
+      "score": 0.9199103116989136,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M3": {
+      "x": 3.2499938011169434,
+      "y": 1.5000022649765015,
+      "yaw": 3.101545810699463,
+      "score": 0.9272764325141907,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M4": {
+      "x": 3.199960947036743,
+      "y": 3.8999788761138916,
+      "yaw": 3.163388252258301,
+      "score": 0.9528497457504272,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M5": {
+      "x": 3.7999343872070312,
+      "y": 4.549930572509766,
+      "yaw": 3.1383111476898193,
+      "score": 0.9522927403450012,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M6": {
+      "x": 4.999948501586914,
+      "y": 3.8999810218811035,
+      "yaw": 3.1429243087768555,
+      "score": 0.915963351726532,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M7": {
+      "x": 6.199924468994141,
+      "y": 3.9499287605285645,
+      "yaw": -3.1277520656585693,
+      "score": 0.921248733997345,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M8": {
+      "x": 6.249798774719238,
+      "y": 4.4999003410339355,
+      "yaw": -3.1465795040130615,
+      "score": 0.9169549942016602,
+      "valid": true,
+      "mode": "tracking"
+    }
+  },
+  "output_relative_path": "ROUTE/20260723T074715Z_furniture_changed_route_01_08969e7150d9",
+  "route_markers": [
+    {
+      "marker_id": "M1",
+      "zone": "room_1",
+      "x": 0.850138247013092,
+      "y": 2.4997193813323975,
+      "yaw": -1.9251635074615479
+    },
+    {
+      "marker_id": "M2",
+      "zone": "room_1",
+      "x": 3.299994945526123,
+      "y": 2.1000051498413086,
+      "yaw": 1.1745409965515137
+    },
+    {
+      "marker_id": "M3",
+      "zone": "room_1",
+      "x": 3.2499914169311523,
+      "y": 1.4500070810317993,
+      "yaw": 1.1777784824371338
+    },
+    {
+      "marker_id": "M4",
+      "zone": "doorway_transition",
+      "x": 3.1999740600585938,
+      "y": 3.899984359741211,
+      "yaw": 1.1972966194152832
+    },
+    {
+      "marker_id": "M5",
+      "zone": "doorway_transition",
+      "x": 3.7999744415283203,
+      "y": 4.499975204467773,
+      "yaw": 1.2112151384353638
+    },
+    {
+      "marker_id": "M6",
+      "zone": "room_2",
+      "x": 5.049914360046387,
+      "y": 3.8999452590942383,
+      "yaw": 1.1889458894729614
+    },
+    {
+      "marker_id": "M7",
+      "zone": "room_2",
+      "x": 6.249808311462402,
+      "y": 3.899860143661499,
+      "yaw": 1.1782292127609253
+    },
+    {
+      "marker_id": "M8",
+      "zone": "room_2",
+      "x": 6.249709129333496,
+      "y": 4.499829292297363,
+      "yaw": 1.193386435508728
+    }
+  ],
+  "started_unix_ms": 1784792840524,
+  "stopped_unix_ms": 1784793030214,
+  "analyzed_unix_ms": 1784793031385,
+  "finalized_unix_ms": 1784793032978
+}

@@ -69,6 +69,7 @@ Paket Buildroot memasang:
 
 - `/usr/bin/map_inspect`
 - `/usr/bin/localize_scan`
+- `/usr/bin/localize_replay` untuk replay faktorial ablation tanpa LiDAR live
 - `/usr/bin/localize_uart`
 - `/etc/slam/ruang_utama.bin` bila `maps/ruang_utama.bin` tersedia saat build
 - `/etc/init.d/S99zzlocalize_uart` untuk menjalankan localizer otomatis setelah

@@ -1,0 +1,26 @@
+{
+  "schema": "luckfox.experiment.session.v1",
+  "experiment_id": "20260723T041016Z_nominal_ground_truth_01_08969e7150d9",
+  "condition": "nominal",
+  "run_type": "ground_truth",
+  "trial": 1,
+  "route_id": "GROUND_TRUTH_REPEAT",
+  "zone": "room_1",
+  "ground_truth_method": "surveyed_floor_markers",
+  "robot_id": "AGV-001",
+  "state": "finalized",
+  "created_unix_ms": 1784779816288,
+  "status_count": 0,
+  "output_relative_path": "GROUND TRUTH/20260723T041016Z_nominal_ground_truth_01_08969e7150d9",
+  "reference_marker": {
+    "marker_id": "M1",
+    "zone": "room_1",
+    "x": 1.65,
+    "y": 1.35,
+    "yaw": 1.4852751934471744
+  },
+  "started_unix_ms": 1784779846108,
+  "stopped_unix_ms": 1784779990033,
+  "analyzed_unix_ms": 1784779992484,
+  "finalized_unix_ms": 1784779998727
+}

@@ -1,0 +1,167 @@
+{
+  "schema": "luckfox.experiment.session.v1",
+  "experiment_id": "20260725T012524Z_nominal_route_01_198484089432",
+  "condition": "nominal",
+  "run_type": "route",
+  "trial": 1,
+  "route_id": "R2_ROOM_2_TO_1",
+  "route_reference_id": "rv1103-marker-r2",
+  "route_reference_name": "RV1103_marker_r2",
+  "zone": "cross_room",
+  "ground_truth_method": "surveyed_floor_markers",
+  "robot_id": "AGV-001",
+  "state": "finalized",
+  "created_unix_ms": 1784942724501,
+  "status_count": 0,
+  "raw_scan_capture_enabled": true,
+  "raw_scan_capture_target": "backend",
+  "checkpoint_count": 8,
+  "route_started": true,
+  "route_ended": true,
+  "recorded_marker_ids": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7",
+    "M8"
+  ],
+  "checkpoint_estimates": {
+    "M1": {
+      "x": 6.349944591522217,
+      "y": 4.400000095367432,
+      "yaw": -0.030755793675780296,
+      "score": 0.9889992475509644,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M2": {
+      "x": 6.349798679351807,
+      "y": 3.75,
+      "yaw": -0.05481095612049103,
+      "score": 0.995451807975769,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M3": {
+      "x": 5.149707317352295,
+      "y": 3.79997181892395,
+      "yaw": -0.059638094156980515,
+      "score": 0.9821746945381165,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M4": {
+      "x": 3.9499993324279785,
+      "y": 4.450000286102295,
+      "yaw": -0.06132568418979645,
+      "score": 0.9889992475509644,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M5": {
+      "x": 3.349982261657715,
+      "y": 3.849997043609619,
+      "yaw": -0.0558788925409317,
+      "score": 0.9826545715332031,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M6": {
+      "x": 2.949965000152588,
+      "y": 1.4499887228012085,
+      "yaw": -0.06321240961551666,
+      "score": 0.9918760061264038,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M7": {
+      "x": 3.2499608993530273,
+      "y": 2.0500004291534424,
+      "yaw": -0.05398334562778473,
+      "score": 0.9798842072486877,
+      "valid": true,
+      "mode": "tracking"
+    },
+    "M8": {
+      "x": 2.099966287612915,
+      "y": 2.050020933151245,
+      "yaw": -0.07508062571287155,
+      "score": 0.9768795371055603,
+      "valid": true,
+      "mode": "tracking"
+    }
+  },
+  "output_relative_path": "ROUTE/20260725T012524Z_nominal_route_01_198484089432",
+  "route_markers": [
+    {
+      "marker_id": "M1",
+      "zone": "room_2",
+      "x": 6.3496413230896,
+      "y": 4.3501715660095215,
+      "yaw": -0.04555918276309967
+    },
+    {
+      "marker_id": "M2",
+      "zone": "room_2",
+      "x": 6.349771976470947,
+      "y": 3.7501683235168457,
+      "yaw": -0.06698396801948547
+    },
+    {
+      "marker_id": "M3",
+      "zone": "room_2",
+      "x": 5.099859237670898,
+      "y": 3.8001699447631836,
+      "yaw": -0.05684579908847809
+    },
+    {
+      "marker_id": "M4",
+      "zone": "doorway_transition",
+      "x": 3.9499359130859375,
+      "y": 4.450181484222412,
+      "yaw": -0.05452348291873932
+    },
+    {
+      "marker_id": "M5",
+      "zone": "doorway_transition",
+      "x": 3.349961519241333,
+      "y": 3.850177764892578,
+      "yaw": -0.04468156397342682
+    },
+    {
+      "marker_id": "M6",
+      "zone": "room_1",
+      "x": 2.949988842010498,
+      "y": 1.4501882791519165,
+      "yaw": -0.07371307164430618
+    },
+    {
+      "marker_id": "M7",
+      "zone": "room_1",
+      "x": 3.2499942779541016,
+      "y": 2.0501694679260254,
+      "yaw": -0.06170693039894104
+    },
+    {
+      "marker_id": "M8",
+      "zone": "room_1",
+      "x": 2.0999999046325684,
+      "y": 2.050143003463745,
+      "yaw": -0.07458185404539108
+    }
+  ],
+  "dynamic_occlusion_completed_marker_ids": [],
+  "dynamic_occlusion_durations_ms": {},
+  "dynamic_object_detection_required": false,
+  "board_tmp_available_kb_before_start": 16028,
+  "raw_scan_streamed_frames": 1516,
+  "raw_scan_streamed_points": 606400,
+  "started_unix_ms": 1784942729751,
+  "board_tmp_available_kb_after_stop": 16024,
+  "stopped_unix_ms": 1784942897490,
+  "analyzed_unix_ms": 1784942905829,
+  "finalized_unix_ms": 1784942907410
+}

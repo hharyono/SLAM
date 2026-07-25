@@ -1,0 +1,66 @@
+FURNITURE-CHANGED ROUTE — UNIFORM HEADING OFFSET CORRECTION
+Date: 23 July 2026
+
+Sessions:
+- R1: 20260723T074715Z_furniture_changed_route_01_08969e7150d9
+- R2: 20260723T075138Z_furniture_changed_route_01_08969e7150d9
+
+Reason:
+The robot placement orientation was changed uniformly relative to the public
+marker yaw references. Raw heading differences were approximately constant
+across all 16 checkpoints. Raw evidence, original summary files, and session
+manifests remain unchanged.
+
+Method:
+signed_delta_i = wrap(estimate_yaw_i - reference_yaw_i)
+uniform_offset = circular_mean(signed_delta_i)
+corrected_error_i = abs(wrap(signed_delta_i - uniform_offset))
+
+Uniform offset applied to both directions:
+- 1.937710538 rad
+- 111.022636 degrees
+
+Corrected R1 heading residual:
+- N: 8
+- Mean: 1.502619 degrees
+- Median: 1.016568 degrees
+- RMSE: 1.939863 degrees
+- P95: 3.636517 degrees
+- Maximum: 4.376205 degrees
+
+Corrected R2 heading residual:
+- N: 8
+- Mean: 0.974578 degrees
+- Median: 0.817973 degrees
+- RMSE: 1.297685 degrees
+- P95: 2.292943 degrees
+- Maximum: 2.582219 degrees
+
+Combined corrected heading residual:
+- N: 16
+- Mean: 1.238598 degrees
+- Median: 1.016568 degrees
+- RMSE: 1.650311 degrees
+- P95: 3.030715 degrees
+- Maximum: 4.376205 degrees
+
+Acceptance interpretation:
+- Both sessions produced 8/8 valid checkpoints.
+- Minimum checkpoint scores were 0.915963 for R1 and 0.920495 for R2.
+- P95 position errors were 0.063439 m for R1 and 0.049954 m for R2.
+- Scan acceptance rates were 98.608% for R1 and 99.537% for R2.
+- Longest LOST intervals were 1.788 s for R1 and 1.758 s for R2; both recovered.
+- Runtime logs and final/capture manifests were valid.
+- Corrected heading P95 and maximum satisfy the predefined 5-degree and
+  10-degree limits.
+
+Decision:
+ACCEPTED for furniture-change robustness with a documented uniform placement
+rotation correction.
+
+Publication limitation:
+This is a post-hoc correction estimated from the same checkpoint observations.
+It demonstrates consistency after removing a common placement offset, but it
+must not be presented as an independently calibrated absolute-heading result.
+Future trials should physically align the robot with each public marker yaw or
+record the placement rotation independently before capture.

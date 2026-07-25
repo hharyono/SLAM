@@ -1,0 +1,2 @@
+{"schema":"luckfox.experiment.backend_status.v1","robot_id":"AGV-001","seq":1282,"timestamp_ms":1784953502681,"pose":{"x":0,"y":0,"yaw":0,"score":0,"valid":false,"mode":"tracking"},"mission_running":false,"online":true,"received_ms":1784953502848}
+{"schema":"luckfox.experiment.backend_status.v1","robot_id":"AGV-001","seq":1283,"timestamp_ms":1784953502951,"pose":{"x":0,"y":0,"yaw":0,"score":0,"valid":false,"mode":"tracking"},"mission_running":false,"online":true,"received_ms":1784953503113}

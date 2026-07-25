@@ -1,0 +1,8 @@
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784940897433,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784940898067,"event":"ROBOT_CONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784941883916,"event":"MISSION_START_SENT","source":"backend","data":{"robot_id":"AGV-001","command_id":1}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784941884097,"event":"MISSION_ACK","source":"backend","data":{"robot_id":"AGV-001","command":"START_MISSION","command_id":1,"sequence":1}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784942026414,"event":"MISSION_STOP_SENT","source":"backend","data":{"robot_id":"AGV-001","command_id":2}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784942026636,"event":"MISSION_ACK","source":"backend","data":{"robot_id":"AGV-001","command":"STOP_MISSION","command_id":2,"sequence":2}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784942029927,"event":"ROBOT_DISCONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}
+{"schema":"luckfox.experiment.event.v1","timestamp_ms":1784942034184,"event":"ROBOT_CONNECTED","source":"backend","data":{"robot_id":"AGV-001"}}

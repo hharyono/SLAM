@@ -34,14 +34,15 @@ dikirim setelah reload berhasil; proses dan LiDAR tidak perlu direstart.
 
 ## ScanFrame TCP 42010
 
-Board membuka koneksi terpisah ke ROS bridge menggunakan magic `SCN1`. Header
+Board membuka koneksi terpisah ke backend menggunakan magic `SCN1`. Header
 16 byte berisi magic, version u16, type u16, payload length u32, dan sequence
 u32. Payload scan berisi timestamp u64, tujuh float metadata LaserScan, jumlah
 titik u32, lalu setiap titik sebagai angle/range/intensity float32.
 
 YDLidar SDK tetap berjalan pada board untuk decoding UART dan checksum. Backend
-tidak menjalankan `ydlidar_ros2_driver_node`; `scan_tcp_bridge_node` mengubah
-ScanFrame menjadi topic ROS `/scan` reliable.
+menyimpan raw scan eksperimen memakai timestamp u64 board tersebut dan merelay
+frame ke `scan_tcp_bridge_node` pada TCP lokal 42011. Bridge mengubah ScanFrame
+menjadi topic ROS `/scan` reliable tanpa `ydlidar_ros2_driver_node`.
 
 ## Live map TCP 42020
 

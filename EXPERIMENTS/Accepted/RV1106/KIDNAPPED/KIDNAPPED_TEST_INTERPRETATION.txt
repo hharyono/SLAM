@@ -1,0 +1,191 @@
+INTERPRETASI HASIL KIDNAPPED ROBOT UNTUK JURNAL Q3
+Tanggal analisis: 24 Juli 2026
+
+RUANG LINGKUP DATA
+
+Interpretasi ini menggunakan tiga trial Kidnapped Robot yang telah FINALIZED dan
+lulus pemeriksaan integritas:
+
+1. Same-room, M2 ke M3
+   Session: 20260724T012545Z_nominal_kidnapped_01_198484089432
+   Jarak perpindahan referensi: 0,652 m
+
+2. Cross-room, M3 ke M4
+   Session: 20260724T013006Z_nominal_kidnapped_01_198484089432
+   Jarak perpindahan referensi: 2,450 m
+
+3. Cross-room, M5 ke M3
+   Session: 20260724T013212Z_nominal_kidnapped_01_198484089432
+   Jarak perpindahan referensi: 3,099 m
+
+Semua trial memakai kondisi nominal, marker lantai yang dikunci saat session
+dibuat, satu event KIDNAP_START, satu event KIDNAP_RELEASE, dan satu checkpoint
+target B yang direkam otomatis oleh backend setelah localizer kembali ke state
+TRACKING yang valid.
+
+HASIL PER TRIAL
+
+1. SAME-ROOM M2 KE M3
+
+- Relocalization berhasil: ya
+- Timeout 60 detik: tidak
+- Scan pertama setelah release: 438 ms
+- State RECOVERED pertama: 438 ms
+- Kembali stabil ke TRACKING: 622 ms
+- Auto-checkpoint setelah release: 794 ms
+- Final position error: 0,049993 m
+- Final heading error: 2,392°
+- Final localization score: 0,9884
+
+2. CROSS-ROOM M3 KE M4
+
+- Relocalization berhasil: ya
+- Timeout 60 detik: tidak
+- Scan pertama setelah release: 779 ms
+- State RECOVERED pertama: 779 ms
+- Kembali stabil ke TRACKING: 963 ms
+- Auto-checkpoint setelah release: 1.102 ms
+- Final position error: 0,050015 m
+- Final heading error: 0,261°
+- Final localization score: 0,9870
+
+3. CROSS-ROOM M5 KE M3
+
+- Relocalization berhasil: ya
+- Timeout 60 detik: tidak
+- Scan pertama setelah release: 344 ms
+- State RECOVERED pertama: 344 ms
+- Kembali stabil ke TRACKING: 530 ms
+- Auto-checkpoint setelah release: 693 ms
+- Final position error: 0,049993 m
+- Final heading error: 1,642°
+- Final localization score: 0,9856
+
+HASIL AGREGAT AWAL
+
+- Relocalization success rate: 100% (3/3)
+- Timeout rate: 0% (0/3)
+- Mean time to RECOVERED: 520 ms
+- Median time to RECOVERED: 438 ms
+- P95 deskriptif time to RECOVERED: 745 ms
+- Maximum time to RECOVERED: 779 ms
+- Mean time to stable TRACKING: 705 ms
+- Median time to stable TRACKING: 622 ms
+- P95 deskriptif time to stable TRACKING: 929 ms
+- Maximum time to stable TRACKING: 963 ms
+- Mean auto-checkpoint latency: 863 ms setelah release
+- Mean final position error: 0,050000 m
+- Median final position error: 0,049993 m
+- Maximum final position error: 0,050015 m
+- Mean final heading error: 1,432°
+- Median final heading error: 1,642°
+- P95 deskriptif final heading error: 2,317°
+- Maximum final heading error: 2,392°
+- Mean final localization score: 0,9870
+- Minimum final localization score: 0,9856
+
+Seluruh session menghasilkan 2.251 scan telemetry. Sebanyak 2.232 scan diterima,
+sehingga pooled accepted-scan rate adalah 99,16%. Distribusi state keseluruhan
+terdiri dari 2.208 TRACKING, 24 RECOVERED, 12 DEGRADED, dan 7 LOST. Kemunculan
+LOST dan DEGRADED merupakan bagian yang diharapkan dari prosedur kidnapped;
+yang penting, setiap trial kemudian mencapai RECOVERED dan kembali ke TRACKING
+tanpa melewati batas waktu 60 detik.
+
+PERBANDINGAN SAME-ROOM DAN CROSS-ROOM
+
+Trial same-room kembali stabil ke TRACKING dalam 622 ms. Dua trial cross-room
+memerlukan 963 ms dan 530 ms, dengan mean 747 ms. Data awal ini menunjukkan
+bahwa perpindahan antarruangan sejauh 2,45-3,10 m tetap dapat dipulihkan dalam
+kurang dari satu detik pada konfigurasi yang diuji.
+
+Namun, data tidak menunjukkan hubungan monoton antara jarak perpindahan dan
+waktu recovery. Perpindahan terjauh, M5 ke M3 sejauh 3,099 m, justru memiliki
+waktu stable TRACKING tercepat, yaitu 530 ms. Hal ini mengindikasikan bahwa
+keunikan geometri scan di lokasi tujuan dan kualitas kecocokan terhadap peta
+kemungkinan lebih dominan daripada jarak perpindahan geometris semata.
+
+Error posisi akhir hampir identik pada ketiga trial, sekitar 0,05 m. Error
+heading lebih bervariasi, dari 0,261° sampai 2,392°, tetapi seluruh final pose
+tetap valid dengan score minimal 0,9856. Dengan demikian, pada dataset awal ini,
+variasi hasil lebih tampak pada orientasi daripada posisi.
+
+INTERPRETASI UNTUK DISKUSI JURNAL
+
+Hasil awal mendukung bahwa kombinasi deteksi kegagalan tracking dan global
+relocalization mampu memulihkan pose setelah robot dipindahkan tanpa informasi
+pose target diberikan kepada localizer. Referensi marker B hanya digunakan oleh
+backend/evaluator untuk menghitung error akhir. Keberhasilan pada satu relokasi
+dalam ruangan dan dua relokasi antarruangan menunjukkan bahwa mekanisme recovery
+tidak terbatas pada neighborhood lokal pose sebelum robot dipindahkan.
+
+Waktu menuju stable TRACKING selalu di bawah 1 detik, jauh di bawah kriteria
+timeout 60 detik. Final score yang konsisten di atas 0,985 dan error posisi
+sekitar 5 cm menunjukkan bahwa pose hasil global search tidak hanya ditemukan
+dengan cepat, tetapi juga konvergen dekat dengan referensi marker tujuan.
+Auto-checkpoint backend mengurangi bias waktu operator karena checkpoint dicatat
+pada status valid TRACKING pertama setelah fase invalid/global teramati.
+
+Hasil ini sebaiknya ditulis sebagai bukti kelayakan awal (preliminary
+feasibility), bukan sebagai estimasi performa populasi. Campaign yang
+direncanakan membutuhkan 10 trial same-room dan 10 trial cross-room, sedangkan
+dataset saat ini baru berisi satu dan dua trial. Perbandingan antarkategori,
+confidence interval, median, dan P95 belum stabil pada ukuran sampel ini.
+
+BATAS KLAIM DAN ANCAMAN VALIDITAS
+
+1. Ukuran sampel baru 3/20 trial yang direncanakan. Success rate 100% belum boleh
+   digeneralisasi sebagai tingkat keberhasilan sistem secara keseluruhan.
+
+2. Hanya tiga pasangan marker yang diuji. Hasil belum mewakili seluruh posisi,
+   orientasi, tingkat ambiguitas geometri, atau kondisi lingkungan.
+
+3. Error posisi sekitar 0,05 m berimpit dengan linear search step 0,05 m dan
+   resolusi spasial sistem. Nilai ini harus dilaporkan sebagai sekitar 5 cm,
+   bukan sebagai presisi sub-milimeter berdasarkan digit keluaran JSON.
+
+4. Nilai P95 yang dicantumkan bersifat deskriptif dari tiga observasi dan belum
+   layak dipakai sebagai percentile populasi.
+
+5. Validitas absolut bergantung pada independensi survei marker lantai. Untuk
+   publikasi, metode survei koordinat dan yaw marker harus dijelaskan, termasuk
+   alat ukur, resolusi, dan ketidakpastiannya.
+
+6. Semua session menggunakan nomor trial 01 meskipun pasangan marker berbeda.
+   Session ID tetap unik, tetapi trial berikutnya sebaiknya memakai nomor yang
+   meningkat agar traceability campaign lebih jelas.
+
+7. Pengujian dilakukan pada kondisi nominal. Robustness terhadap occlusion,
+   perubahan furnitur, atau gangguan dinamis tidak dapat disimpulkan dari
+   dataset Kidnapped ini.
+
+INTEGRITAS DATA
+
+- Ketiga session berstatus FINALIZED.
+- Masing-masing mempunyai tepat satu START, satu RELEASE, satu
+  KIDNAP_AUTO_CHECKPOINT, dan satu final checkpoint pada marker B.
+- Semua manifest.sha256 dan raw/capture_manifest.sha256 berhasil diverifikasi.
+- Tidak ditemukan fatal error, exception, segmentation fault, atau kegagalan
+  runtime pada ketiga session.
+- Checkpoint otomatis selalu direkam setelah recovery kembali ke TRACKING.
+
+KESIMPULAN
+
+Ketiga trial Kidnapped Robot berhasil dan memenuhi kriteria operasional: sistem
+mendeteksi kehilangan pose, menjalankan global relocalization, kembali ke
+TRACKING dalam waktu kurang dari satu detik, dan menghasilkan final pose valid
+dengan error posisi sekitar 5 cm serta error heading maksimum 2,392°. Hasil ini
+merupakan bukti awal yang kuat bahwa pipeline recovery bekerja untuk perpindahan
+same-room maupun cross-room. Klaim statistik akhir harus menunggu penyelesaian
+20 trial yang direncanakan.
+
+PUBLICATION-READY SUMMARY
+
+Across three preliminary kidnapped-robot trials, including one same-room and two
+cross-room relocations spanning 0.65-3.10 m, the system successfully recovered
+in all cases without exceeding the 60 s timeout. The median time to the first
+RECOVERED state was 438 ms, and the median time to stable TRACKING was 622 ms;
+the maximum stable-tracking time was 963 ms. Mean final position and heading
+errors were 0.050 m and 1.432°, respectively, while the minimum final
+localization score was 0.9856. These findings demonstrate preliminary
+feasibility of the global relocalization pipeline, but population-level claims
+require completion of the planned 20-trial campaign.

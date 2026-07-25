@@ -74,4 +74,17 @@ if(BUILD_TESTING)
       ${CMAKE_CURRENT_BINARY_DIR}/tiny.bin)
   add_test(NAME inspect_test COMMAND map_inspect ${CMAKE_CURRENT_BINARY_DIR}/tiny.bin)
   set_tests_properties(inspect_test PROPERTIES DEPENDS converter_test)
+  foreach(REPLAY_VARIANT
+      local_only_single
+      local_only_multi
+      local_global_single
+      local_global_multi)
+    add_test(NAME replay_${REPLAY_VARIANT}
+      COMMAND localize_replay
+        ${CMAKE_CURRENT_BINARY_DIR}/tiny.bin
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/tiny_scan.csv
+        --mode ${REPLAY_VARIANT}
+        --initial 0 0 0)
+    set_tests_properties(replay_${REPLAY_VARIANT} PROPERTIES DEPENDS converter_test)
+  endforeach()
 endif()

@@ -82,10 +82,15 @@ type ExperimentSession = {
   run_type: ExperimentRunType;
   trial: number;
   route_id: string;
+  route_reference_id?: string;
+  route_reference_name?: string;
   zone: string;
   state: ExperimentState;
   created_unix_ms: number;
   status_count: number;
+  raw_scan_capture_enabled?: boolean;
+  board_tmp_available_kb_before_start?: number;
+  board_tmp_available_kb_after_stop?: number;
   checkpoint_count?: number;
   route_started?: boolean;
   route_ended?: boolean;
@@ -94,7 +99,23 @@ type ExperimentSession = {
   output_relative_path?: string;
   reference_marker?: ExperimentMarker;
   route_markers?: ExperimentMarker[];
+  dynamic_occlusion_markers?: ExperimentMarker[];
+  dynamic_occlusion_completed_marker_ids?: string[];
+  dynamic_occlusion_active_marker_id?: string;
+  dynamic_occlusion_active_started_unix_ms?: number;
+  dynamic_occlusion_durations_ms?: Record<string, number>;
+  kidnap_start_marker?: ExperimentMarker;
+  kidnap_target_marker?: ExperimentMarker;
+  kidnap_release_unix_ms?: number;
+  kidnap_recovery_observed?: boolean;
+  kidnap_auto_checkpoint_unix_ms?: number;
   source_experiment_id?: string;
+  ablation_execution_target?: AblationExecutionTarget;
+  resource_mode?: 'live_tracking' | 'live_endurance' | 'replay';
+  resource_replay_pacing?: 'recorded';
+  resource_active_phase?: string;
+  resource_active_started_unix_ms?: number;
+  resource_completed_phases?: string[];
   error?: string;
 };
 type RouteMarkerDraft = {
@@ -105,6 +126,134 @@ type RouteMarkerDraft = {
   yawRadians: string;
   saved: boolean;
 };
+
+type RouteReference = {
+  schema: 'luckfox.route-reference.v1';
+  reference_id: string;
+  name: string;
+  created_unix_ms: number;
+  markers: ExperimentMarker[];
+  legacy?: boolean;
+};
+
+function RouteDrafts(markers: ExperimentMarker[]): RouteMarkerDraft[] {
+  return markers.map((marker) => ({
+    marker_id: marker.marker_id,
+    zone: marker.zone,
+    x: String(marker.x),
+    y: String(marker.y),
+    yawRadians: String(marker.yaw),
+    saved: true,
+  }));
+}
+
+function RouteMarkersMatch(
+  referenceMarkers: ExperimentMarker[],
+  sessionMarkers: ExperimentMarker[] | undefined,
+): boolean {
+  if (!sessionMarkers || referenceMarkers.length !== sessionMarkers.length) return false;
+  return referenceMarkers.every((marker, index) => {
+    const sessionMarker = sessionMarkers[index];
+    return (
+      sessionMarker?.marker_id === marker.marker_id &&
+      sessionMarker.zone === marker.zone &&
+      sessionMarker.x === marker.x &&
+      sessionMarker.y === marker.y &&
+      sessionMarker.yaw === marker.yaw
+    );
+  });
+}
+
+type AblationSource = {
+  experiment_id: string;
+  platform: string;
+  condition: ExperimentSession['condition'];
+  run_type: ExperimentRunType;
+  route_id: string;
+  collection: 'accepted';
+  raw_scan_bytes: number;
+  raw_scan_schema: 'luckfox.raw-scan.csv.v1';
+  map_name: string;
+  map_sha256: string;
+  source_revision: string;
+  replay_binary_sha256: string;
+  readiness: {
+    finalized: true;
+    raw_scan: true;
+    map_hash: true;
+    telemetry: true;
+    firmware_format: true;
+    replay_binary: true;
+  };
+};
+
+type AblationExecutionTarget = 'host' | 'rv1103' | 'rv1106';
+
+type AblationTargetStatus = {
+  target: AblationExecutionTarget;
+  label: string;
+  ready: boolean;
+  execution_location: 'backend' | 'board';
+  board_target?: string;
+  architecture?: string;
+  replay_binary_sha256?: string;
+  reason?: string;
+};
+
+type AblationAnalysis = {
+  protocol_valid: boolean;
+  validity_errors: string[];
+  execution_target: AblationExecutionTarget;
+  validation_mode?: 'factorial_ablation' | 'selected_method_board' | 'resource_replay_board';
+  replay_pacing?: 'recorded' | 'unpaced';
+  source_raw_scan_sha256: string;
+  source_map_sha256: string;
+  variants: Array<{
+    variant: string;
+    global_relocalization: boolean;
+    multi_resolution: boolean;
+    scans: number;
+    accepted_scan_rate: number;
+    success: boolean;
+    execution_time_ms: { mean?: number; p95?: number };
+    scan_cycle_time_ms: { mean?: number; p95?: number };
+    tracking_execution_time_ms?: { mean?: number; p95?: number; maximum?: number };
+    global_execution_time_ms?: { mean?: number; p95?: number; maximum?: number };
+    global_scan_count?: number;
+    deadline_miss_count?: number;
+    deadline_miss_rate?: number;
+    cpu_percent: { mean?: number; p95?: number };
+    peak_rss_kb: number;
+    recovery_time_ms?: number;
+    final_position_error_m?: number;
+    final_heading_error_deg?: number;
+    false_recovery_count: number;
+  }>;
+};
+
+type DynamicOcclusionAnalysis = {
+  object_detection_available_count: number;
+  object_passing_detected_count: number;
+  object_passing_detection_rate: number | null;
+  stationary_event_count: number;
+  events: Array<{
+    trigger_marker: string;
+    robot_stationary: boolean;
+    object_passing: {
+      available: boolean;
+      detected: boolean;
+      observed_direction: string;
+      minimum_front_range_m: number | null;
+    };
+  }>;
+};
+
+function HeadingErrorDegrees(estimate: number, reference: number): number {
+  return (
+    (Math.abs(Math.atan2(Math.sin(estimate - reference), Math.cos(estimate - reference))) * 180) /
+    Math.PI
+  );
+}
 
 function InitialRouteMarkers(): RouteMarkerDraft[] {
   return Array.from({ length: 8 }, (_, index) => ({
@@ -117,30 +266,6 @@ function InitialRouteMarkers(): RouteMarkerDraft[] {
   }));
 }
 
-const RouteMarkerStorageKey = 'luckfox.route-marker-drafts.v1';
-
-function StoredRouteMarkers(): RouteMarkerDraft[] {
-  try {
-    const stored = JSON.parse(localStorage.getItem(RouteMarkerStorageKey) || 'null');
-    if (
-      Array.isArray(stored) &&
-      stored.length === 8 &&
-      stored.every(
-        (marker) =>
-          typeof marker.marker_id === 'string' &&
-          typeof marker.zone === 'string' &&
-          typeof marker.x === 'string' &&
-          typeof marker.y === 'string' &&
-          typeof marker.yawRadians === 'string' &&
-          typeof marker.saved === 'boolean',
-      )
-    )
-      return stored as RouteMarkerDraft[];
-  } catch {
-    // Invalid browser state is safely replaced by a clean marker set.
-  }
-  return InitialRouteMarkers();
-}
 type ExperimentPreflight = {
   board_target: string;
   active_map?: string;
@@ -435,7 +560,7 @@ function MapView({ map, robot }: MapViewProps) {
 
 type ExperimentPanelProps = {
   robot?: RobotStatus;
-  mission: (action: 'start' | 'stop') => Promise<void>;
+  mission: (action: 'start' | 'stop') => Promise<boolean>;
   setNotice: (message: string) => void;
   preflight?: ExperimentPreflight;
   setPreflight: (preflight: ExperimentPreflight) => void;
@@ -462,32 +587,67 @@ function ExperimentPanel({
   const [trial, setTrial] = useState(1);
   const [session, setSession] = useState<ExperimentSession>();
   const [sessions, setSessions] = useState<ExperimentSession[]>([]);
+  const [ablationSources, setAblationSources] = useState<AblationSource[]>([]);
+  const [ablationTargets, setAblationTargets] = useState<AblationTargetStatus[]>([]);
+  const [ablationExecutionTarget, setAblationExecutionTarget] =
+    useState<AblationExecutionTarget>('host');
+  const [resourceMode, setResourceMode] = useState<'live_tracking' | 'live_endurance' | 'replay'>(
+    'live_tracking',
+  );
+  const [resourceReplaySources, setResourceReplaySources] = useState<AblationSource[]>([]);
+  const [resourceSourceExperimentId, setResourceSourceExperimentId] = useState('');
   const [busy, setBusy] = useState(false);
   const [markerId, setMarkerId] = useState('M1');
   const [markerX, setMarkerX] = useState('1.65');
   const [markerY, setMarkerY] = useState('1.35');
   const [markerYawDegrees, setMarkerYawDegrees] = useState('85.1');
   const [markerZone, setMarkerZone] = useState('room_1');
-  const [routeMarkers, setRouteMarkers] = useState<RouteMarkerDraft[]>(StoredRouteMarkers);
+  const [routeMarkers, setRouteMarkers] = useState<RouteMarkerDraft[]>(InitialRouteMarkers);
+  const [routeReferences, setRouteReferences] = useState<RouteReference[]>([]);
+  const [routeReferenceId, setRouteReferenceId] = useState('');
+  const [routeReferenceName, setRouteReferenceName] = useState('');
+  const [kidnapMarkers, setKidnapMarkers] = useState<ExperimentMarker[]>([]);
+  const [kidnapStartMarkerId, setKidnapStartMarkerId] = useState('M1');
+  const [kidnapTargetMarkerId, setKidnapTargetMarkerId] = useState('M8');
   const [report, setReport] = useState<Record<string, unknown>>();
   const [sourceExperimentId, setSourceExperimentId] = useState('');
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [resourceRepetition, setResourceRepetition] = useState(1);
-  const [resourceMeasurementCount, setResourceMeasurementCount] = useState(0);
-  const [dynamicCrossingStartedAt, setDynamicCrossingStartedAt] = useState<number>();
-  const [dynamicCrossingDuration, setDynamicCrossingDuration] = useState<number>();
+  const [resourceNowMs, setResourceNowMs] = useState(Date.now());
+  const [resourceScoreSnapshot, setResourceScoreSnapshot] = useState<Pose>();
+  const routeReferencesInitialized = useRef(false);
+  const robotPoseRef = useRef<Pose | undefined>(undefined);
+  robotPoseRef.current = robot?.pose;
 
   const Refresh = async () => {
-    const [active, list] = await Promise.all([
+    const [active, list, sources, resourceSources, references] = await Promise.all([
       JsonRequest<ExperimentSession | null>('/api/experiments/active'),
       JsonRequest<ExperimentSession[]>('/api/experiments'),
+      JsonRequest<AblationSource[]>('/api/experiments/ablation-sources'),
+      JsonRequest<AblationSource[]>('/api/experiments/resource-replay-sources'),
+      JsonRequest<RouteReference[]>('/api/experiments/route-references'),
     ]);
+    let sessionReferenceResolved = false;
     if (active) {
       setSession(active);
       setRunType(active.run_type);
       setCondition(active.condition);
       setRouteId(active.route_id);
+      setRouteReferenceId(
+        active.route_reference_id ||
+          references.find((reference) => RouteMarkersMatch(reference.markers, active.route_markers))
+            ?.reference_id ||
+          '',
+      );
+      sessionReferenceResolved = true;
       setCheckpointCount(active.checkpoint_count ?? 0);
+      if (active.kidnap_start_marker) setKidnapStartMarkerId(active.kidnap_start_marker.marker_id);
+      if (active.kidnap_target_marker)
+        setKidnapTargetMarkerId(active.kidnap_target_marker.marker_id);
+      if (active.ablation_execution_target)
+        setAblationExecutionTarget(active.ablation_execution_target);
+      if (active.resource_mode) setResourceMode(active.resource_mode);
+      if (active.run_type === 'resource' && active.source_experiment_id)
+        setResourceSourceExperimentId(active.source_experiment_id);
     } else {
       const resumable = list.find((item) => !['finalized', 'error'].includes(item.state));
       const updated = session
@@ -499,18 +659,53 @@ function ExperimentPanel({
         setRunType(selected.run_type);
         setCondition(selected.condition);
         setRouteId(selected.route_id);
+        setRouteReferenceId(
+          selected.route_reference_id ||
+            references.find((reference) =>
+              RouteMarkersMatch(reference.markers, selected.route_markers),
+            )?.reference_id ||
+            '',
+        );
+        sessionReferenceResolved = true;
         setCheckpointCount(selected.checkpoint_count ?? 0);
+        if (selected.kidnap_start_marker)
+          setKidnapStartMarkerId(selected.kidnap_start_marker.marker_id);
+        if (selected.kidnap_target_marker)
+          setKidnapTargetMarkerId(selected.kidnap_target_marker.marker_id);
+        if (selected.ablation_execution_target)
+          setAblationExecutionTarget(selected.ablation_execution_target);
+        if (selected.resource_mode) setResourceMode(selected.resource_mode);
+        if (selected.run_type === 'resource' && selected.source_experiment_id)
+          setResourceSourceExperimentId(selected.source_experiment_id);
       } else {
         setSession(undefined);
         setCheckpointCount(0);
       }
     }
     setSessions(list);
+    setAblationSources(sources);
+    setResourceReplaySources(resourceSources);
+    setRouteReferences(references);
+    if (!routeReferencesInitialized.current) {
+      routeReferencesInitialized.current = true;
+      if (!sessionReferenceResolved)
+        setRouteReferenceId((current) => current || references[0]?.reference_id || '');
+    }
   };
 
   useEffect(() => {
     Refresh().catch((error) => setNotice(String(error)));
     const timer = window.setInterval(() => Refresh().catch(() => undefined), 2500);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const refreshTargets = () =>
+      JsonRequest<AblationTargetStatus[]>('/api/experiments/ablation-targets')
+        .then(setAblationTargets)
+        .catch(() => undefined);
+    refreshTargets();
+    const timer = window.setInterval(refreshTargets, 15_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -527,7 +722,10 @@ function ExperimentPanel({
     if (runType === 'route') {
       setRouteId('R1_ROOM_1_TO_2');
     }
-    if (runType === 'kidnapped') setRouteId('KIDNAP_SAME_ROOM');
+    if (runType === 'kidnapped') {
+      setKidnapStartMarkerId('M1');
+      setKidnapTargetMarkerId('M8');
+    }
     if (runType === 'dynamic_occluded') {
       setRouteId('R1_ROOM_1_TO_2');
     }
@@ -538,34 +736,48 @@ function ExperimentPanel({
   }, [runType]);
 
   useEffect(() => {
-    localStorage.setItem(RouteMarkerStorageKey, JSON.stringify(routeMarkers));
-  }, [routeMarkers]);
+    const reference = routeReferences.find((item) => item.reference_id === routeReferenceId);
+    if (!reference) return;
+    setRouteMarkers(RouteDrafts(reference.markers));
+    setKidnapMarkers(reference.markers);
+    setRouteReferenceName(reference.name);
+    setNotice(`Global route reference loaded: ${reference.name}`);
+  }, [routeReferenceId, routeReferences]);
+
+  const SelectRouteReference = (referenceId: string) => {
+    setRouteReferenceId(referenceId);
+    const reference = routeReferences.find((item) => item.reference_id === referenceId);
+    if (!reference) return;
+    setRouteMarkers(RouteDrafts(reference.markers));
+    setKidnapMarkers(reference.markers);
+    setRouteReferenceName(reference.name);
+    setNotice(`Global route reference selected: ${reference.name}`);
+  };
+
+  const kidnapStartMarker = kidnapMarkers.find(
+    (marker) => marker.marker_id === kidnapStartMarkerId,
+  );
+  const kidnapTargetMarker = kidnapMarkers.find(
+    (marker) => marker.marker_id === kidnapTargetMarkerId,
+  );
 
   useEffect(() => {
-    if (runType !== 'route' && runType !== 'dynamic_occluded') return;
-    let active = true;
-    JsonRequest<ExperimentMarker[]>(`/api/experiments/route-markers/${encodeURIComponent(routeId)}`)
-      .then((markers) => {
-        if (!active) return;
-        setRouteMarkers(
-          markers.map((marker) => ({
-            marker_id: marker.marker_id,
-            zone: marker.zone,
-            x: String(marker.x),
-            y: String(marker.y),
-            yawRadians: String(marker.yaw),
-            saved: true,
-          })),
-        );
-        setNotice(`${routeId}: public ground-truth markers loaded`);
-      })
-      .catch((error) => {
-        if (active) setNotice((error as Error).message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [routeId, runType]);
+    if (runType !== 'ground_truth') return;
+    const reference = kidnapMarkers.find((marker) => marker.marker_id === markerId);
+    if (!reference) return;
+    setMarkerZone(reference.zone);
+    setZone(reference.zone);
+    setMarkerX(String(reference.x));
+    setMarkerY(String(reference.y));
+    setMarkerYawDegrees(String((reference.yaw * 180) / Math.PI));
+  }, [kidnapMarkers, markerId, runType]);
+
+  useEffect(() => {
+    if (runType !== 'kidnapped' || !kidnapStartMarker || !kidnapTargetMarker) return;
+    const sameZone = kidnapStartMarker.zone === kidnapTargetMarker.zone;
+    setRouteId(sameZone ? 'KIDNAP_SAME_ROOM' : 'KIDNAP_CROSS_ROOM');
+    setZone(sameZone ? kidnapTargetMarker.zone : 'cross_room');
+  }, [kidnapStartMarker, kidnapTargetMarker, runType]);
 
   useEffect(() => {
     if (sourceExperimentId) return;
@@ -576,6 +788,27 @@ function ExperimentPanel({
     );
     if (candidate) setSourceExperimentId(candidate.experiment_id);
   }, [sessions, sourceExperimentId]);
+
+  useEffect(() => {
+    if (
+      resourceSourceExperimentId &&
+      resourceReplaySources.some((source) => source.experiment_id === resourceSourceExperimentId)
+    )
+      return;
+    setResourceSourceExperimentId(resourceReplaySources[0]?.experiment_id || '');
+  }, [resourceReplaySources, resourceSourceExperimentId]);
+
+  useEffect(() => {
+    if (runType !== 'resource' || resourceMode === 'replay' || session?.state !== 'capturing')
+      return;
+    const update = () => {
+      setResourceNowMs(Date.now());
+      if (robotPoseRef.current) setResourceScoreSnapshot(robotPoseRef.current);
+    };
+    update();
+    const timer = window.setInterval(update, 1_000);
+    return () => window.clearInterval(timer);
+  }, [resourceMode, runType, session?.state]);
 
   const UpdateRouteMarker = (
     index: number,
@@ -629,6 +862,48 @@ function ExperimentPanel({
     );
   };
 
+  const UnlockRouteMarker = (index: number) => {
+    setRouteReferenceId('');
+    setRouteMarkers((markers) =>
+      markers.map((marker, markerIndex) =>
+        markerIndex === index ? { ...marker, saved: false } : marker,
+      ),
+    );
+    setNotice(`${routeMarkers[index]?.marker_id || `Marker ${index + 1}`} unlocked`);
+  };
+
+  const ResetRouteMarkers = () => {
+    setRouteReferenceId('');
+    setRouteReferenceName('');
+    setRouteMarkers(InitialRouteMarkers());
+    setKidnapMarkers([]);
+    setNotice('All route markers reset; record M1 through M8 and save a named reference');
+  };
+
+  const SaveGlobalRouteReference = () =>
+    Run(async () => {
+      if (!routeReferenceName.trim()) throw new Error('Enter a route reference name');
+      if (!routeMarkers.every((marker) => marker.saved))
+        throw new Error('Lock all 8 markers before saving the route reference');
+      const created = await JsonRequest<RouteReference>('/api/experiments/route-references', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: routeReferenceName,
+          markers: routeMarkers.map((marker) => ({
+            marker_id: marker.marker_id,
+            zone: marker.zone,
+            x: Number(marker.x),
+            y: Number(marker.y),
+            yaw: Number(marker.yawRadians),
+          })),
+        }),
+      });
+      setRouteReferences((references) => [...references, created]);
+      setRouteReferenceId(created.reference_id);
+      setNotice(`Global route reference saved: ${created.name}`);
+    }, false);
+
   const Run = async (action: () => Promise<void>, refreshAfter = true) => {
     setBusy(true);
     try {
@@ -651,10 +926,27 @@ function ExperimentPanel({
           run_type: runType,
           trial,
           route_id: routeId,
+          route_reference_id:
+            runType === 'resource' &&
+            (resourceMode === 'replay' || resourceMode === 'live_endurance')
+              ? undefined
+              : routeReferenceId || undefined,
+          route_reference_name:
+            routeReferences.find((reference) => reference.reference_id === routeReferenceId)
+              ?.name || undefined,
           zone,
           ground_truth_method: 'surveyed_floor_markers',
           robot_id: robot?.robot_id || 'AGV-001',
-          source_experiment_id: runType === 'ablation' ? sourceExperimentId : undefined,
+          source_experiment_id:
+            runType === 'ablation'
+              ? sourceExperimentId
+              : runType === 'resource' && resourceMode === 'replay'
+                ? resourceSourceExperimentId
+                : undefined,
+          ablation_execution_target: runType === 'ablation' ? ablationExecutionTarget : undefined,
+          resource_mode: runType === 'resource' ? resourceMode : undefined,
+          kidnap_start_marker: runType === 'kidnapped' ? kidnapStartMarker : undefined,
+          kidnap_target_marker: runType === 'kidnapped' ? kidnapTargetMarker : undefined,
           reference_marker:
             runType === 'ground_truth'
               ? {
@@ -684,9 +976,6 @@ function ExperimentPanel({
       ]);
       setReport(undefined);
       setCheckpointCount(0);
-      setResourceMeasurementCount(0);
-      setDynamicCrossingStartedAt(undefined);
-      setDynamicCrossingDuration(undefined);
       setNotice(`Session created: ${created.experiment_id}`);
     }, false);
 
@@ -708,13 +997,42 @@ function ExperimentPanel({
       }
     });
 
+  const CancelSession = () => {
+    if (!session) {
+      setNotice('Create a session first');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Cancel test ${session.experiment_id}? This permanently deletes its board and backend files.`,
+      )
+    )
+      return;
+    const experimentId = session.experiment_id;
+    Run(async () => {
+      await JsonRequest<{ experiment_id: string; deleted: true }>(
+        `/api/experiments/${experimentId}/cancel`,
+        { method: 'POST' },
+      );
+      setSession(undefined);
+      setReport(undefined);
+      setCheckpointCount(0);
+      setNotice(`Test cancelled and deleted: ${experimentId}`);
+    });
+  };
+
   const RecordEvent = (
     event: string,
     includeReference = false,
     data: Record<string, unknown> = {},
+    startMission = false,
   ) =>
     Run(async () => {
       if (!session) throw new Error('Start a capture session first');
+      if (startMission && !robot?.mission_running) {
+        const started = await mission('start');
+        if (!started) throw new Error('Mission could not be started for the tracking interval');
+      }
       const updated = await JsonRequest<ExperimentSession>(
         `/api/experiments/${session.experiment_id}/event`,
         {
@@ -731,16 +1049,6 @@ function ExperimentPanel({
         },
       );
       setSession(updated);
-      if (event === 'DYNAMIC_OCCLUSION_START') {
-        setDynamicCrossingStartedAt(Date.now());
-        setDynamicCrossingDuration(undefined);
-      }
-      if (event === 'DYNAMIC_OCCLUSION_END' && dynamicCrossingStartedAt) {
-        setDynamicCrossingDuration(Date.now() - dynamicCrossingStartedAt);
-        setDynamicCrossingStartedAt(undefined);
-      }
-      if (event.startsWith('RESOURCE_') && event.endsWith('_END'))
-        setResourceMeasurementCount((count) => count + 1);
       setNotice(`Event ${event} recorded`);
     });
 
@@ -789,16 +1097,51 @@ function ExperimentPanel({
       setNotice(`${configuredMarker.marker_id} unlocked; its card is live and can be locked again`);
     });
 
-  const RunAblation = () =>
-    Run(async () => {
-      if (!session) throw new Error('Create an ablation session first');
+  const RunAblation = async () => {
+    if (!session) {
+      setNotice('Create an ablation session first');
+      return;
+    }
+    setSession({ ...session, state: 'starting' });
+    try {
       const updated = await JsonRequest<ExperimentSession>(
         `/api/experiments/${session.experiment_id}/ablation`,
         { method: 'POST' },
       );
       setSession(updated);
-      setNotice('Four ablation replay variants completed');
-    });
+      setNotice(
+        ablationExecutionTarget === 'host'
+          ? 'Four ablation replay variants completed on PC'
+          : `Selected Global + Multi firmware validation completed on ${ablationExecutionTarget.toUpperCase()}`,
+      );
+      await Refresh();
+    } catch (error) {
+      const message = (error as Error).message;
+      if (!message.toLowerCase().includes('cancelled')) setNotice(message);
+    }
+  };
+
+  const RunResourceReplay = async () => {
+    if (!session) {
+      setNotice('Create a Resource Replay session first');
+      return;
+    }
+    setSession({ ...session, state: 'starting' });
+    try {
+      const updated = await JsonRequest<ExperimentSession>(
+        `/api/experiments/${session.experiment_id}/resource-replay`,
+        { method: 'POST' },
+      );
+      setSession(updated);
+      setNotice(
+        'RV1103 completed the selected Accepted dataset with production Global + Multi at recorded sensor timing',
+      );
+      await Refresh();
+    } catch (error) {
+      const message = (error as Error).message;
+      if (!message.toLowerCase().includes('cancelled')) setNotice(message);
+    }
+  };
 
   const RunPreflight = () =>
     Run(async () => {
@@ -824,7 +1167,6 @@ function ExperimentPanel({
     preflight.map_match &&
     preflight.binary_match,
   );
-  const pedestrianDirection = routeId === 'R2_ROOM_2_TO_1' ? 'H2_TO_H1' : 'H1_TO_H2';
   const routeMarkersReady = routeMarkers.every(
     (marker) =>
       marker.saved &&
@@ -834,7 +1176,81 @@ function ExperimentPanel({
       marker.yawRadians.trim() &&
       [Number(marker.x), Number(marker.y), Number(marker.yawRadians)].every(Number.isFinite),
   );
+  const selectedRouteReference = routeReferences.find(
+    (reference) => reference.reference_id === routeReferenceId,
+  );
+  const resourceReplay = runType === 'resource' && resourceMode === 'replay';
+  const resourceEndurance = runType === 'resource' && resourceMode === 'live_endurance';
+  const globalReferenceReady =
+    runType === 'ablation' ||
+    resourceReplay ||
+    resourceEndurance ||
+    Boolean(selectedRouteReference);
+  const kidnapReferencesReady = Boolean(
+    kidnapStartMarker &&
+    kidnapTargetMarker &&
+    kidnapStartMarker.marker_id !== kidnapTargetMarker.marker_id,
+  );
   const configuredRouteMarkers = session?.route_markers || [];
+  const dynamicAnalysis = report?.dynamic_occlusion as DynamicOcclusionAnalysis | undefined;
+  const reportSummary = report?.summary as Record<string, unknown> | undefined;
+  const ablationAnalysis =
+    runType === 'ablation' || resourceReplay
+      ? (reportSummary as AblationAnalysis | undefined)
+      : undefined;
+  const selectedAblationSource = ablationSources.find(
+    (source) => source.experiment_id === sourceExperimentId,
+  );
+  const selectedAblationTarget = ablationTargets.find(
+    (target) => target.target === ablationExecutionTarget,
+  );
+  const selectedResourceSource = resourceReplaySources.find(
+    (source) => source.experiment_id === resourceSourceExperimentId,
+  );
+  const rv1103Target = ablationTargets.find((target) => target.target === 'rv1103');
+  const ablationSourceGroups = [...new Set(ablationSources.map((source) => source.platform))].map(
+    (platform) => ({
+      platform,
+      sources: ablationSources.filter((source) => source.platform === platform),
+    }),
+  );
+  const routeStartMarkerId = configuredRouteMarkers[0]?.marker_id;
+  const routeEndMarkerId = configuredRouteMarkers.at(-1)?.marker_id;
+  const resourcePhases: Array<{
+    id: string;
+    label: string;
+    targetSeconds?: number;
+    guidance: string;
+  }> =
+    resourceMode === 'live_endurance'
+      ? [
+          {
+            id: 'RESOURCE_ENDURANCE',
+            label: 'ENDURANCE',
+            guidance: 'Boleh bergerak, diam, atau campuran; durasi bebas',
+          },
+        ]
+      : [
+          { id: 'RESOURCE_IDLE', label: 'IDLE', targetSeconds: 60, guidance: 'Robot diam' },
+          {
+            id: 'RESOURCE_TRACKING_R1',
+            label: 'TRACKING R1',
+            targetSeconds: 60,
+            guidance: 'Jalankan route R1',
+          },
+          {
+            id: 'RESOURCE_TRACKING_R2',
+            label: 'TRACKING R2',
+            targetSeconds: 60,
+            guidance: 'Jalankan route R2',
+          },
+        ];
+  const completedResourcePhases = new Set(session?.resource_completed_phases || []);
+  const resourceElapsedSeconds = session?.resource_active_started_unix_ms
+    ? Math.max(0, Math.floor((resourceNowMs - session.resource_active_started_unix_ms) / 1_000))
+    : 0;
+  const FormatDuration = (seconds: number) =>
+    `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
   return (
     <section className="experiment-panel">
@@ -930,6 +1346,23 @@ function ExperimentPanel({
           <span>Session setup</span>
         </div>
         <div className="form-grid">
+          {runType !== 'ablation' && !resourceReplay && !resourceEndurance && (
+            <label className="wide-field">
+              Global route reference
+              <select
+                value={routeReferenceId}
+                disabled={Boolean(session && !canCreate)}
+                onChange={(event) => SelectRouteReference(event.target.value)}
+              >
+                <option value="">Select a saved route reference</option>
+                {routeReferences.map((reference) => (
+                  <option key={reference.reference_id} value={reference.reference_id}>
+                    {reference.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             Condition
             <select
@@ -960,15 +1393,38 @@ function ExperimentPanel({
             </label>
           )}
           {runType === 'kidnapped' && (
-            <label>
-              Relocation
-              <select value={routeId} onChange={(event) => setRouteId(event.target.value)}>
-                <option value="KIDNAP_SAME_ROOM">Within the same room</option>
-                <option value="KIDNAP_CROSS_ROOM">Between rooms</option>
-              </select>
-            </label>
+            <>
+              <label>
+                A — Start marker
+                <select
+                  value={kidnapStartMarkerId}
+                  onChange={(event) => setKidnapStartMarkerId(event.target.value)}
+                >
+                  {kidnapMarkers.map((marker) => (
+                    <option key={marker.marker_id} value={marker.marker_id}>
+                      {marker.marker_id} — {marker.zone.replaceAll('_', ' ')} · X{' '}
+                      {marker.x.toFixed(2)} · Y {marker.y.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                B — Target marker
+                <select
+                  value={kidnapTargetMarkerId}
+                  onChange={(event) => setKidnapTargetMarkerId(event.target.value)}
+                >
+                  {kidnapMarkers.map((marker) => (
+                    <option key={marker.marker_id} value={marker.marker_id}>
+                      {marker.marker_id} — {marker.zone.replaceAll('_', ' ')} · X{' '}
+                      {marker.x.toFixed(2)} · Y {marker.y.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           )}
-          {(runType === 'ground_truth' || runType === 'kidnapped') && (
+          {runType === 'ground_truth' && (
             <label>
               Zone
               <select value={zone} onChange={(event) => setZone(event.target.value)}>
@@ -980,26 +1436,102 @@ function ExperimentPanel({
             </label>
           )}
           {runType === 'ablation' && (
-            <label className="wide-field">
-              Source recording
-              <select
-                value={sourceExperimentId}
-                onChange={(event) => setSourceExperimentId(event.target.value)}
-              >
-                <option value="">Select a finalized recording</option>
-                {sessions
-                  .filter(
-                    (item) =>
-                      item.state === 'finalized' &&
-                      ['route', 'kidnapped', 'dynamic_occluded'].includes(item.run_type),
-                  )
-                  .map((item) => (
-                    <option key={item.experiment_id} value={item.experiment_id}>
-                      {item.experiment_id}
+            <>
+              <label className="wide-field">
+                Source recording
+                <select
+                  value={sourceExperimentId}
+                  onChange={(event) => {
+                    const experimentId = event.target.value;
+                    setSourceExperimentId(experimentId);
+                    const platform = ablationSources
+                      .find((source) => source.experiment_id === experimentId)
+                      ?.platform.toLowerCase() as AblationExecutionTarget | undefined;
+                    if (platform && ablationTargets.some((target) => target.target === platform))
+                      setAblationExecutionTarget(platform);
+                  }}
+                >
+                  <option value="">Select an Accepted replay-ready recording</option>
+                  {ablationSourceGroups.map((group) => (
+                    <optgroup
+                      key={group.platform}
+                      label={`${group.platform} — ${group.sources.length} READY`}
+                    >
+                      {group.sources.map((source) => (
+                        <option key={source.experiment_id} value={source.experiment_id}>
+                          {source.run_type.toUpperCase()} · {source.condition.toUpperCase()} ·{' '}
+                          {source.route_id} · {(source.raw_scan_bytes / 1024 / 1024).toFixed(1)} MiB
+                          · {source.experiment_id.slice(0, 16)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <label className="wide-field">
+                Execution target
+                <select
+                  value={ablationExecutionTarget}
+                  onChange={(event) =>
+                    setAblationExecutionTarget(event.target.value as AblationExecutionTarget)
+                  }
+                >
+                  {ablationTargets.map((target) => (
+                    <option key={target.target} value={target.target}>
+                      {target.label} — {target.ready ? 'READY' : 'OFFLINE / NOT READY'}
                     </option>
                   ))}
-              </select>
-            </label>
+                </select>
+              </label>
+            </>
+          )}
+          {runType === 'resource' && (
+            <>
+              <label className="wide-field">
+                Resource scenario
+                <select
+                  value={resourceMode}
+                  disabled={Boolean(session && !canCreate)}
+                  onChange={(event) =>
+                    setResourceMode(
+                      event.target.value as 'live_tracking' | 'live_endurance' | 'replay',
+                    )
+                  }
+                >
+                  <option value="live_tracking">LIVE — Idle + Tracking R1/R2</option>
+                  <option value="live_endurance">LIVE — Endurance, duration bebas</option>
+                  <option value="replay">REPLAY — Accepted dataset on RV1103</option>
+                </select>
+              </label>
+              {resourceReplay && (
+                <>
+                  <label className="wide-field">
+                    Accepted RV1103 dataset
+                    <select
+                      value={resourceSourceExperimentId}
+                      onChange={(event) => setResourceSourceExperimentId(event.target.value)}
+                    >
+                      <option value="">Select a replay-ready RV1103 dataset</option>
+                      {resourceReplaySources.map((source) => (
+                        <option key={source.experiment_id} value={source.experiment_id}>
+                          {source.run_type.toUpperCase()} · {source.route_id} ·{' '}
+                          {source.condition.toUpperCase()} ·{' '}
+                          {(source.raw_scan_bytes / 1024 / 1024).toFixed(1)} MiB ·{' '}
+                          {source.experiment_id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="wide-field">
+                    Execution
+                    <input
+                      readOnly
+                      value="RV1103 · GLOBAL ON + MULTI RESOLUTION ON · RECORDED PACING"
+                    />
+                  </label>
+                </>
+              )}
+            </>
           )}
           <label>
             Trial
@@ -1018,11 +1550,17 @@ function ExperimentPanel({
             <div className="marker-form">
               <label>
                 Marker ID
-                <input
+                <select
                   value={markerId}
                   disabled={Boolean(session && !canCreate)}
                   onChange={(event) => setMarkerId(event.target.value)}
-                />
+                >
+                  {kidnapMarkers.map((marker) => (
+                    <option key={marker.marker_id} value={marker.marker_id}>
+                      {marker.marker_id} — {marker.zone.replaceAll('_', ' ')}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 X (m)
@@ -1060,21 +1598,58 @@ function ExperimentPanel({
         {(runType === 'route' || runType === 'dynamic_occluded') && (
           <div className="ground-truth-reference-setup">
             <div className="route-survey-controls">
-              <button
-                disabled={!robot?.online || Boolean(robot?.mission_running)}
-                type="button"
-                onClick={() => mission('start')}
-              >
-                START LIVE
-              </button>
-              <button
-                className="stop"
-                disabled={!robot?.online || !robot?.mission_running}
-                type="button"
-                onClick={() => mission('stop')}
-              >
-                STOP LIVE
-              </button>
+              <div className="route-survey-heading">
+                <b>ROUTE REFERENCE BUILDER</b>
+              </div>
+              <div className="route-survey-setup">
+                <button
+                  disabled={Boolean(robot?.mission_running)}
+                  type="button"
+                  onClick={ResetRouteMarkers}
+                >
+                  1. NEW ROUTE
+                </button>
+                <label>
+                  <input
+                    disabled={Boolean(robot?.mission_running)}
+                    placeholder="Example: RV1103_Marker1_R1"
+                    value={routeReferenceName}
+                    onChange={(event) => setRouteReferenceName(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="route-survey-actions">
+                <button
+                  disabled={!robot?.online || Boolean(robot?.mission_running)}
+                  type="button"
+                  onClick={() => mission('start')}
+                >
+                  3. START SURVEY
+                </button>
+                <button
+                  className="stop"
+                  disabled={!robot?.online || !robot?.mission_running}
+                  type="button"
+                  onClick={() => mission('stop')}
+                >
+                  5. STOP SURVEY
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    !routeMarkersReady ||
+                    !routeReferenceName.trim() ||
+                    Boolean(robot?.mission_running)
+                  }
+                  onClick={SaveGlobalRouteReference}
+                >
+                  6. SAVE GLOBAL ROUTE
+                </button>
+              </div>
+            </div>
+            <div className="route-marker-section-title">
+              <b>4. LOCK MARKER POSITIONS</b>
+              <small>Move the robot to each reference point, choose its zone, then lock it.</small>
             </div>
             <div className="route-marker-grid">
               {routeMarkers.map((marker, index) => {
@@ -1149,11 +1724,15 @@ function ExperimentPanel({
                       </small>
                       <button
                         className={marker.saved ? '' : 'highlight'}
-                        disabled={marker.saved || !livePose?.valid}
+                        disabled={!marker.saved && (!livePose?.valid || !robot?.mission_running)}
                         type="button"
-                        onClick={() => SaveRouteMarker(index)}
+                        onClick={() =>
+                          marker.saved ? UnlockRouteMarker(index) : SaveRouteMarker(index)
+                        }
                       >
-                        {marker.saved ? `${marker.marker_id} LOCKED` : `SAVE ${marker.marker_id}`}
+                        {marker.saved
+                          ? `EDIT ${marker.marker_id} POSITION`
+                          : `LOCK ${marker.marker_id} POSITION`}
                       </button>
                     </div>
                   </div>
@@ -1167,33 +1746,133 @@ function ExperimentPanel({
           disabled={
             busy ||
             !canCreate ||
-            !preflightReady ||
-            (runType === 'ablation' && !sourceExperimentId) ||
+            (runType !== 'ablation' && !resourceReplay && !preflightReady) ||
+            !globalReferenceReady ||
+            (runType === 'ablation' && !selectedAblationSource) ||
+            (runType === 'ablation' && !selectedAblationTarget?.ready) ||
+            (resourceReplay && !selectedResourceSource) ||
+            (resourceReplay && !rv1103Target?.ready) ||
+            (runType === 'kidnapped' && !kidnapReferencesReady) ||
             ((runType === 'route' || runType === 'dynamic_occluded') && !routeMarkersReady)
           }
           onClick={CreateSession}
         >
           CREATE SESSION
         </button>
-        {!preflightReady && <p className="gate-message">...</p>}
+        {runType !== 'ablation' && !resourceReplay && !preflightReady && (
+          <p className="gate-message">
+            Run Preflight and resolve robot, mission, map, and binary readiness first.
+          </p>
+        )}
+        {!globalReferenceReady && (
+          <p className="gate-message">
+            Select a saved Global route reference before creating the session.
+          </p>
+        )}
         {(runType === 'route' || runType === 'dynamic_occluded') && !routeMarkersReady && (
           <p className="gate-message">Save all 8 marker references before creating the session.</p>
         )}
+        {runType === 'kidnapped' && !kidnapReferencesReady && (
+          <p className="gate-message">
+            Load the marker list and select two different markers for A and B.
+          </p>
+        )}
+        {runType === 'ablation' && selectedAblationSource && (
+          <div className="ablation-source-readiness">
+            <b>
+              {selectedAblationSource.platform} · {selectedAblationSource.run_type.toUpperCase()} ·{' '}
+              READY
+            </b>
+            <span>{selectedAblationSource.experiment_id}</span>
+            <small>
+              RAW SCAN ✓ · MAP/HASH ✓ · TELEMETRY ✓ · FIRMWARE FORMAT ✓ · REPLAY BINARY ✓
+            </small>
+            <small>
+              Map {selectedAblationSource.map_name} · source firmware revision{' '}
+              {selectedAblationSource.source_revision} · replay{' '}
+              {selectedAblationTarget?.replay_binary_sha256?.slice(0, 12) || 'checking'}…
+            </small>
+            <small>
+              Execution: {selectedAblationTarget?.label || 'checking'} ·{' '}
+              {selectedAblationTarget?.execution_location === 'board'
+                ? 'localize_uart will stop temporarily and recover automatically'
+                : 'robot board remains untouched'}
+            </small>
+            {selectedAblationTarget && !selectedAblationTarget.ready && (
+              <small>
+                Target unavailable: {selectedAblationTarget.reason || 'readiness check failed'}
+              </small>
+            )}
+          </div>
+        )}
+        {resourceReplay && selectedResourceSource && (
+          <div className="ablation-source-readiness">
+            <b>RV1103 · {selectedResourceSource.run_type.toUpperCase()} · REPLAY READY</b>
+            <span>{selectedResourceSource.experiment_id}</span>
+            <small>ACCEPTED RAW SCAN ✓ · MAP/HASH ✓ · TELEMETRY ✓ · FIRMWARE FORMAT ✓</small>
+            <small>
+              Production method only: Global ON + Multi Resolution ON. Sensor timestamps are
+              replayed using their recorded timing.
+            </small>
+            <small>
+              Board: {rv1103Target?.ready ? 'READY' : 'NOT READY'} · localize_uart stops temporarily
+              and restarts automatically after replay.
+            </small>
+            {rv1103Target && !rv1103Target.ready && (
+              <small>Target unavailable: {rv1103Target.reason || 'readiness check failed'}</small>
+            )}
+          </div>
+        )}
       </div>
 
-      {runType === 'ablation' ? (
+      {runType === 'ablation' || resourceReplay ? (
         <div className="workflow-card">
           <div className="workflow-title">
             <b>2</b>
-            <span>Ablation replay</span>
+            <span>
+              {resourceReplay
+                ? 'Resource replay on RV1103'
+                : ablationExecutionTarget === 'host'
+                  ? 'Ablation replay'
+                  : 'Selected firmware validation'}
+            </span>
           </div>
+          <p className="gate-message">
+            {resourceReplay
+              ? 'RV1103 replays one Accepted recording at its original sensor timing using only the production Global + Multi method.'
+              : ablationExecutionTarget === 'host'
+                ? 'PC replays the Accepted source through all four combinations for method comparison.'
+                : `${ablationExecutionTarget.toUpperCase()} replays only the selected production method: Global ON + Multi Resolution ON.`}
+          </p>
           <button
             className="step-primary"
-            disabled={busy || session?.state !== 'created'}
-            onClick={RunAblation}
+            disabled={
+              busy ||
+              session?.state !== 'created' ||
+              (resourceReplay ? !rv1103Target?.ready : !selectedAblationTarget?.ready)
+            }
+            onClick={resourceReplay ? RunResourceReplay : RunAblation}
           >
-            RUN REPLAY
+            {resourceReplay
+              ? 'RUN PACED GLOBAL + MULTI ON RV1103'
+              : ablationExecutionTarget === 'host'
+                ? 'RUN 4 PC REPLAYS'
+                : `VALIDATE GLOBAL + MULTI ON ${ablationExecutionTarget.toUpperCase()}`}
           </button>
+          <div className="ablation-design">
+            {resourceReplay ? (
+              <span>RESOURCE · RECORDED PACING · PRODUCTION METHOD</span>
+            ) : ablationExecutionTarget === 'host' ? (
+              <>
+                <span>GLOBAL OFF · SINGLE</span>
+                <span>GLOBAL OFF · MULTI</span>
+                <span>GLOBAL ON · SINGLE</span>
+                <span>GLOBAL ON · MULTI</span>
+              </>
+            ) : (
+              <span>PRODUCTION METHOD · GLOBAL ON · MULTI ON</span>
+            )}
+          </div>
         </div>
       ) : (
         <div className="workflow-card start-card">
@@ -1212,14 +1891,21 @@ function ExperimentPanel({
           <div className="start-step">
             <div className="workflow-title">
               <b>3</b>
-              <span>{runType === 'resource' ? 'Mission after IDLE' : 'Mission'}</span>
+              <span>{runType === 'resource' ? 'Mission automatic' : 'Mission'}</span>
             </div>
-            <button
-              disabled={busy || !capturing || Boolean(robot?.mission_running)}
-              onClick={() => mission('start')}
-            >
-              START MISSION
-            </button>
+            {runType === 'resource' ? (
+              <p className="gate-message">
+                START Tracking R1/R2 or Endurance automatically starts the mission and LiDAR; no
+                separate button is required.
+              </p>
+            ) : (
+              <button
+                disabled={busy || !capturing || Boolean(robot?.mission_running)}
+                onClick={() => mission('start')}
+              >
+                START MISSION
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1232,46 +1918,22 @@ function ExperimentPanel({
           </div>
 
           {runType === 'kidnapped' && (
-            <div className="marker-form">
-              <label>
-                Marker ID
-                <input value={markerId} onChange={(event) => setMarkerId(event.target.value)} />
-              </label>
-              <label>
-                Zone
-                <select value={markerZone} onChange={(event) => setMarkerZone(event.target.value)}>
-                  <option value="room_1">Room 1</option>
-                  <option value="doorway_transition">Doorway</option>
-                  <option value="room_2">Room 2</option>
-                </select>
-              </label>
-              <label>
-                X (m)
-                <input
-                  type="number"
-                  step="0.01"
-                  value={markerX}
-                  onChange={(event) => setMarkerX(event.target.value)}
-                />
-              </label>
-              <label>
-                Y (m)
-                <input
-                  type="number"
-                  step="0.01"
-                  value={markerY}
-                  onChange={(event) => setMarkerY(event.target.value)}
-                />
-              </label>
-              <label>
-                Yaw (deg)
-                <input
-                  type="number"
-                  step="0.1"
-                  value={markerYawDegrees}
-                  onChange={(event) => setMarkerYawDegrees(event.target.value)}
-                />
-              </label>
+            <div className="kidnap-reference-grid">
+              {[session?.kidnap_start_marker, session?.kidnap_target_marker].map(
+                (marker, index) =>
+                  marker && (
+                    <div key={marker.marker_id}>
+                      <small>{index === 0 ? 'A · START' : 'B · TARGET'}</small>
+                      <b>
+                        {marker.marker_id} · {marker.zone.replaceAll('_', ' ')}
+                      </b>
+                      <span>
+                        X {marker.x.toFixed(3)} · Y {marker.y.toFixed(3)} · yaw{' '}
+                        {marker.yaw.toFixed(6)} rad
+                      </span>
+                    </div>
+                  ),
+              )}
             </div>
           )}
 
@@ -1311,54 +1973,100 @@ function ExperimentPanel({
           {(runType === 'route' || runType === 'dynamic_occluded') && (
             <>
               {runType === 'dynamic_occluded' && (
-                <div className="dynamic-occlusion-card">
-                  <div>
-                    <small>DYNAMIC CROSSING</small>
-                    <b>T0 · {pedestrianDirection.replaceAll('_', ' ')}</b>
-                    <span>Required crossing time: 2.5–3.5 seconds</span>
+                <div className="dynamic-occlusion-sequence">
+                  <div className="dynamic-occlusion-instructions">
+                    <small>DYNAMIC OCCLUSION · 6 POSITIONS</small>
+                    <b>13 × 13 × 30 cm · 50 cm from LiDAR</b>
+                    <span>
+                      Route {routeId === 'R2_ROOM_2_TO_1' ? 'M8→M1' : 'M1→M8'} · keep the obstacle
+                      outside the front sector for ≥1 second, then pass it left → right for 4
+                      seconds. START saves the checkpoint; END is automatic.
+                    </span>
                   </div>
-                  <button
-                    className="warning"
-                    disabled={
-                      dynamicCrossingStartedAt !== undefined ||
-                      dynamicCrossingDuration !== undefined
-                    }
-                    onClick={() =>
-                      RecordEvent('DYNAMIC_OCCLUSION_START', false, {
-                        trigger_marker: 'T0',
-                        pedestrian_direction: pedestrianDirection,
-                      })
-                    }
-                  >
-                    PERSON START
-                  </button>
-                  <button
-                    className="stop"
-                    disabled={dynamicCrossingStartedAt === undefined}
-                    onClick={() =>
-                      RecordEvent('DYNAMIC_OCCLUSION_END', false, {
-                        trigger_marker: 'T0',
-                        pedestrian_direction: pedestrianDirection,
-                      })
-                    }
-                  >
-                    PERSON END
-                  </button>
-                  <output
-                    className={
-                      dynamicCrossingDuration === undefined
-                        ? ''
-                        : dynamicCrossingDuration >= 2500 && dynamicCrossingDuration <= 3500
-                          ? 'duration-pass'
-                          : 'duration-fail'
-                    }
-                  >
-                    {dynamicCrossingStartedAt
-                      ? 'CROSSING…'
-                      : dynamicCrossingDuration === undefined
-                        ? 'NOT RECORDED'
-                        : `${(dynamicCrossingDuration / 1000).toFixed(2)} s`}
-                  </output>
+                  {(session?.dynamic_occlusion_markers || []).map((occlusionMarker, index) => {
+                    const completed = Boolean(
+                      session?.dynamic_occlusion_completed_marker_ids?.includes(
+                        occlusionMarker.marker_id,
+                      ),
+                    );
+                    const active =
+                      session?.dynamic_occlusion_active_marker_id === occlusionMarker.marker_id;
+                    const next =
+                      !active &&
+                      !completed &&
+                      (session?.dynamic_occlusion_completed_marker_ids?.length || 0) === index;
+                    const duration =
+                      session?.dynamic_occlusion_durations_ms?.[occlusionMarker.marker_id];
+                    const positionError = robot
+                      ? Math.hypot(
+                          robot.pose.x - occlusionMarker.x,
+                          robot.pose.y - occlusionMarker.y,
+                        )
+                      : Number.POSITIVE_INFINITY;
+                    const headingError = robot
+                      ? HeadingErrorDegrees(robot.pose.yaw, occlusionMarker.yaw)
+                      : Number.POSITIVE_INFINITY;
+                    const poseReady = Boolean(
+                      robot?.online &&
+                      robot.pose.valid &&
+                      robot.pose.mode === 'tracking' &&
+                      positionError <= 0.15 &&
+                      headingError <= 15,
+                    );
+                    const checkpointSequenceReady = checkpointCount === index + 1;
+                    const startReady = next && poseReady && checkpointSequenceReady;
+                    return (
+                      <div
+                        className={`dynamic-occlusion-card ${completed ? 'completed' : ''}`}
+                        key={occlusionMarker.marker_id}
+                      >
+                        <div>
+                          <small>POSITION {index + 1}/6</small>
+                          <b>
+                            {occlusionMarker.marker_id} · X {occlusionMarker.x.toFixed(3)} · Y{' '}
+                            {occlusionMarker.y.toFixed(3)}
+                          </b>
+                          <span>
+                            Δpos {Number.isFinite(positionError) ? positionError.toFixed(3) : '—'} m
+                            · Δyaw {Number.isFinite(headingError) ? headingError.toFixed(1) : '—'}°
+                            · baseline ≥1 s
+                          </span>
+                        </div>
+                        <button
+                          className="warning"
+                          disabled={!startReady}
+                          onClick={() =>
+                            RecordEvent('DYNAMIC_OCCLUSION_START', false, {
+                              trigger_marker: occlusionMarker.marker_id,
+                            })
+                          }
+                        >
+                          OCCLUSION START
+                        </button>
+                        <output
+                          className={
+                            duration === undefined
+                              ? ''
+                              : duration >= 3500 && duration <= 4500
+                                ? 'duration-pass'
+                                : 'duration-fail'
+                          }
+                        >
+                          {active
+                            ? 'OCCLUDING… AUTO END AT 4 s'
+                            : duration === undefined
+                              ? startReady
+                                ? 'READY · MOVE LEFT → RIGHT'
+                                : next && !checkpointSequenceReady
+                                  ? `LOCK ${routeStartMarkerId} FIRST`
+                                  : next && !poseReady
+                                    ? 'ALIGN POSE ≤0.15 m / ≤15°'
+                                    : 'WAITING'
+                              : `${(duration / 1000).toFixed(2)} s`}
+                        </output>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               <div className="route-checkpoint-grid">
@@ -1369,10 +2077,23 @@ function ExperimentPanel({
                   const displayedPose = recorded
                     ? session?.checkpoint_estimates?.[configuredMarker.marker_id]
                     : robot?.pose;
+                  const requiresOcclusion = Boolean(
+                    session?.dynamic_occlusion_markers?.some(
+                      (marker) => marker.marker_id === configuredMarker.marker_id,
+                    ),
+                  );
+                  const occlusionComplete = Boolean(
+                    session?.dynamic_occlusion_completed_marker_ids?.includes(
+                      configuredMarker.marker_id,
+                    ),
+                  );
                   return (
                     <button
                       className={recorded ? 'route-marker-locked' : 'route-marker-live'}
-                      disabled={checkpointCount >= 8 && !recorded}
+                      disabled={
+                        (checkpointCount >= 8 && !recorded) ||
+                        (requiresOcclusion && !occlusionComplete)
+                      }
                       key={configuredMarker.marker_id}
                       onClick={() => {
                         if (!recorded) RecordCheckpoint(configuredMarker);
@@ -1414,105 +2135,97 @@ function ExperimentPanel({
             </>
           )}
           {runType === 'kidnapped' && (
-            <div className="event-actions">
-              <button className="warning" onClick={() => RecordEvent('KIDNAP_START')}>
-                KIDNAP START
-              </button>
-              <button className="highlight" onClick={() => RecordEvent('KIDNAP_RELEASE', true)}>
-                RELEASE + REF
-              </button>
-              <button onClick={() => RecordCheckpoint()}>FINAL CHECKPOINT</button>
-            </div>
+            <>
+              <div className="event-actions">
+                <button className="warning" onClick={() => RecordEvent('KIDNAP_START')}>
+                  START AT A
+                </button>
+                <button className="highlight" onClick={() => RecordEvent('KIDNAP_RELEASE')}>
+                  RELEASE AT B
+                </button>
+              </div>
+              <p className="gate-message">
+                {session?.kidnap_auto_checkpoint_unix_ms
+                  ? 'Checkpoint B recorded automatically after recovery returned to TRACKING.'
+                  : session?.kidnap_recovery_observed
+                    ? 'Recovery detected. Waiting for valid TRACKING to record checkpoint B…'
+                    : session?.kidnap_release_unix_ms
+                      ? 'Released at B. Waiting for LOST/GLOBAL recovery…'
+                      : 'Checkpoint B will be recorded automatically after RELEASE and recovery.'}
+              </p>
+            </>
           )}
-          {runType === 'resource' && (
+          {runType === 'resource' && resourceMode !== 'replay' && (
             <div className="resource-procedure">
               <div className="resource-repetition">
-                <label>
-                  Repetition being recorded
-                  <select
-                    value={resourceRepetition}
-                    onChange={(event) => setResourceRepetition(Number(event.target.value))}
-                  >
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <option key={value} value={value}>
-                        Repetition {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <div>
-                  <small>COMPLETED INTERVALS</small>
-                  <b>{resourceMeasurementCount}/15</b>
+                  <small>COMPLETED PHASES IN THIS SESSION</small>
+                  <b>
+                    {completedResourcePhases.size}/{resourcePhases.length}
+                  </b>
+                </div>
+                <div>
+                  <small>LIVE LOCALIZATION · UPDATED EACH SECOND</small>
+                  <b>
+                    {resourceScoreSnapshot?.mode?.toUpperCase() || 'NO DATA'} · SCORE{' '}
+                    {resourceScoreSnapshot?.score.toFixed(3) ?? '—'}
+                  </b>
+                  <span>
+                    Pose {resourceScoreSnapshot?.valid ? 'VALID' : 'INVALID'} · robot may move or
+                    remain stationary during Endurance
+                  </span>
                 </div>
               </div>
               <div className="resource-intervals">
-                <div>
-                  <b>1. IDLE — 60 s</b>
-                  <button
-                    onClick={() =>
-                      RecordEvent('RESOURCE_IDLE_START', false, {
-                        repetition: resourceRepetition,
-                      })
-                    }
-                  >
-                    START
-                  </button>
-                  <button
-                    className="stop"
-                    onClick={() =>
-                      RecordEvent('RESOURCE_IDLE_END', false, {
-                        repetition: resourceRepetition,
-                      })
-                    }
-                  >
-                    END
-                  </button>
-                </div>
-                <div>
-                  <b>2. NORMAL TRACKING — 60 s</b>
-                  <button
-                    onClick={() =>
-                      RecordEvent('RESOURCE_TRACKING_START', false, {
-                        repetition: resourceRepetition,
-                      })
-                    }
-                  >
-                    START
-                  </button>
-                  <button
-                    className="stop"
-                    onClick={() =>
-                      RecordEvent('RESOURCE_TRACKING_END', false, {
-                        repetition: resourceRepetition,
-                      })
-                    }
-                  >
-                    END
-                  </button>
-                </div>
-                <div>
-                  <b>3. GLOBAL RELOCALIZATION — 60 s</b>
-                  <button
-                    onClick={() =>
-                      RecordEvent('RESOURCE_GLOBAL_START', false, {
-                        repetition: resourceRepetition,
-                      })
-                    }
-                  >
-                    START
-                  </button>
-                  <button
-                    className="stop"
-                    onClick={() =>
-                      RecordEvent('RESOURCE_GLOBAL_END', false, {
-                        repetition: resourceRepetition,
-                      })
-                    }
-                  >
-                    END
-                  </button>
-                </div>
+                {resourcePhases.map((phase, index) => {
+                  const active = session?.resource_active_phase === phase.id;
+                  const completed = completedResourcePhases.has(phase.id);
+                  const remaining =
+                    phase.targetSeconds === undefined
+                      ? undefined
+                      : Math.max(0, phase.targetSeconds - resourceElapsedSeconds);
+                  return (
+                    <div key={phase.id}>
+                      <b>
+                        {index + 1}. {phase.label}
+                        {phase.targetSeconds === undefined
+                          ? ' — DURATION RECORDED FROM START TO END'
+                          : ` — ${FormatDuration(phase.targetSeconds)}`}
+                      </b>
+                      <span>{phase.guidance}</span>
+                      <strong>
+                        {completed
+                          ? 'COMPLETED'
+                          : active
+                            ? remaining === undefined
+                              ? `${FormatDuration(resourceElapsedSeconds)} elapsed`
+                              : `${FormatDuration(resourceElapsedSeconds)} elapsed · ${FormatDuration(remaining)} remaining`
+                            : 'READY'}
+                      </strong>
+                      <button
+                        disabled={Boolean(session?.resource_active_phase) || completed}
+                        onClick={() =>
+                          RecordEvent(`${phase.id}_START`, false, {}, phase.id !== 'RESOURCE_IDLE')
+                        }
+                      >
+                        START
+                      </button>
+                      <button
+                        className="stop"
+                        disabled={!active}
+                        onClick={() => RecordEvent(`${phase.id}_END`)}
+                      >
+                        END
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
+              <p className="gate-message">
+                {resourceMode === 'live_endurance'
+                  ? 'Endurance tidak memiliki batas waktu. START dan END beserta durasi aktual disimpan di hasil session.'
+                  : 'Idle, Tracking R1, dan Tracking R2 masing-masing dijalankan satu kali per folder session.'}
+              </p>
             </div>
           )}
         </div>
@@ -1524,7 +2237,7 @@ function ExperimentPanel({
           <span>Results</span>
         </div>
         <div className="ordered-actions finish-actions">
-          {runType !== 'ablation' && (
+          {runType !== 'ablation' && !resourceReplay && (
             <>
               <button
                 className="stop"
@@ -1546,24 +2259,124 @@ function ExperimentPanel({
             disabled={busy || session?.state !== 'stopped'}
             onClick={() => SessionAction('analyze')}
           >
-            {runType === 'ablation' ? '3. ANALYZE' : '7. ANALYZE'}
+            {runType === 'ablation' || resourceReplay ? '3. ANALYZE' : '7. ANALYZE'}
           </button>
           <button
-            disabled={busy || session?.state !== 'analyzed'}
+            disabled={
+              busy ||
+              session?.state !== 'analyzed' ||
+              ((runType === 'ablation' || resourceReplay) &&
+                ablationAnalysis?.protocol_valid !== true)
+            }
             onClick={() => SessionAction('finalize')}
           >
-            {runType === 'ablation' ? '4. FINALIZE' : '8. FINALIZE'}
+            {runType === 'ablation' || resourceReplay ? '4. FINALIZE' : '8. FINALIZE'}
+          </button>
+          <button
+            className="cancel-test"
+            disabled={
+              busy ||
+              !session ||
+              ['stopping', 'finalized'].includes(session.state) ||
+              (session.state === 'starting' && runType !== 'ablation' && !resourceReplay)
+            }
+            onClick={CancelSession}
+          >
+            CANCEL TEST
           </button>
         </div>
         {session && (
-          <div className="session-id">
-            <b>Output:</b> EXPERIMENTS/Ouputs/
-            {session.output_relative_path || session.experiment_id}
-          </div>
+          <>
+            <div className="session-id">
+              <b>Output:</b> EXPERIMENTS/Ouputs/
+              {session.output_relative_path || session.experiment_id}
+            </div>
+            {(session.board_tmp_available_kb_before_start !== undefined ||
+              session.board_tmp_available_kb_after_stop !== undefined) && (
+              <div className="session-id">
+                <b>Board /tmp after cleanup:</b>{' '}
+                {(
+                  (session.board_tmp_available_kb_after_stop ??
+                    session.board_tmp_available_kb_before_start ??
+                    0) / 1024
+                ).toFixed(1)}{' '}
+                MiB available
+              </div>
+            )}
+          </>
         )}
         {session?.error && <div className="experiment-error">{session.error}</div>}
       </div>
 
+      {(runType === 'ablation' || resourceReplay) && ablationAnalysis && (
+        <div className="ablation-results">
+          <div className="ablation-result-heading">
+            <div>
+              <small>
+                {ablationAnalysis.validation_mode === 'resource_replay_board'
+                  ? 'RESOURCE REPLAY VALIDITY'
+                  : ablationAnalysis.validation_mode === 'selected_method_board'
+                    ? 'SELECTED METHOD VALIDITY'
+                    : '2×2 FACTORIAL VALIDITY'}
+              </small>
+              <b>{ablationAnalysis.protocol_valid ? 'VALID' : 'INVALID'}</b>
+            </div>
+            <span>
+              EXECUTION TARGET:{' '}
+              {ablationAnalysis.execution_target === 'host'
+                ? 'PC'
+                : ablationAnalysis.execution_target.toUpperCase()}{' '}
+              · raw {ablationAnalysis.source_raw_scan_sha256.slice(0, 12)}… · map{' '}
+              {ablationAnalysis.source_map_sha256.slice(0, 12)}…
+            </span>
+          </div>
+          {ablationAnalysis.validity_errors.length > 0 && (
+            <ul>
+              {ablationAnalysis.validity_errors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          )}
+          <div className="ablation-result-grid">
+            {ablationAnalysis.variants.map((variant) => (
+              <div key={variant.variant}>
+                <small>{variant.variant.replaceAll('_', ' ').toUpperCase()}</small>
+                <b>{variant.success ? 'SUCCESS' : 'FAILURE'}</b>
+                <span>
+                  Global {variant.global_relocalization ? 'ON' : 'OFF'} · Multi{' '}
+                  {variant.multi_resolution ? 'ON' : 'OFF'}
+                </span>
+                <span>
+                  {variant.scans} scans · accepted {(variant.accepted_scan_rate * 100).toFixed(1)}%
+                </span>
+                <span>
+                  matcher μ {variant.execution_time_ms.mean?.toFixed(2) ?? '—'} ms · P95{' '}
+                  {variant.execution_time_ms.p95?.toFixed(2) ?? '—'} ms
+                </span>
+                {ablationAnalysis.validation_mode === 'resource_replay_board' && (
+                  <span>
+                    tracking P95 {variant.tracking_execution_time_ms?.p95?.toFixed(2) ?? '—'} ms ·
+                    global μ {variant.global_execution_time_ms?.mean?.toFixed(2) ?? '—'} ms ·
+                    deadline misses {variant.deadline_miss_count ?? 0} (
+                    {((variant.deadline_miss_rate ?? 0) * 100).toFixed(2)}%)
+                  </span>
+                )}
+                <span>
+                  CPU μ {variant.cpu_percent.mean?.toFixed(1) ?? '—'}% · peak RAM{' '}
+                  {variant.peak_rss_kb ? `${(variant.peak_rss_kb / 1024).toFixed(2)} MiB` : 'N/A'}
+                </span>
+                <span>
+                  recovery{' '}
+                  {variant.recovery_time_ms === undefined
+                    ? 'N/A'
+                    : `${variant.recovery_time_ms.toFixed(0)} ms`}{' '}
+                  · false {variant.false_recovery_count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {report && <pre className="report-preview">{JSON.stringify(report, null, 2)}</pre>}
     </section>
   );
@@ -1694,13 +2507,17 @@ function App() {
     };
   }, []);
   const robot = Object.values(robots)[0];
-  const mission = async (action: 'start' | 'stop') => {
-    if (!robot) return;
+  const mission = async (action: 'start' | 'stop'): Promise<boolean> => {
+    if (!robot) return false;
     setNotice(`Sending ${action}...`);
     const response = await fetch(`/api/robots/${robot.robot_id}/mission/${action}`, {
       method: 'POST',
     });
-    if (!response.ok) setNotice(((await response.json()) as { error: string }).error);
+    if (!response.ok) {
+      setNotice(((await response.json()) as { error: string }).error);
+      return false;
+    }
+    return true;
   };
   const mappingAction = async (action: 'start' | 'stop' | 'save') => {
     setNotice(`Mapping ${action}...`);

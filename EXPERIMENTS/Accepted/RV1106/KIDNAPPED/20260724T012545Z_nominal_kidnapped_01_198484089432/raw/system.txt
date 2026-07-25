@@ -1,0 +1,21 @@
+2026-07-24T01:25:47+00:00
+Linux luckfox 5.10.160 #4 Wed Jul 22 05:59:16 +07 2026 armv7l GNU/Linux
+localize_uart_bytes=348268
+941b9cd2dd9d63182af888621b311be8ddd314e126cee3d5fb1168c481b4c5d2  /usr/bin/localize_uart
+map_bytes=43196
+38e292ceae0c45560ffb61faf2c16112bb2370e1c88e9953caaeb6c90495207a  /etc/slam/ruang_utama.bin
+5: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
+    link/ether 9c:53:22:84:ed:b5 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.24/24 brd 192.168.1.255 scope global dynamic noprefixroute wlan0
+       valid_lft 3563sec preferred_lft 2663sec
+    inet6 fded:5781:c49e:10:86dc:eb2a:4533:cae2/64 scope global noprefixroute flags 100 
+       valid_lft forever preferred_lft forever
+    inet6 2401:e320:5aa:db10:31a3:4c1b:9136:36d0/64 scope global dynamic noprefixroute flags 100 
+       valid_lft 208sec preferred_lft 58sec
+    inet6 fe80::9e53:22ff:fe84:edb5/64 scope link 
+       valid_lft forever preferred_lft forever
+default via 192.168.1.1 dev wlan0  src 192.168.1.24  metric 1005 
+192.168.1.0/24 dev wlan0 scope link  src 192.168.1.24  metric 1005 
+Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE
+ face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22
+ wlan0: 0000  100.   99.    0.       0      0      0      0      0        0
