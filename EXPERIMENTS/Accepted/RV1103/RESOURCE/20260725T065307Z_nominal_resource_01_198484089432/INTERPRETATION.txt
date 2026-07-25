@@ -1,0 +1,37 @@
+RESOURCE LIVE ENDURANCE — INTERPRETATION
+Experiment: 20260725T065307Z_nominal_resource_01_198484089432
+Platform: RV1103
+Decision: ACCEPTED
+
+Protocol completeness
+- Session is finalized and every file listed by manifest.sha256 passes checksum verification.
+- The test has exactly one RESOURCE_ENDURANCE_START and one RESOURCE_ENDURANCE_END event.
+- Measured endurance duration is 302.251 s (5 min 2.251 s).
+- Mission START and STOP were acknowledged by the robot.
+- No crash, fatal error, segmentation fault, OOM, or localization failure was found in runtime.log.
+
+Localization quality
+- 2,999 of 2,999 scans were accepted (100% accepted-scan rate).
+- State samples consist of 2,996 TRACKING and 3 RECOVERED samples; there are no LOST or DEGRADED samples.
+- Tracking-sample rate is 99.97%.
+- Localization score mean/minimum is 0.9527/0.9015.
+- The result demonstrates continuous and stable localization throughout the five-minute live run.
+
+RV1103 resource and real-time performance
+- CPU mean/P95 derived from per-scan telemetry is 62.09%/66.04%; peak RSS is 2,076 KiB.
+- Matcher latency mean/P95/max is 59.43/65.25/893.08 ms.
+- Scan-cycle latency mean/P95/max is 98.89/105.71/927.90 ms.
+- 593 of 2,999 scan cycles (19.77%) exceed the nominal 100 ms period.
+- The high maximum values occur during global recovery; routine tracking remains much lower.
+
+Publication interpretation
+This is a valid live-endurance result: localization remains functional and stable for the full
+measurement window with all scans accepted and no LOST/DEGRADED state. RV1103 nevertheless
+operates close to its 100 ms real-time budget, with a P95 slightly over the target and 19.77%
+deadline overruns. Present this as a resource-margin limitation, not as a protocol failure.
+
+Data-quality note
+processed/summary.json reports resource_samples=0 and does not aggregate CPU/RSS for endurance,
+although those values are present in every scan record. The CPU and RSS figures above were
+therefore calculated directly from raw/telemetry.jsonl. This analyzer aggregation limitation
+must be disclosed when using the generated summary table.

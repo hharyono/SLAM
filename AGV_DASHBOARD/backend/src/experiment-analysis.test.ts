@@ -348,7 +348,13 @@ test('Resource replay requires recorded pacing and writes board resource metrics
       candidate_count: 100,
       matcher_execution_us: sequence === 1 ? 125_000 : 20_000,
       scan_cycle_us: sequence === 1 ? 125_100 : 20_100,
+      process_cpu_delta_us: sequence === 1 ? 110_000 : 18_000,
       process_cpu_percent: 88,
+      process_cpu_interval_delta_us: sequence === 1 ? 110_000 : 18_000,
+      replay_interval_us: sequence === 1 ? 125_100 : 100_000,
+      process_cpu_interval_percent: sequence === 1 ? 87.93 : 18,
+      pacing_wait_us: sequence === 1 ? 0 : 79_900,
+      rss_kb: 1_550,
       peak_rss_kb: 1_600,
     }));
     fs.writeFileSync(
@@ -360,13 +366,31 @@ test('Resource replay requires recorded pacing and writes board resource metrics
       schema: string;
       protocol_valid: boolean;
       replay_pacing: string;
-      variants: Array<{ deadline_miss_count: number; global_scan_count: number }>;
+      variants: Array<{
+        deadline_miss_count: number;
+        global_scan_count: number;
+        resource_telemetry_complete: boolean;
+        resource_telemetry_samples: number;
+        cpu_utilization_percent: number;
+        cpu_percent: { n: number; mean: number };
+        matcher_cpu_percent: { n: number; mean: number };
+        pacing_wait_ms: { n: number };
+        rss_kb: { n: number; mean: number };
+      }>;
     };
     assert.equal(result.schema, 'luckfox.experiment.resource-replay.v1');
     assert.equal(result.protocol_valid, true);
     assert.equal(result.replay_pacing, 'recorded');
     assert.equal(result.variants[0]?.deadline_miss_count, 1);
     assert.equal(result.variants[0]?.global_scan_count, 1);
+    assert.equal(result.variants[0]?.resource_telemetry_complete, true);
+    assert.equal(result.variants[0]?.resource_telemetry_samples, 3);
+    assert.equal(result.variants[0]?.cpu_percent.n, 3);
+    assert.equal(result.variants[0]?.matcher_cpu_percent.mean, 88);
+    assert.equal(result.variants[0]?.pacing_wait_ms.n, 3);
+    assert.equal(result.variants[0]?.rss_kb.mean, 1_550);
+    assert.ok(result.variants[0]!.cpu_utilization_percent > 40);
+    assert.ok(result.variants[0]!.cpu_utilization_percent < 50);
     assert.equal(fs.existsSync(path.join(directory, 'tables', 'resource_replay.csv')), true);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });

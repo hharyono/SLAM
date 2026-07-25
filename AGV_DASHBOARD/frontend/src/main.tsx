@@ -222,7 +222,13 @@ type AblationAnalysis = {
     global_scan_count?: number;
     deadline_miss_count?: number;
     deadline_miss_rate?: number;
-    cpu_percent: { mean?: number; p95?: number };
+    resource_telemetry_complete?: boolean;
+    resource_telemetry_samples?: number;
+    cpu_percent: { mean?: number; p95?: number; maximum?: number };
+    cpu_utilization_percent?: number;
+    matcher_cpu_percent?: { mean?: number; p95?: number; maximum?: number };
+    pacing_wait_ms?: { mean?: number; p95?: number; maximum?: number };
+    rss_kb?: { mean?: number; p95?: number; maximum?: number };
     peak_rss_kb: number;
     recovery_time_ms?: number;
     final_position_error_m?: number;
@@ -2361,10 +2367,40 @@ function ExperimentPanel({
                     {((variant.deadline_miss_rate ?? 0) * 100).toFixed(2)}%)
                   </span>
                 )}
-                <span>
-                  CPU μ {variant.cpu_percent.mean?.toFixed(1) ?? '—'}% · peak RAM{' '}
-                  {variant.peak_rss_kb ? `${(variant.peak_rss_kb / 1024).toFixed(2)} MiB` : 'N/A'}
-                </span>
+                {ablationAnalysis.validation_mode === 'resource_replay_board' ? (
+                  <>
+                    <span>
+                      CPU paced μ/P95/max {variant.cpu_percent.mean?.toFixed(1) ?? '—'}/
+                      {variant.cpu_percent.p95?.toFixed(1) ?? '—'}/
+                      {variant.cpu_percent.maximum?.toFixed(1) ?? '—'}% · weighted{' '}
+                      {variant.cpu_utilization_percent?.toFixed(1) ?? '—'}%
+                    </span>
+                    <span>
+                      CPU matcher μ/P95 {variant.matcher_cpu_percent?.mean?.toFixed(1) ?? '—'}/
+                      {variant.matcher_cpu_percent?.p95?.toFixed(1) ?? '—'}% · pacing wait μ{' '}
+                      {variant.pacing_wait_ms?.mean?.toFixed(2) ?? '—'} ms
+                    </span>
+                    <span>
+                      RAM μ{' '}
+                      {variant.rss_kb?.mean
+                        ? `${(variant.rss_kb.mean / 1024).toFixed(2)} MiB`
+                        : 'N/A'}{' '}
+                      · peak{' '}
+                      {variant.peak_rss_kb
+                        ? `${(variant.peak_rss_kb / 1024).toFixed(2)} MiB`
+                        : 'N/A'}{' '}
+                      · telemetry{' '}
+                      {variant.resource_telemetry_complete
+                        ? `COMPLETE (${variant.resource_telemetry_samples ?? variant.scans})`
+                        : 'INCOMPLETE'}
+                    </span>
+                  </>
+                ) : (
+                  <span>
+                    CPU μ {variant.cpu_percent.mean?.toFixed(1) ?? '—'}% · peak RAM{' '}
+                    {variant.peak_rss_kb ? `${(variant.peak_rss_kb / 1024).toFixed(2)} MiB` : 'N/A'}
+                  </span>
+                )}
                 <span>
                   recovery{' '}
                   {variant.recovery_time_ms === undefined

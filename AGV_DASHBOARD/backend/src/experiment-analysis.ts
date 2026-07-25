@@ -3,6 +3,7 @@ import path from 'node:path';
 
 type NumericSummary = {
   n: number;
+  minimum?: number;
   mean?: number;
   median?: number;
   rmse?: number;
@@ -33,6 +34,11 @@ type TelemetryRow = {
   matcher_execution_us: number;
   scan_cycle_us: number;
   process_cpu_percent: number;
+  process_cpu_delta_us?: number;
+  process_cpu_interval_delta_us?: number;
+  process_cpu_interval_percent?: number;
+  replay_interval_us?: number;
+  pacing_wait_us?: number;
   rss_kb: number;
   peak_rss_kb: number;
 };
@@ -118,6 +124,7 @@ function Summarize(values: number[]): NumericSummary {
     ordered.length % 2 ? ordered[middle]! : (ordered[middle - 1]! + ordered[middle]!) / 2;
   return {
     n: finite.length,
+    minimum: Math.min(...finite),
     mean,
     median,
     rmse: Math.sqrt(finite.reduce((sum, value) => sum + value * value, 0) / finite.length),
@@ -488,6 +495,38 @@ function AnalyzeAblation(directory: string, experimentId: string): unknown {
     const trackingReplay = replay.filter((row) => row.mode === 'tracking');
     const globalReplay = replay.filter((row) => row.mode === 'global');
     const deadlineMissCount = replay.filter((row) => row.scan_cycle_us > 100_000).length;
+    const pacedCpuRows = replay.filter(
+      (row) =>
+        Number.isFinite(row.process_cpu_interval_delta_us) &&
+        Number.isFinite(row.replay_interval_us) &&
+        Number(row.replay_interval_us) > 0,
+    );
+    const pacedCpuTimeUs = pacedCpuRows.reduce(
+      (sum, row) => sum + Number(row.process_cpu_interval_delta_us),
+      0,
+    );
+    const pacedWallTimeUs = pacedCpuRows.reduce(
+      (sum, row) => sum + Number(row.replay_interval_us),
+      0,
+    );
+    const requiredResourceFields: Array<keyof ReplayRow> = [
+      'matcher_execution_us',
+      'scan_cycle_us',
+      'process_cpu_percent',
+      'rss_kb',
+      'peak_rss_kb',
+    ];
+    const resourceCompleteRows = replay.filter((row) =>
+      requiredResourceFields.every((field) => Number.isFinite(Number(row[field]))),
+    );
+    if (resourceReplay && resourceCompleteRows.length !== replay.length)
+      validityErrors.push(
+        `${variant} has ${replay.length - resourceCompleteRows.length} rows with incomplete CPU/RSS/latency telemetry`,
+      );
+    if (resourceReplay && pacedCpuRows.length !== replay.length)
+      validityErrors.push(
+        `${variant} has ${replay.length - pacedCpuRows.length} rows without end-to-end paced CPU telemetry`,
+      );
     const rejectedCount = replay.length - accepted.length;
     const finalAccepted = [...evaluated].reverse().find((row) => row.accepted);
     let recoveryPending = false;
@@ -534,7 +573,20 @@ function AnalyzeAblation(directory: string, experimentId: string): unknown {
       global_scan_count: globalReplay.length,
       deadline_miss_count: deadlineMissCount,
       deadline_miss_rate: deadlineMissCount / replay.length,
-      cpu_percent: Summarize(replay.map((row) => row.process_cpu_percent)),
+      resource_telemetry_complete: resourceCompleteRows.length === replay.length,
+      resource_telemetry_samples: resourceCompleteRows.length,
+      cpu_percent: Summarize(
+        resourceReplay
+          ? replay.map((row) => Number(row.process_cpu_interval_percent))
+          : replay.map((row) => row.process_cpu_percent),
+      ),
+      cpu_utilization_percent:
+        pacedWallTimeUs > 0 ? (100 * pacedCpuTimeUs) / pacedWallTimeUs : undefined,
+      matcher_cpu_percent: Summarize(replay.map((row) => row.process_cpu_percent)),
+      cpu_time_us_total: pacedCpuRows.length ? pacedCpuTimeUs : undefined,
+      replay_wall_time_us_total: pacedCpuRows.length ? pacedWallTimeUs : undefined,
+      pacing_wait_ms: Summarize(replay.map((row) => Number(row.pacing_wait_us) / 1000)),
+      rss_kb: Summarize(replay.map((row) => Number(row.rss_kb))),
       peak_rss_kb: Math.max(0, ...replay.map((row) => Number(row.peak_rss_kb) || 0)),
       candidate_count: Summarize(replay.map((row) => row.candidate_count)),
       global_candidate_acquisition_ms:
@@ -636,7 +688,20 @@ function AnalyzeAblation(directory: string, experimentId: string): unknown {
       'global_time_maximum_ms',
       'deadline_miss_count',
       'deadline_miss_rate',
+      'resource_telemetry_complete',
+      'resource_telemetry_samples',
       'cpu_mean_percent',
+      'cpu_p95_percent',
+      'cpu_maximum_percent',
+      'cpu_utilization_percent',
+      'matcher_cpu_mean_percent',
+      'matcher_cpu_p95_percent',
+      'cpu_time_us_total',
+      'replay_wall_time_us_total',
+      'pacing_wait_mean_ms',
+      'pacing_wait_p95_ms',
+      'rss_mean_kb',
+      'rss_p95_kb',
       'peak_rss_kb',
       'candidate_count_mean',
       'candidate_count_p95',
@@ -669,7 +734,20 @@ function AnalyzeAblation(directory: string, experimentId: string): unknown {
       row.global_execution_time_ms.maximum,
       row.deadline_miss_count,
       row.deadline_miss_rate,
+      row.resource_telemetry_complete,
+      row.resource_telemetry_samples,
       row.cpu_percent.mean,
+      row.cpu_percent.p95,
+      row.cpu_percent.maximum,
+      row.cpu_utilization_percent,
+      row.matcher_cpu_percent.mean,
+      row.matcher_cpu_percent.p95,
+      row.cpu_time_us_total,
+      row.replay_wall_time_us_total,
+      row.pacing_wait_ms.mean,
+      row.pacing_wait_ms.p95,
+      row.rss_kb.mean,
+      row.rss_kb.p95,
       row.peak_rss_kb,
       row.candidate_count.mean,
       row.candidate_count.p95,
@@ -1123,9 +1201,19 @@ export function AnalyzeExperiment(
           ? enduranceEndEvent.timestamp_ms - enduranceStartEvent.timestamp_ms
           : null,
       samples: enduranceTelemetry.length,
-      resource_samples: enduranceResources.length,
-      cpu_percent: Summarize(enduranceResources.map((row) => row.process_cpu_percent)),
-      peak_rss_kb: Math.max(...enduranceResources.map((row) => row.peak_rss_kb), 0),
+      resource_samples: enduranceTelemetry.length || enduranceResources.length,
+      resource_sample_source: enduranceTelemetry.length ? 'scan' : 'heartbeat',
+      cpu_percent: Summarize(
+        (enduranceTelemetry.length ? enduranceTelemetry : enduranceResources).map(
+          (row) => row.process_cpu_percent,
+        ),
+      ),
+      peak_rss_kb: Math.max(
+        ...(enduranceTelemetry.length ? enduranceTelemetry : enduranceResources).map(
+          (row) => row.peak_rss_kb,
+        ),
+        0,
+      ),
       processing_time_ms: Summarize(
         enduranceTelemetry.map((row) => row.matcher_execution_us / 1000),
       ),

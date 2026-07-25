@@ -1,0 +1,43 @@
+RESOURCE PACED BOARD REPLAY — COMPLETE RESOURCE INTERPRETATION
+Experiment: 20260725T071433Z_nominal_resource_01_f90df293b555
+Platform: RV1103
+Source: 20260725T013706Z_nominal_kidnapped_01_198484089432 (cross-room kidnapped)
+Decision: ACCEPTED — replaces incomplete replay 20260725T070009Z_nominal_resource_01_f90df293b555
+
+Protocol and telemetry completeness
+- Session is finalized and every file listed by manifest.sha256 passes checksum verification.
+- protocol_valid is true and validity_errors is empty.
+- Execution target is RV1103, pacing is recorded, and only local_global_multi was executed.
+- Replay binary SHA-256 is 69032f14c1cabbd5f0ee69d931e2ecfb69b8aad495fc635e4a7146e42b83f697.
+- All 576 replay rows contain matcher latency, scan-cycle latency, matcher CPU,
+  end-to-end paced CPU, CPU time, pacing wait, current RSS, and peak RSS.
+- resource_telemetry_complete is true with 576/576 complete samples.
+
+Localization and recovery
+- 576 scans were replayed: 569 accepted and 7 rejected (98.78% accepted).
+- The cross-room kidnapped recovery succeeded in 1,045 ms.
+- Final position error is 0.04998 m and final heading error is 0.343 degrees.
+- Three global scans were used and no false recovery occurred.
+
+RV1103 CPU and memory
+- End-to-end paced CPU mean/P95/max is 66.48%/82.26%/99.81%.
+- Time-weighted CPU utilization is 66.05%.
+- Matcher-active CPU mean/P95 is 98.42%/99.94%.
+- Pacing wait mean/P95 is 33.53/63.44 ms.
+- RSS mean/P95/peak is 1,456/1,456/1,456 KiB.
+- Total measured CPU time is 39.678 s across 60.069 s replay wall time.
+
+Latency and real-time behavior
+- Tracking latency mean/P95/max is 50.96/67.25/107.71 ms.
+- Global-search latency mean/max is 866.24/1,110.28 ms.
+- Overall matcher latency mean/P95 is 55.20/67.48 ms.
+- Four of 576 cycles missed the 100 ms deadline (0.69%).
+
+Publication interpretation
+This replacement run provides complete resource evidence for the production local_global_multi
+method on RV1103. Recorded pacing shows that the real end-to-end CPU load is approximately 66%,
+whereas the matcher uses nearly one complete core while actively computing. Routine tracking
+meets the 100 ms period at P95, with only 0.69% deadline misses. Global recovery remains the
+dominant exceptional cost, but recovery is successful, final error is low, and there are no
+false recoveries. The result is suitable for reporting embedded capacity, real-time margin,
+and cross-room recovery cost.

@@ -71,18 +71,24 @@ class ReplayPacer {
  public:
   explicit ReplayPacer(std::string mode) : mode_(std::move(mode)) {}
 
-  void Wait(std::uint64_t timestamp_ns) {
-    if (mode_ != "recorded") return;
+  std::uint64_t Wait(std::uint64_t timestamp_ns) {
+    if (mode_ != "recorded") return 0;
     if (!initialized_) {
       initialized_ = true;
       first_timestamp_ns_ = timestamp_ns;
       started_ = std::chrono::steady_clock::now();
-      return;
+      return 0;
     }
     if (timestamp_ns < first_timestamp_ns_)
       throw std::runtime_error("recorded replay timestamp moved backwards");
+    const auto wait_before = std::chrono::steady_clock::now();
     std::this_thread::sleep_until(
         started_ + std::chrono::nanoseconds(timestamp_ns - first_timestamp_ns_));
+    const auto wait_after = std::chrono::steady_clock::now();
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(wait_after -
+                                                              wait_before)
+            .count());
   }
 
  private:
@@ -90,6 +96,12 @@ class ReplayPacer {
   bool initialized_ = false;
   std::uint64_t first_timestamp_ns_ = 0;
   std::chrono::steady_clock::time_point started_{};
+};
+
+struct ReplayResourceState {
+  bool initialized = false;
+  std::uint64_t previous_cpu_us = 0;
+  std::chrono::steady_clock::time_point previous_wall{};
 };
 
 struct ScanGroup {
@@ -103,9 +115,10 @@ void Emit(const luckfox::SlamMap& map, luckfox::PoseTracker* tracker,
           const ScanGroup& scan, const std::string& variant,
           bool global_relocalization, bool multi_resolution,
           const std::string& replay_pacing, ReplayPacer* pacer,
+          ReplayResourceState* resource_state,
           std::ostream& output) {
   if (scan.raw_points == 0) return;
-  pacer->Wait(scan.timestamp_ns);
+  const auto pacing_wait_us = pacer->Wait(scan.timestamp_ns);
   rusage usage_before{};
   getrusage(RUSAGE_SELF, &usage_before);
   const auto wall_before = std::chrono::steady_clock::now();
@@ -122,10 +135,26 @@ void Emit(const luckfox::SlamMap& map, luckfox::PoseTracker* tracker,
                                                             wall_before)
           .count();
   const auto cpu_delta_us = cpu_after - cpu_before;
-  const double cpu_percent =
+  const double matcher_cpu_percent =
       wall_us > 0 ? 100.0 * static_cast<double>(cpu_delta_us) /
                         static_cast<double>(wall_us)
                   : 0.0;
+  const auto interval_wall_us = resource_state->initialized
+                                    ? std::chrono::duration_cast<std::chrono::microseconds>(
+                                          wall_after - resource_state->previous_wall)
+                                          .count()
+                                    : wall_us;
+  const auto interval_cpu_us =
+      resource_state->initialized ? cpu_after - resource_state->previous_cpu_us
+                                  : cpu_delta_us;
+  const double interval_cpu_percent =
+      interval_wall_us > 0
+          ? 100.0 * static_cast<double>(interval_cpu_us) /
+                static_cast<double>(interval_wall_us)
+          : 0.0;
+  resource_state->initialized = true;
+  resource_state->previous_cpu_us = cpu_after;
+  resource_state->previous_wall = wall_after;
   output << std::setprecision(9)
             << "{\"schema\":\"luckfox.localization.replay.v1\""
             << ",\"variant\":\"" << variant << "\""
@@ -154,7 +183,11 @@ void Emit(const luckfox::SlamMap& map, luckfox::PoseTracker* tracker,
             << ",\"scan_cycle_us\":" << wall_us
             << ",\"process_cpu_time_us\":" << cpu_after
             << ",\"process_cpu_delta_us\":" << cpu_delta_us
-            << ",\"process_cpu_percent\":" << cpu_percent
+            << ",\"process_cpu_percent\":" << matcher_cpu_percent
+            << ",\"process_cpu_interval_delta_us\":" << interval_cpu_us
+            << ",\"replay_interval_us\":" << interval_wall_us
+            << ",\"process_cpu_interval_percent\":" << interval_cpu_percent
+            << ",\"pacing_wait_us\":" << pacing_wait_us
             << ",\"rss_kb\":" << CurrentRssKb()
             << ",\"peak_rss_kb\":" << usage_after.ru_maxrss
             << ",\"transition_reason\":\"" << result.transition_reason << "\""
@@ -218,6 +251,7 @@ int main(int argc, char** argv) try {
       variant == "local_only_multi" || variant == "local_global_multi";
   const std::string replay_pacing = ReplayPacing();
   ReplayPacer pacer(replay_pacing);
+  ReplayResourceState resource_state;
   const auto map = luckfox::LoadMap(argv[1]);
   luckfox::SearchOptions search;
   search.linear_window = EnvironmentFloat("LUCKFOX_LINEAR_WINDOW_M", search.linear_window);
@@ -288,7 +322,7 @@ int main(int argc, char** argv) try {
       if (timestamp_ns < group.timestamp_ns)
         throw std::runtime_error("raw scan timestamp moved backwards");
       Emit(map, &tracker, group, variant, global_relocalization,
-           multi_resolution, replay_pacing, &pacer, *output);
+           multi_resolution, replay_pacing, &pacer, &resource_state, *output);
       previous_sequence = group.sequence;
       previous_timestamp_ns = group.timestamp_ns;
       group = {};
@@ -306,7 +340,7 @@ int main(int argc, char** argv) try {
       group.points.push_back({range * std::cos(angle), range * std::sin(angle)});
   }
   Emit(map, &tracker, group, variant, global_relocalization,
-       multi_resolution, replay_pacing, &pacer, *output);
+       multi_resolution, replay_pacing, &pacer, &resource_state, *output);
   return 0;
 } catch (const std::exception& error) {
   std::cerr << "localize_replay: " << error.what() << '\n';

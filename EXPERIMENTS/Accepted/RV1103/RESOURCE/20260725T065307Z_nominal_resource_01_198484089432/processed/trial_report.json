@@ -1,0 +1,151 @@
+{
+  "summary": {
+    "schema": "luckfox.experiment.summary.v1",
+    "experiment_id": "20260725T065307Z_nominal_resource_01_198484089432",
+    "generated_unix_ms": 1784962719141,
+    "accuracy": {
+      "checkpoint_count": 0,
+      "successful_checkpoints": 0,
+      "success_rate": null,
+      "position_error_m": {
+        "n": 0
+      },
+      "heading_error_deg": {
+        "n": 0
+      }
+    },
+    "ground_truth_repeatability": {
+      "marker_count": 0,
+      "placement_count": 0,
+      "position_spread_m": {
+        "n": 0
+      },
+      "heading_spread_deg": {
+        "n": 0
+      }
+    },
+    "relocalization": {
+      "trials": 0,
+      "successes": 0,
+      "timeouts": 0,
+      "success_rate": null,
+      "first_recovered_ms": {
+        "n": 0
+      },
+      "stable_tracking_ms": {
+        "n": 0
+      }
+    },
+    "dynamic_occlusion": null,
+    "resources": {
+      "idle": {
+        "samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0
+      },
+      "tracking_r1": {
+        "samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0,
+        "processing_time_ms": {
+          "n": 0
+        },
+        "scan_cycle_ms": {
+          "n": 0
+        },
+        "localization_score": {
+          "n": 0
+        },
+        "tracking_sample_rate": 0
+      },
+      "tracking_r2": {
+        "samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0,
+        "processing_time_ms": {
+          "n": 0
+        },
+        "scan_cycle_ms": {
+          "n": 0
+        },
+        "localization_score": {
+          "n": 0
+        },
+        "tracking_sample_rate": 0
+      },
+      "endurance": {
+        "started_unix_ms": 1784962396791,
+        "ended_unix_ms": 1784962699042,
+        "duration_ms": 302251,
+        "samples": 2999,
+        "resource_samples": 0,
+        "cpu_percent": {
+          "n": 0
+        },
+        "peak_rss_kb": 0,
+        "processing_time_ms": {
+          "n": 2999,
+          "mean": 59.429709236412165,
+          "median": 58.576,
+          "rmse": 61.86317204186755,
+          "standard_deviation": 17.180271102552595,
+          "p95": 65.20299999999999,
+          "maximum": 893.081,
+          "confidence_interval_95_lower": 58.81471609876302,
+          "confidence_interval_95_upper": 60.04470237406131
+        },
+        "scan_cycle_ms": {
+          "n": 2999,
+          "mean": 98.88856118706235,
+          "median": 98.942,
+          "rmse": 100.32144565540217,
+          "standard_deviation": 16.895115410745827,
+          "p95": 105.70469999999999,
+          "maximum": 927.897,
+          "confidence_interval_95_lower": 98.2837756178838,
+          "confidence_interval_95_upper": 99.4933467562409
+        },
+        "localization_score": {
+          "n": 2999,
+          "mean": 0.9527491764924957,
+          "median": 0.955348969,
+          "rmse": 0.9528640031509964,
+          "standard_deviation": 0.014792403246552642,
+          "p95": 0.9750755672,
+          "maximum": 0.985448897,
+          "confidence_interval_95_lower": 0.9522196606058333,
+          "confidence_interval_95_upper": 0.9532786923791581
+        },
+        "tracking_sample_rate": 0.9996665555185061,
+        "accepted_scan_rate": 1
+      },
+      "update_rate_hz": {
+        "n": 3044,
+        "mean": 10.101690208152318,
+        "median": 10,
+        "rmse": 10.146678022864487,
+        "standard_deviation": 0.9544264446260292,
+        "p95": 10.989010989010989,
+        "maximum": 20,
+        "confidence_interval_95_lower": 10.067778664511184,
+        "confidence_interval_95_upper": 10.135601751793452
+      },
+      "binary_size_bytes": 263524,
+      "measurement_windows": {
+        "idle": [],
+        "tracking_r1": [],
+        "tracking_r2": [],
+        "endurance": [
+          302251
+        ]
+      }
+    }
+  },
+  "recovery_trials": []
+}

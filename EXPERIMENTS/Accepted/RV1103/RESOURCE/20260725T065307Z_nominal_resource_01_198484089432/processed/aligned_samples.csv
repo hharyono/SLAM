@@ -1,0 +1,1 @@
+timestamp_ms,marker_id,zone,truth_x_m,truth_y_m,truth_yaw_rad,estimate_x_m,estimate_y_m,estimate_yaw_rad,score,valid,position_error_m,heading_error_deg
