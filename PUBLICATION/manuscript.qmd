@@ -1,5 +1,5 @@
 ---
-title: "Resource-Aware Local–Global Multi-Resolution Localization and Recovery on a Constrained RV1103 Robot"
+title: "Resource-Aware Local–Global Multi-Resolution Localization and Recovery on a Constrained RV1103 Embedded Platform"
 subtitle: "Physical, Ablation, and Sensor-Paced Hardware Evaluation"
 author:
   - name: "Haryono"
@@ -42,7 +42,7 @@ keywords:
   - embedded localization
   - global relocalization
   - multi-resolution scan matching
-  - resource-aware robotics
+  - resource-aware embedded systems
   - RV1103
 ---
 
@@ -55,11 +55,11 @@ University, Tangerang, Indonesia. **Corresponding authors:** Haryono
 
 # Introduction
 
-Reliable localization on a constrained robot is not established by pose
+Reliable localization on a constrained embedded platform is not established by pose
 accuracy alone. The implementation must track through physical motion, detect
 loss, recover after relocation, tolerate temporary scan disturbance, and meet
 the sensor period with limited CPU and memory. We address these requirements
-on an RV1103 robot using one production implementation and one traceable
+on an RV1103 board–LiDAR platform using one production implementation and one traceable
 evaluation chain.
 
 Correlative scan matching, coarse-to-fine search, and global relocalization
@@ -149,7 +149,7 @@ to `LOST` before confirmed tracking. The deployed configuration,
 replay through the same tracker, score, map representation, and transitions.
 
 The dashboard, backend, and firmware enforce one session lifecycle:
-preflight verifies robot state and map/binary SHA-256 hashes; session creation
+preflight verifies target state and map/binary SHA-256 hashes; session creation
 freezes configuration and references; capture isolates the experimental
 localizer; scenario events are order-checked; stop copies evidence with
 checksums and restores normal localization; analysis validates protocol
@@ -170,7 +170,10 @@ of the reverse traversal rather than the same physical location as R1/M\(k\).
 The fourth and fifth checkpoints span the doorway in either direction.
 Furniture-change trials deliberately retain their frozen localization map
 while the physical arrangement differs. The separately acquired changed-scene
-grid documents the disturbance but is not used for localization.
+grid documents the disturbance but is not used for localization. All route
+movement and kidnapped repositioning were performed manually with the
+board–LiDAR assembly; no drive base, motor controller, or autonomous
+navigation stack was integrated.
 
 @tbl-protocols gives the complete experimental logic without repeating
 the common session lifecycle. Ground Truth, Route, Kidnapped, and Dynamic
@@ -181,10 +184,10 @@ recorded-timestamp replay.
 
 | Test | Controlled execution | Validity gate and primary measures |
 |---|---|---|
-| Ground Truth | Independently return the robot to one surveyed M1 pose ten times. | Exactly 10 records; pose repeatability. |
-| Route | Traverse eight ordered checkpoints in R1 and R2; nominal, static 90° LiDAR occlusion, or changed furniture. | 8 unique ordered poses; position and wrapped-heading error. |
-| Kidnapped | Stabilize at A, cover and relocate the robot, uncover at B; same- or cross-room. | One start/release/final pose, 60 s timeout; first recovery, stable tracking, final error, false recovery. |
-| Dynamic Occluded | Robot stationary at M2–M7; a 13 × 13 × 30 cm object crosses about 0.50 m ahead for 4 s. | Six 3.5–4.5 s windows and eight checkpoints; acceptance, drift, recovery, and near-sector response. |
+| Ground Truth | Independently return the board–LiDAR assembly to one surveyed M1 pose ten times. | Exactly 10 records; pose repeatability. |
+| Route | Move the board–LiDAR assembly manually through eight ordered checkpoints in R1 and R2; nominal, static 90° LiDAR occlusion, or changed furniture. | 8 unique ordered poses; position and wrapped-heading error. |
+| Kidnapped | Stabilize the localization assembly at A, cover and relocate it, then uncover it at B; same- or cross-room. | One start/release/final pose, 60 s timeout; first recovery, stable tracking, final error, false recovery. |
+| Dynamic Occluded | Keep the localization assembly stationary at M2–M7 while a 13 × 13 × 30 cm object crosses about 0.50 m ahead for 4 s. | Six 3.5–4.5 s windows and eight checkpoints; acceptance, drift, recovery, and near-sector response. |
 | Ablation | On the host, replay each source through a 2×2 method design; on RV1103, validate only the selected method. Map, initial pose, scan sequence, hash, and timestamps remain equal among variants of a source. | Expected variant set and equal within-source input; recovery, acceptance, and matcher cost. |
 | Resource | RV1103 live idle/R1/R2, live endurance, and recorded-paced replay. | Complete CPU/RSS/latency fields; boundary-specific overruns, stability, and recovery. |
 
@@ -416,7 +419,8 @@ furniture case preserves original records while near-equal bidirectional
 offsets expose the reference-entry correction; its in-sample corrected
 residuals are evidence of consistency rather than independent calibration.
 
-The main limitations are one primary RV1103 robot, one indoor environment,
+The main limitations are one primary RV1103 board–LiDAR assembly, no integrated
+mobile-platform deployment, one indoor environment,
 manual placement/object motion, small and unbalanced session counts,
 independently acquired cross-board maps and marker references, and dependent
 scans. Ground Truth measures one-marker repeatability rather than absolute
