@@ -1,0 +1,71 @@
+---
+title: ""
+lang: en
+format:
+  docx:
+    reference-doc: ../templates/generic/reference.docx
+  pdf:
+    pdf-engine: lualatex
+    documentclass: article
+    geometry:
+      - margin=1in
+    fontsize: 11pt
+execute:
+  echo: false
+---
+
+27 July 2026
+
+**Dear Editor,**
+
+Please consider our manuscript, **“Resource-Aware Local–Global
+Multi-Resolution Localization and Recovery on a Constrained RV1103 Embedded
+Platform,”** for publication in your journal.
+
+Reliable two-dimensional LiDAR localization on constrained embedded hardware
+requires more than pose accuracy: an implementation must track physical
+movement, detect loss, recover after displacement, tolerate short scene
+disturbances, and remain within CPU, memory, and scan-cycle limits. Existing
+studies often examine these requirements separately or only on host computers.
+Our work connects the localization method, embedded implementation, physical
+evaluation, and hardware-resource evidence in one auditable study.
+
+The manuscript presents a five-state local–global multi-resolution
+correlative localization system deployed on an RV1103 board–LiDAR platform;
+RV1106 evidence is included only for supported conditions. Six traceable test
+families comprise 24 reported, finalized sessions. RV1103 completed all 16
+nominal route checkpoints with 0.0279 m position RMSE and 0.589° heading RMSE.
+Four physical kidnapped trials recovered within 0.529–0.970 s, while twelve
+dynamic-crossing windows accepted 472/475 scans and automatically recovered
+from one brief loss.
+
+Factor isolation explains the result: only the combined local–global,
+multi-resolution variant recovered in both replay sources. On RV1103, the
+selected method achieved approximately 49–50 ms matcher P95. Recorded-paced
+replay measured 66.05% time-weighted CPU, 1,456 KiB peak RSS, and a 0.69%
+computation-deadline-miss rate. Live measurements additionally expose
+scheduling costs hidden by algorithm-only replay.
+
+The manuscript is appropriate for a journal addressing embedded intelligent
+systems, localization, sensor processing, and resource-aware edge computing.
+Its contribution is a reproducible embedded co-design and evaluation relating
+physical accuracy, recovery, disturbance response, method factors, and
+hardware cost. Finalized evidence retains raw telemetry, configuration,
+processed metrics, binary/map hashes, and SHA-256 manifests. Source code and
+publication materials are maintained at
+<https://github.com/hharyono/SLAM.git>.
+
+Thank you for considering our manuscript. We appreciate the opportunity to
+submit this work for editorial and peer review.
+
+Sincerely,
+
+**Haryono**  
+Information Technology Master's Degree Program  
+Pradita University, Tangerang, Indonesia  
+Email: haryono81@gmail.com
+
+**Handrio Santosa**  
+Information Technology Master's Degree Program  
+Pradita University, Tangerang, Indonesia  
+Email: handri.santoso@pradita.ac.id
