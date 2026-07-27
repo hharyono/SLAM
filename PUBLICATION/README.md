@@ -24,6 +24,7 @@ From this directory:
 ./scripts/build.sh docx
 ./scripts/build.sh pdf
 ./scripts/build.sh latex
+./scripts/build.sh springer
 ./scripts/build.sh all
 ./scripts/build.sh check
 ```
@@ -35,6 +36,10 @@ Outputs are written to `build/`.
 - PDF and `latex` builds retain the exact generated LaTeX source as
   `build/manuscript.tex`, with its generated figure dependencies under
   `build/manuscript_files/`. It can be compiled from inside `build/`.
+- `springer` creates a Springer Nature `iicol` submission package at
+  `build/springer-nature-submission/` and a matching `.zip`. The package
+  contains the compiled PDF, editable TEX/QMD/BIB/SVG sources, PDF figures,
+  and the official December 2024 `sn-jnl.cls` and `sn-basic.bst` files.
 - Citations use `references/references.bib` and `styles/ieee.csl`.
 
 Quarto stable 1.9.38 is installed for the current user at
