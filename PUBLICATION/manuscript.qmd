@@ -20,7 +20,7 @@ abstract: |
   Embedded two-dimensional LiDAR localization must combine accuracy,
   disturbance recovery, and bounded resource use. This work deploys a
   local–global multi-resolution correlative matcher with RV1103 as the primary
-  target and evaluates it across six traceable test families and 25 finalized
+  target and evaluates it across six traceable test families and 24 finalized
   sessions; auxiliary host and RV1106 evidence is explicitly identified.
   RV1103 completed
   16/16 nominal route checkpoints with 0.0279 m position RMSE and 0.589°
@@ -85,7 +85,7 @@ budget. The contributions are:
    target and auxiliary evidence identified by execution target; and
 3. finalized, version-controlled, checksum-verifiable evidence binding
    telemetry, configuration, map/binary hashes, processed metrics, and
-   manifests across 25 sessions.
+   manifests across 24 reported sessions.
 
 # Related Work
 
@@ -178,8 +178,7 @@ navigation stack was integrated.
 the common session lifecycle. Ground Truth, Route, Kidnapped, and Dynamic
 Occluded are physical tests. Host Ablation is identical-scan unpaced replay;
 board Ablation validates only the selected production method. Resource
-testing separates live idle/tracking, unrestricted live endurance, and
-recorded-timestamp replay.
+testing separates live idle/tracking and recorded-timestamp replay.
 
 | Test | Controlled execution | Validity gate and primary measures |
 |---|---|---|
@@ -188,7 +187,7 @@ recorded-timestamp replay.
 | Kidnapped | Stabilize the localization assembly at A, cover and relocate it, then uncover it at B; same- or cross-room. | One start/release/final pose, 60 s timeout; first recovery, stable tracking, final error, false recovery. |
 | Dynamic Occluded | Keep the localization assembly stationary at M2–M7 while a 13 × 13 × 30 cm object crosses about 0.50 m ahead for 4 s. | Six 3.5–4.5 s windows and eight checkpoints; acceptance, drift, recovery, and near-sector response. |
 | Ablation | On the host, replay each source through a 2×2 method design; on RV1103, validate only the selected method. Map, initial pose, scan sequence, hash, and timestamps remain equal among variants of a source. | Expected variant set and equal within-source input; recovery, acceptance, and matcher cost. |
-| Resource | RV1103 live idle/R1/R2, live endurance, and recorded-paced replay. | Complete CPU/RSS/latency fields; boundary-specific overruns, stability, and recovery. |
+| Resource | RV1103 live idle/R1/R2 and recorded-paced replay. | Complete CPU/RSS/latency fields; boundary-specific overruns and recovery. |
 
 : Six test families and their enforced evidence. {#tbl-protocols}
 
@@ -211,8 +210,8 @@ matcher execution above 100 ms; pacing wait is recorded separately. These
 rates characterize different execution boundaries and are not directly
 interchangeable.
 Results remain descriptive because sessions are limited and temporally
-dependent. The 25 accepted sessions comprise one Ground Truth, eight Route,
-seven Kidnapped, two Dynamic Occluded, four Ablation, and three Resource
+dependent. The 24 reported sessions comprise one Ground Truth, eight Route,
+seven Kidnapped, two Dynamic Occluded, four Ablation, and two Resource
 sessions. Short test/source labels replace filesystem paths and long
 identifiers in the paper; the manifest preserves the exact mapping.
 
@@ -363,7 +362,6 @@ and is not compared with board utilization.
 | Live idle | 63.1 s / 63 | — | 0.57 | 1,688 | — | — |
 | Live R1 | 61.4 s / 582 | 100% | 60.89 | 2,076 | 62.93 | 105.31 / 21.13% |
 | Live R2 | 62.4 s / 626 | 100% | 60.96 | 2,076 | 62.93 | 105.53 / 21.41% |
-| Endurance | 302.3 s / 2,999 | 100% | 62.09 | 2,076 | 65.25 | 105.71 / 19.77% |
 | Paced replay | 576 scans | 98.78% | 66.05* | 1,456 | 67.25 | 4/576 (0.69%) |
 
 : Live and recorded-paced RV1103 resource results. Idle observations are
@@ -373,17 +371,9 @@ computation-deadline misses use the distinct boundaries defined in the
 Experimental Method.
 {#tbl-resource}
 
-Live R1/R2 accepted every scan without `LOST` or `DEGRADED`. Endurance
-accepted all 2,999 scans (2,996 `TRACKING`, three `RECOVERED`) with no crash,
-fatal, or out-of-memory evidence. However, live cycle P95 was 105–106 ms and
-about one fifth of cycles exceeded 100 ms, demonstrating limited scheduling
-margin.
-
-The endurance analyzer did not aggregate its CPU/RSS fields
-(`resource_samples=0`), although every per-scan telemetry record retained
-them. Endurance CPU and RSS in @tbl-resource were therefore recomputed
-directly from the finalized raw telemetry; latency and state counts agree with
-the generated session summary.
+Live R1/R2 accepted every scan without `LOST` or `DEGRADED`. Their cycle P95
+was 105–106 ms and about one fifth of cycles exceeded 100 ms, demonstrating
+limited scheduling margin.
 
 Recorded-paced cross-room replay contained complete resource telemetry for
 576/576 rows. Matcher-active CPU mean/P95 was 98.42/99.94%, whereas
