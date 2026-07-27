@@ -417,8 +417,9 @@ kernel OOM trace was retained to establish whether the OOM killer terminated
 the process. Taken together, these observations identify RV1103 memory
 capacity as the primary suspected operational limitation. No corresponding
 interruption appears in the finalized RV1106 sessions. This observation is
-consistent with the memory-capacity interpretation because the RV1106 test
-platform has a larger memory configuration than the 64 MiB RV1103 target.
+consistent with the memory-capacity interpretation: the RV1103 target has
+64 MiB DDR2, whereas the RV1106 target has 256 MiB DDR3L and therefore four
+times the nominal memory capacity [@luckfox_rv1103; @luckfox_rv1106].
 
 The main limitations are one primary RV1103 board–LiDAR assembly, no integrated
 mobile-platform deployment, one indoor environment,
