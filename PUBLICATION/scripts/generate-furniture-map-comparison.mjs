@@ -100,7 +100,7 @@ function markerLayer(markers, map, x0, y0, scale, resolution) {
 }
 
 const resolution = 0.05;
-const baseline = readPgm(path.join(slamDir, "maps", "map_rv1103.pgm"));
+const baseline = readPgm(path.join(slamDir, "maps", "ruang_utama.pgm"));
 const changed = readPgm(path.join(slamDir, "maps", "map_occluded.pgm"));
 const markers = JSON.parse(
   fs.readFileSync(
