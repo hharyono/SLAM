@@ -25,7 +25,6 @@ From this directory:
 ./scripts/build.sh pdf
 ./scripts/build.sh latex
 ./scripts/build.sh springer
-./scripts/build.sh cover
 ./scripts/build.sh all
 ./scripts/build.sh check
 ```
@@ -41,8 +40,8 @@ Outputs are written to `build/`.
   `build/springer-nature-submission/` and a matching `.zip`. The package
   contains the compiled PDF, editable TEX/QMD/BIB/SVG sources, PDF figures,
   and the official December 2024 `sn-jnl.cls` and `sn-basic.bst` files.
-- `cover` creates the separately uploaded cover letter as
-  `build/cover/cover-letter.docx` and `build/cover/cover-letter.pdf`.
+- The separately uploaded cover letter is maintained as the plain-text file
+  `cover/cover-letter.txt`.
 - Citations use `references/references.bib` and `styles/ieee.csl`.
 
 Quarto stable 1.9.38 is installed for the current user at

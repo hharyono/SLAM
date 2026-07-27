@@ -113,17 +113,6 @@ build_springer() {
   )
 }
 
-build_cover_letter() {
-  (
-    cd cover
-    "$quarto_command" render cover-letter.qmd --to docx
-    "$quarto_command" render cover-letter.qmd --to pdf
-  )
-  mkdir -p build/cover
-  mv cover/cover-letter.docx build/cover/cover-letter.docx
-  mv cover/cover-letter.pdf build/cover/cover-letter.pdf
-}
-
 check_sources() {
   test -s manuscript.qmd
   test -f references/references.bib
@@ -152,19 +141,15 @@ case "$target" in
   springer|springer-nature)
     build_springer
     ;;
-  cover|cover-letter)
-    build_cover_letter
-    ;;
   all)
     build_docx
     build_springer
-    build_cover_letter
     ;;
   check)
     check_sources
     ;;
   *)
-    echo "Usage: $0 {docx|pdf|latex|springer|cover|all|check}" >&2
+    echo "Usage: $0 {docx|pdf|latex|springer|all|check}" >&2
     exit 2
     ;;
 esac

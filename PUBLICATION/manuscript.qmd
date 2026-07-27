@@ -408,6 +408,16 @@ furniture case preserves original records while near-equal bidirectional
 offsets expose the reference-entry correction; its in-sample corrected
 residuals are evidence of consistency rather than independent calibration.
 
+During development and non-finalized RV1103 runs, several operational
+interruptions occurred under severe memory pressure. In one inspected case,
+the board reported approximately 0.9 MiB free and 2.5 MiB available memory
+while `localize_uart` was no longer active and SSH access was unresponsive.
+The coincidence strongly indicates a memory-pressure failure, although no
+kernel OOM trace was retained to establish whether the OOM killer terminated
+the process. No corresponding interruption appears in the finalized RV1106
+sessions. Because the two targets did not undergo balanced resource testing,
+this observation does not establish that RV1106 is generally more reliable.
+
 The main limitations are one primary RV1103 board–LiDAR assembly, no integrated
 mobile-platform deployment, one indoor environment,
 manual placement/object motion, small and unbalanced session counts,
