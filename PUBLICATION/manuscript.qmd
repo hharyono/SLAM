@@ -414,9 +414,12 @@ the board reported approximately 0.9 MiB free and 2.5 MiB available memory
 while `localize_uart` was no longer active and SSH access was unresponsive.
 The coincidence strongly indicates a memory-pressure failure, although no
 kernel OOM trace was retained to establish whether the OOM killer terminated
-the process. No corresponding interruption appears in the finalized RV1106
-sessions. Because the two targets did not undergo balanced resource testing,
-this observation does not establish that RV1106 is generally more reliable.
+the process. Taken together, these observations identify RV1103 memory
+capacity as the primary suspected operational limitation. No corresponding
+interruption appears in the finalized RV1106 sessions, which is consistent
+with, but does not prove, this memory-capacity interpretation. Because the two
+targets did not undergo balanced resource testing, the absence of an observed
+RV1106 interruption does not establish general platform reliability.
 
 The main limitations are one primary RV1103 board–LiDAR assembly, no integrated
 mobile-platform deployment, one indoor environment,
