@@ -29,6 +29,16 @@ build_docx() {
 build_pdf() {
   generate_figures
   "$quarto_command" render manuscript.qmd --to pdf
+  test -s manuscript.tex
+  test -d manuscript_files
+  mkdir -p build/manuscript_files
+  cp -a manuscript_files/. build/manuscript_files/
+  mv manuscript.tex build/manuscript.tex
+}
+
+build_latex() {
+  build_pdf
+  test -s build/manuscript.tex
 }
 
 check_sources() {
@@ -53,6 +63,9 @@ case "$target" in
   pdf)
     build_pdf
     ;;
+  latex|tex)
+    build_latex
+    ;;
   all)
     build_docx
     build_pdf
@@ -61,7 +74,7 @@ case "$target" in
     check_sources
     ;;
   *)
-    echo "Usage: $0 {docx|pdf|all|check}" >&2
+    echo "Usage: $0 {docx|pdf|latex|all|check}" >&2
     exit 2
     ;;
 esac

@@ -23,6 +23,7 @@ From this directory:
 ```bash
 ./scripts/build.sh docx
 ./scripts/build.sh pdf
+./scripts/build.sh latex
 ./scripts/build.sh all
 ./scripts/build.sh check
 ```
@@ -30,8 +31,10 @@ From this directory:
 Outputs are written to `build/`.
 
 - DOCX uses `templates/generic/reference.docx`.
-- PDF uses LuaLaTeX and retains the intermediate `.tex` source locally; the
-  generated `.tex` file is ignored by Git.
+- PDF uses LuaLaTeX.
+- PDF and `latex` builds retain the exact generated LaTeX source as
+  `build/manuscript.tex`, with its generated figure dependencies under
+  `build/manuscript_files/`. It can be compiled from inside `build/`.
 - Citations use `references/references.bib` and `styles/ieee.csl`.
 
 Quarto stable 1.9.38 is installed for the current user at
