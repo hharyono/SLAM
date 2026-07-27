@@ -167,7 +167,6 @@ surveyed locations define reciprocal routes: R1 traverses the physical
 locations M1→M8 and R2 traverses them in reverse. Acquisition files number
 each route by travel order, however, so R2/M\(k\) means the \(k\)-th checkpoint
 of the reverse traversal rather than the same physical location as R1/M\(k\).
-The fourth and fifth checkpoints span the doorway in either direction.
 Furniture-change trials deliberately retain their frozen localization map
 while the physical arrangement differs. The separately acquired changed-scene
 grid documents the disturbance but is not used for localization. All route
