@@ -211,7 +211,7 @@ Embedded Platform}
 \subtitle{Physical, Ablation, and Sensor-Paced Hardware Evaluation}
 
 \author*[1]{\sur{Haryono}}\email{haryono81@gmail.com}
-\author*[1]{\fnm{Handrio} \sur{Santosa}}
+\author*[1]{\fnm{Handri} \sur{Santoso}}
 \email{handri.santoso@pradita.ac.id}
 
 \affil*[1]{\orgdiv{Information Technology Master's Degree Program},

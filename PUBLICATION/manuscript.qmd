@@ -10,7 +10,7 @@ author:
         name: "Information Technology Master’s Degree Program, Pradita University"
         city: Tangerang
         country: Indonesia
-  - name: "Handrio Santosa"
+  - name: "Handri Santoso"
     email: "handri.santoso@pradita.ac.id"
     corresponding: true
     affiliations:
@@ -49,7 +49,7 @@ keywords:
 ::: {.author-information}
 **Affiliation:** Information Technology Master’s Degree Program, Pradita
 University, Tangerang, Indonesia. **Corresponding authors:** Haryono
-([haryono81@gmail.com](mailto:haryono81@gmail.com)) and Handrio Santosa
+([haryono81@gmail.com](mailto:haryono81@gmail.com)) and Handri Santoso
 ([handri.santoso@pradita.ac.id](mailto:handri.santoso@pradita.ac.id)).
 :::
 
