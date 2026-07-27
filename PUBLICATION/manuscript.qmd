@@ -416,10 +416,9 @@ The coincidence strongly indicates a memory-pressure failure, although no
 kernel OOM trace was retained to establish whether the OOM killer terminated
 the process. Taken together, these observations identify RV1103 memory
 capacity as the primary suspected operational limitation. No corresponding
-interruption appears in the finalized RV1106 sessions, which is consistent
-with, but does not prove, this memory-capacity interpretation. Because the two
-targets did not undergo balanced resource testing, the absence of an observed
-RV1106 interruption does not establish general platform reliability.
+interruption appears in the finalized RV1106 sessions. This observation is
+consistent with the memory-capacity interpretation because the RV1106 test
+platform has a larger memory configuration than the 64 MiB RV1103 target.
 
 The main limitations are one primary RV1103 board–LiDAR assembly, no integrated
 mobile-platform deployment, one indoor environment,
