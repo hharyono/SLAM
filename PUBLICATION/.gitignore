@@ -1,0 +1,13 @@
+/build/*
+!/build/.gitkeep
+/.quarto/
+/_freeze/
+/manuscript_files/
+/.jupyter_cache/
+/manuscript.tex
+*.aux
+*.log
+*.out
+*.toc
+
+**/*.quarto_ipynb

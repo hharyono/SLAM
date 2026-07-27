@@ -1,0 +1,37 @@
+project:
+  type: default
+  output-dir: build
+  render:
+    - manuscript.qmd
+
+lang: en
+bibliography: references/references.bib
+csl: styles/ieee.csl
+link-citations: true
+
+crossref:
+  fig-title: Figure
+  tbl-title: Table
+  eq-prefix: Equation
+
+format:
+  docx:
+    reference-doc: templates/generic/reference.docx
+    number-sections: true
+    toc: false
+    highlight-style: github
+  pdf:
+    pdf-engine: lualatex
+    documentclass: article
+    classoption:
+      - 10pt
+    keep-tex: true
+    number-sections: true
+    toc: false
+    geometry:
+      - margin=1in
+
+execute:
+  freeze: auto
+  echo: false
+  warning: false

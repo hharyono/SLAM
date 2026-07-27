@@ -1,0 +1,448 @@
+---
+title: "Resource-Aware Local–Global Multi-Resolution Localization and Recovery on a Constrained RV1103 Robot"
+subtitle: "Physical, Ablation, and Sensor-Paced Hardware Evaluation"
+author:
+  - name: "Haryono"
+    email: "haryono81@gmail.com"
+    corresponding: true
+    affiliations:
+      - id: institution
+        name: "Information Technology Master’s Degree Program, Pradita University"
+        city: Tangerang
+        country: Indonesia
+  - name: "Handrio Santosa"
+    email: "handri.santoso@pradita.ac.id"
+    corresponding: true
+    affiliations:
+      - ref: institution
+date: last-modified
+abstract: |
+  Embedded two-dimensional LiDAR localization must combine accuracy,
+  disturbance recovery, and bounded resource use. This work deploys a
+  local–global multi-resolution correlative matcher with RV1103 as the primary
+  target and evaluates it across six traceable test families and 25 finalized
+  sessions; auxiliary host and RV1106 evidence is explicitly identified.
+  RV1103 completed
+  16/16 nominal route checkpoints with 0.0279 m position RMSE and 0.589°
+  heading RMSE. Four physical kidnapped trials recovered in 0.529–0.970 s,
+  with final position error no greater than 0.0501 m. Twelve operator-timed
+  dynamic-crossing windows accepted 472/475 scans; one brief loss recovered
+  automatically.
+  Factorial host replay showed that only the combined local–global,
+  multi-resolution variant recovered in both sources. The selected method on
+  RV1103 achieved approximately 49–50 ms matcher P95. Recorded-paced replay
+  measured 66.05% time-weighted CPU, 1,456 KiB peak RSS, 0.69%
+  computation-deadline misses, 1.045 s cross-room recovery, and no false
+  recovery. Live tracking remained functional but showed approximately 20%
+  inter-scan overruns, exposing limited scheduling margin. The contribution
+  is an auditable embedded co-design and evaluation that connects physical
+  accuracy, recovery, disturbance behavior, method factors, and real hardware
+  cost.
+keywords:
+  - embedded localization
+  - global relocalization
+  - multi-resolution scan matching
+  - resource-aware robotics
+  - RV1103
+---
+
+::: {.author-information}
+**Affiliation:** Information Technology Master’s Degree Program, Pradita
+University, Tangerang, Indonesia. **Corresponding authors:** Haryono
+([haryono81@gmail.com](mailto:haryono81@gmail.com)) and Handrio Santosa
+([handri.santoso@pradita.ac.id](mailto:handri.santoso@pradita.ac.id)).
+:::
+
+# Introduction
+
+Reliable localization on a constrained robot is not established by pose
+accuracy alone. The implementation must track through physical motion, detect
+loss, recover after relocation, tolerate temporary scan disturbance, and meet
+the sensor period with limited CPU and memory. We address these requirements
+on an RV1103 robot using one production implementation and one traceable
+evaluation chain.
+
+Correlative scan matching, coarse-to-fine search, and global relocalization
+are established concepts. Their combination is useful on embedded hardware
+because local search exploits the previous pose, global search removes that
+assumption after displacement, and a likelihood pyramid limits exhaustive
+fine-resolution work. Our novelty claim is therefore not a new matching
+equation. It is the implemented local–global multi-resolution co-design and
+its joint evaluation through physical, factor-isolation, and sensor-paced
+hardware evidence. All reported performance values are computed from the
+finalized project evidence.
+
+This paper asks whether the production method (i) maintains route tracking,
+(ii) recovers from same- and cross-room kidnapping, (iii) remains usable
+during short dynamic obstruction, (iv) requires both global and
+multi-resolution factors, and (v) fits the RV1103 CPU, memory, and 100 ms scan
+budget. The contributions are:
+
+1. a five-state embedded tracker combining bounded local search,
+   whole-map recovery, and multi-resolution refinement;
+2. six enforced protocols covering Ground Truth, Route, Kidnapped, Dynamic
+   Occluded, Ablation, and Resource evaluation, with RV1103 as the primary
+   target and auxiliary evidence identified by execution target; and
+3. finalized, version-controlled, checksum-verifiable evidence binding
+   telemetry, configuration, map/binary hashes, processed metrics, and
+   manifests across 25 sessions.
+
+# Related Work
+
+Recent 2D LiDAR SLAM literature spans matching, filtering, graph optimization,
+sensor fusion, and dynamic-scene handling [@ran2025review]. Robust front ends
+and probabilistic estimators address ambiguous geometry
+[@huang2022robust2d; @lim2024minimax], while improved Gmapping and tightly
+coupled LiDAR–inertial–wheel systems add complementary motion constraints
+[@tian2023gmapping; @zhang2024_2dliw]. Indoor mapping and sparse sensing have
+also been treated through conditional line fitting and efficient graph
+optimization [@prieto2024weighted; @zhou2022sparse]. Visual loop closure can
+disambiguate similar indoor geometry [@zhou2023visual], and cross-environment
+evaluation shows that reported SLAM performance depends on scene structure
+and test conditions [@li2024evaluation].
+
+Computational efficiency remains central to deployable LiDAR estimation.
+Recent work demonstrates carefully engineered point registration, continuous
+scan slicing, and FPGA acceleration [@vizzo2023kiss; @karimi2021lola;
+@sugiura2021fpga]. Global localization can also be formulated through learned
+scan similarity [@chen2022overlapnet]. Dynamic-scene studies instead detect
+scan-matching faults, identify moving objects, or modify matching to tolerate
+occlusion [@jeong2023fault; @mihalik2022dynamic; @koyama2026occlusion].
+These studies motivate the present combination: robust 2D matching informs
+the fixed-map front end [@huang2022robust2d], multi-resolution and engineered
+registration motivate bounded search [@vizzo2023kiss; @sugiura2021fpga], and
+dynamic-scene studies motivate explicit rejection and recovery rather than
+unsupported object classification [@jeong2023fault; @mihalik2022dynamic;
+@koyama2026occlusion]. The remaining gap addressed here is their joint
+deployment and evaluation: fixed-map 2D localization, whole-map recovery,
+physical disturbance, controlled factor isolation, and sensor-paced resource
+measurement on a 64 MiB target within one traceable workflow.
+
+# System and Production Method
+
+The primary target is a Luckfox Pico Plus RV1103 with 64 MiB DDR2, 128 MiB
+SPI NAND, Buildroot/Linux 5.10.160, and a YDLIDAR T-mini Plus connected by
+UART at 230400 bit/s [@luckfox_rv1103; @ydlidar_tmini_plus]. The LiDAR
+operates at 10 Hz and 4 kHz ranging; valid localization ranges are
+0.05–12 m, making 100 ms the nominal scan-cycle deadline. RV1106 is reported
+only where physical evidence exists [@luckfox_rv1106]; comparisons are
+restricted to conditions represented on both targets. The RV1103 and RV1106
+deployments use independently acquired map and marker-reference realizations,
+so cross-board results are descriptive deployment comparisons, not isolated
+hardware benchmarks.
+
+For a candidate pose, valid scan endpoints are transformed into the map and
+scored against a likelihood field. A candidate requires at least the larger
+of three points or one third of the scan inside the map and must meet the 0.90
+acceptance threshold. Local tracking searches ±0.50 m and ±0.35 rad around
+the last accepted pose using 0.05 m and 1° finest increments. Global recovery
+searches the complete coarse map at 10° heading steps, retains the best 12
+candidates, and refines each through progressively finer likelihood levels.
+
+The state machine exposes uncertainty rather than silently propagating a poor
+pose. `GLOBAL_SEARCH` acquires an initial or replacement pose; acceptance
+enters `RECOVERED`; three accepted local updates confirm `TRACKING`. One or
+two rejected scans produce `DEGRADED`; the third produces `LOST`, invalidates
+the local center, and triggers whole-map search. A false recovery is a return
+to `LOST` before confirmed tracking. The deployed configuration,
+`local_global_multi`, is shared by live UART localization and deterministic
+replay through the same tracker, score, map representation, and transitions.
+
+The dashboard, backend, and firmware enforce one session lifecycle:
+preflight verifies robot state and map/binary SHA-256 hashes; session creation
+freezes configuration and references; capture isolates the experimental
+localizer; scenario events are order-checked; stop copies evidence with
+checksums and restores normal localization; analysis validates protocol
+structure; finalization creates an inventory and manifest. Raw scans are
+streamed to the backend when board storage would be unsafe. Reviewed evidence
+is finalized, version-controlled, and checksum-verifiable; it can later be
+replayed without rewriting the physical run.
+
+# Experimental Method
+
+## Environment and protocols
+
+The primary RV1103 occupancy grid is 148 × 122 pixels at 0.05 m/pixel. Eight
+surveyed locations define reciprocal routes: R1 traverses the physical
+locations M1→M8 and R2 traverses them in reverse. Acquisition files number
+each route by travel order, however, so R2/M\(k\) means the \(k\)-th checkpoint
+of the reverse traversal rather than the same physical location as R1/M\(k\).
+The fourth and fifth checkpoints span the doorway in either direction.
+Furniture-change trials deliberately retain their frozen localization map
+while the physical arrangement differs. The separately acquired changed-scene
+grid documents the disturbance but is not used for localization.
+
+@tbl-protocols gives the complete experimental logic without repeating
+the common session lifecycle. Ground Truth, Route, Kidnapped, and Dynamic
+Occluded are physical tests. Host Ablation is identical-scan unpaced replay;
+board Ablation validates only the selected production method. Resource
+testing separates live idle/tracking, unrestricted live endurance, and
+recorded-timestamp replay.
+
+| Test | Controlled execution | Validity gate and primary measures |
+|---|---|---|
+| Ground Truth | Independently return the robot to one surveyed M1 pose ten times. | Exactly 10 records; pose repeatability. |
+| Route | Traverse eight ordered checkpoints in R1 and R2; nominal, static 90° LiDAR occlusion, or changed furniture. | 8 unique ordered poses; position and wrapped-heading error. |
+| Kidnapped | Stabilize at A, cover and relocate the robot, uncover at B; same- or cross-room. | One start/release/final pose, 60 s timeout; first recovery, stable tracking, final error, false recovery. |
+| Dynamic Occluded | Robot stationary at M2–M7; a 13 × 13 × 30 cm object crosses about 0.50 m ahead for 4 s. | Six 3.5–4.5 s windows and eight checkpoints; acceptance, drift, recovery, and near-sector response. |
+| Ablation | On the host, replay each source through a 2×2 method design; on RV1103, validate only the selected method. Map, initial pose, scan sequence, hash, and timestamps remain equal among variants of a source. | Expected variant set and equal within-source input; recovery, acceptance, and matcher cost. |
+| Resource | RV1103 live idle/R1/R2, live endurance, and recorded-paced replay. | Complete CPU/RSS/latency fields; boundary-specific overruns, stability, and recovery. |
+
+: Six test families and their enforced evidence. {#tbl-protocols}
+
+Dynamic evidence counts returns at 0.30–0.80 m in left (+10° to +65°), center
+(−10° to +10°), and right (−65° to −10°) sectors relative to the preceding
+one-second baseline. A crossing is valid without occupying all sectors; a
+stricter auxiliary direction detector requires at least three excess points
+in each sector with ordered peaks.
+
+## Measures and traceability
+
+Position error is $e_p=\sqrt{(\hat{x}-x)^2+(\hat{y}-y)^2}$; heading error is
+the absolute wrapped angle
+$e_\theta=|\operatorname{atan2}(\sin(\hat\theta-\theta),
+\cos(\hat\theta-\theta))|$. Reports use RMSE, P95, maximum, success
+proportions, and recovery latency. For live runs, an overrun is an observed
+inter-scan cycle above 100 ms and therefore includes sensor transport, I/O,
+and scheduling. For recorded-paced replay, a computation-deadline miss is
+matcher execution above 100 ms; pacing wait is recorded separately. These
+rates characterize different execution boundaries and are not directly
+interchangeable.
+Results remain descriptive because sessions are limited and temporally
+dependent. The 25 accepted sessions comprise one Ground Truth, eight Route,
+seven Kidnapped, two Dynamic Occluded, four Ablation, and three Resource
+sessions. Short test/source labels replace filesystem paths and long
+identifiers in the paper; the manifest preserves the exact mapping.
+
+# Results
+
+## Ground Truth
+
+Ground Truth produced exactly ten records at M1. Position RMSE was
+0.000017 m and heading RMSE/max was 0.570°/1.342°. The repeated discrete pose
+must not be interpreted as micrometre surveying accuracy; it verifies
+estimator/reference repeatability at one marker. This Accepted test exists
+only for RV1106, so no RV1103–RV1106 comparison is made.
+
+## Route
+
+| Platform | Condition | Route | Success | Position RMSE / P95 (m) | Heading RMSE / P95 (°) |
+|---|---|---:|---:|---:|---:|
+| RV1103 | Nominal | R1 | 8/8 | 0.031 / 0.050 | 0.632 / 0.836 |
+| RV1103 | Nominal | R2 | 8/8 | 0.025 / 0.050 | 0.542 / 0.795 |
+| RV1106 | Nominal | R1 | 8/8 | 0.040 / 0.050 | 1.697 / 3.081 |
+| RV1106 | Nominal | R2 | 8/8 | 0.040 / 0.050 | 2.588 / 3.812 |
+| RV1106 | Furniture changed | R1 | 8/8 | 0.043 / 0.063 | 1.940 / 3.637* |
+| RV1106 | Furniture changed | R2 | 8/8 | 0.031 / 0.050 | 1.298 / 2.293* |
+| RV1106 | Static 90° occlusion | R1 | 8/8 | 0.064 / 0.090 | 1.926 / 3.646 |
+| RV1106 | Static 90° occlusion | R2 | 8/8 | 0.059 / 0.071 | 1.935 / 3.206 |
+
+: Physical Route results. *Post-hoc corrected reference heading; estimator
+output and Accepted evidence were not changed. {#tbl-route}
+
+RV1103 nominal performance pooled over both directions was 0.0279 m position
+RMSE and 0.589° heading RMSE, with 16/16 valid checkpoints. The only
+cross-board Route comparison uses nominal R1/R2, which exists on both targets:
+RV1106 also achieved 16/16, with pooled 0.0396 m position RMSE and 2.189°
+heading RMSE. Static occlusion and furniture change exist only on RV1106 and
+are therefore reported as RV1106 disturbance results, not compared with
+RV1103. Because the platforms used independently acquired map and marker
+references, the pooled errors describe two deployments and do not isolate a
+hardware effect. Static occlusion retained 16/16 valid checkpoints. Furniture
+change
+also retained 16/16; its raw heading RMSE near 111° arose from an
+operator-entered reference heading. One shared +111.023° correction was
+applied only in secondary analysis: independently observed R1/R2 offsets were
+110.804° and 111.241° (difference 0.436°), yielding corrected RMSE of 1.940°
+and 1.298°. This supports internally consistent localization under the
+frozen-map mismatch, but the shared correction was estimated and evaluated on
+the same records without a holdout. The corrected residuals therefore show
+internal consistency, not independently validated absolute-heading accuracy.
+
+![Frozen localization reference (left) and Furniture Arrangement Change
+(right). Both panels use the same physical scale and surveyed M1–M8
+coordinates. Black contours are occupied LiDAR returns. Interior and boundary
+differences show that the changed scene is not identical to the reference;
+separate acquisition and normalization preclude pixel-wise subtraction. The
+localizer continued using the frozen left map.](figures/furniture-map-comparison.svg){#fig-furniture-map-comparison width=95%}
+
+## Kidnapped
+
+| Platform | Scenario | Trials | First recovery (ms) | Stable tracking (ms) | Maximum final error |
+|---|---|---:|---:|---:|---:|
+| RV1103 | Same room | 2 | 529–970 | 778–1,132 | 0.0002 m / 0.420° |
+| RV1103 | Cross room | 2 | 790–952 | 1,034–1,201 | 0.0501 m / 0.268° |
+| RV1106 | Same room | 1 | 438 | 622 | 0.0500 m / 2.392° |
+| RV1106 | Cross room | 2 | 344–779 | 530–963 | 0.0501 m / 1.642° |
+
+: Physical Kidnapped recovery. Every trial succeeded within 60 s.
+{#tbl-kidnapped}
+
+RV1103 recovered all four displacements; mean first/stable latency was
+810/1,036 ms. RV1106 recovered all three; corresponding means were 520/705 ms.
+For the balanced cross-room subset (two trials per target), RV1103 first/stable
+means were 871/1,118 ms and RV1106 means were 562/747 ms; all four cross-room
+trials succeeded. Same-room results remain listed but are not used for a
+balanced comparison because RV1103 has two trials and RV1106 one. These
+descriptive observations do not establish universal platform superiority.
+
+## Dynamic Occluded
+
+| Route | Events | Accepted scans | Post-event tracking mean / P95 | Position / heading RMSE |
+|---|---:|---:|---:|---:|
+| R1 | 6 | 242/242 (100%) | 64.5 / 92.3 ms | 0.035 m / 0.952° |
+| R2 | 6 | 230/233 (98.71%) | 52.2 / 91.5 ms | 0.017 m / 0.474° |
+
+: RV1103 Dynamic Occluded session summary. {#tbl-dynamic}
+
+All 12 planned windows lasted 4.000–4.002 s. Overall acceptance was 472/475
+(99.37%); maximum window drift was 0.050 m and 1.465°. Eleven events remained
+continuously accepted. R2/M4 briefly reached `LOST` and recovered without
+operator intervention. Because this event has neither near-sector excess nor
+beam-level raw scans, a door-state or other map mismatch is plausible but
+unverified. The supported result is automatic confidence detection and
+recovery, not causal attribution. The strict direction detector confirmed
+only 2/12 passages, so the experiment supports localization robustness to
+short stationary crossings, not general obstacle-motion recognition or
+avoidance.
+
+![All operator-timed dynamic-crossing windows at M2–M7. Values are peak excess near-range
+returns above the preceding one-second baseline; a dash means no positive
+excess. The black dots around M2–M7 in Panel A are evidence-derived schematic
+projections. At each marker, the R1 or R2 event with the largest total sector
+excess is shown; every non-zero side is retained even when the response occurs
+in only one sector. Dot count is scaled for readability. These are not raw
+beam endpoints because beam-level scan rows were not captured.
+R2/M4 accepted 30/33 scans: scores 0.917–0.996 were accepted, while
+0.897, 0.884, and 0.891 were rejected at the 0.90 threshold. The third
+rejection caused `LOST`; global acceptance followed after 935 ms and confirmed
+tracking after 1.087 s. Its absent near-sector signal prevents attribution to
+the moving object.](figures/dynamic-occlusion-evidence.svg){#fig-dynamic-occlusion width=95% fig-pos="H"}
+
+## Ablation
+
+Host replay evaluated local/global search and single/multi-resolution as a
+2×2 design. Abbreviations are L-S (local single), L-M (local multi), LG-S
+(local–global single), and LG-M (local–global multi). S1 is an RV1106
+cross-room Kidnapped source; S2 is an RV1103 same-room Kidnapped source; and
+S3 is an RV1103 cross-room Kidnapped source. Equal-input control applies among
+the four host variants within S1 or within S2. Board validation reuses S2 and
+S3 but executes only LG-M.
+
+| Target/source | Variant | Accepted | Recovery | Matcher P95 (ms) | Recovery (ms) |
+|---|---|---:|---:|---:|---:|
+| Host/S1 | L-S | 35.26% | No | 92.79 | — |
+| Host/S1 | L-M | 77.32% | No | 4.17 | — |
+| Host/S1 | LG-S | 77.32% | No | 3,489.69 | — |
+| Host/S1 | LG-M | 98.56% | Yes | 5.57 | 365 |
+| Host/S2 | L-S | 82.03% | No | 108.21 | — |
+| Host/S2 | L-M | 82.03% | No | 5.17 | — |
+| Host/S2 | LG-S | 82.03% | No | 3,023.47 | — |
+| Host/S2 | LG-M | 98.23% | Yes | 4.11 | 985 |
+| RV1103/S2 | LG-M | 98.23% | Yes | 50.06 | 985 |
+| RV1103/S3 | LG-M | 98.78% | Yes | 49.35 | 1,045 |
+
+: Identical-input host ablation and selected-method RV1103 validation.
+{#tbl-ablation}
+
+Only LG-M recovered in both factorial sources. Multi-resolution reduced
+local-only mean matcher time from 67.66 to 3.02 ms (S1) and 71.15 to 3.43 ms
+(S2). Global search without the pyramid was computationally prohibitive and
+still failed the recovery criterion. The interaction is operationally clear:
+global search supplies recovery, while multi-resolution makes it tractable.
+RV1103 replay reproduced the selected method's acceptance and recovery with
+1,420–1,436 KiB peak RSS. Host CPU near 100% represents unpaced computation
+and is not compared with board utilization.
+
+## Resource
+
+| Mode | Duration / observations | Accepted | CPU mean (%) | RSS peak (KiB) | Matcher or tracking P95 (ms) | Cycle P95 / overruns |
+|---|---:|---:|---:|---:|---:|---:|
+| Live idle | 63.1 s / 63 | — | 0.57 | 1,688 | — | — |
+| Live R1 | 61.4 s / 582 | 100% | 60.89 | 2,076 | 62.93 | 105.31 / 21.13% |
+| Live R2 | 62.4 s / 626 | 100% | 60.96 | 2,076 | 62.93 | 105.53 / 21.41% |
+| Endurance | 302.3 s / 2,999 | 100% | 62.09 | 2,076 | 65.25 | 105.71 / 19.77% |
+| Paced replay | 576 scans | 98.78% | 66.05* | 1,456 | 67.25 | 4/576 (0.69%) |
+
+: Live and recorded-paced RV1103 resource results. Idle observations are
+one-second resource samples; all other observations are localization scans.
+The replay value marked * is time-weighted CPU. Live overruns and replay
+computation-deadline misses use the distinct boundaries defined in the
+Experimental Method.
+{#tbl-resource}
+
+Live R1/R2 accepted every scan without `LOST` or `DEGRADED`. Endurance
+accepted all 2,999 scans (2,996 `TRACKING`, three `RECOVERED`) with no crash,
+fatal, or out-of-memory evidence. However, live cycle P95 was 105–106 ms and
+about one fifth of cycles exceeded 100 ms, demonstrating limited scheduling
+margin.
+
+The endurance analyzer did not aggregate its CPU/RSS fields
+(`resource_samples=0`), although every per-scan telemetry record retained
+them. Endurance CPU and RSS in @tbl-resource were therefore recomputed
+directly from the finalized raw telemetry; latency and state counts agree with
+the generated session summary.
+
+Recorded-paced cross-room replay contained complete resource telemetry for
+576/576 rows. Matcher-active CPU mean/P95 was 98.42/99.94%, whereas
+time-weighted CPU was 66.05% because it includes inter-scan waiting. Tracking
+latency mean/P95/max was 50.96/67.25/107.71 ms; global latency mean/max was
+866.24/1,110.28 ms. The replay recovered in 1.045 s with three global scans,
+0.04998 m/0.343° final error, and zero false recoveries. Routine tracking
+therefore fits the recorded 100 ms pacing, while global recovery dominates
+worst-case latency.
+
+# Discussion
+
+The physical and continuous results answer the five research questions
+consistently. Nominal tracking is centimetre-scale at all checkpoints;
+confirmed Kidnapped recovery completes in about one second on RV1103.
+Dynamic trials support localization through short crossings, not object
+classification or avoidance.
+
+Ablation supplies the mechanism behind these results. Local-only variants
+cannot resolve displacement; global single-resolution search is too costly;
+only the joint global and multi-resolution configuration provides recovery
+with tractable computation. Hardware replay separates near-100%
+matcher-active CPU from 66.05% time-weighted CPU. The live approximately 20%
+inter-scan overrun rate exposes sensor, I/O, and scheduling costs outside the
+replay computation boundary; it must not be read as a direct contrast with
+the replay's 0.69% computation-deadline misses.
+
+Traceability is part of the contribution. Frontend controls constrain event
+order, the backend and firmware validate protocol/state, and versioned
+manifests make finalized raw and processed evidence checksum-verifiable. The
+furniture case preserves original records while near-equal bidirectional
+offsets expose the reference-entry correction; its in-sample corrected
+residuals are evidence of consistency rather than independent calibration.
+
+The main limitations are one primary RV1103 robot, one indoor environment,
+manual placement/object motion, small and unbalanced session counts,
+independently acquired cross-board maps and marker references, and dependent
+scans. Ground Truth measures one-marker repeatability rather than absolute
+surveying accuracy; R2/M4 is unresolved; furniture correction is post hoc and
+has no holdout; and RV1106 has no balanced resource comparison. Results are
+descriptive, not population probabilities.
+
+# Conclusion
+
+The deployed local–global multi-resolution system connects physical accuracy,
+loss recovery, disturbance behavior, ablation, and embedded cost in one
+auditable workflow. RV1103 achieved 0.0279 m/0.589° pooled nominal Route RMSE,
+recovered all four observed kidnapped cases within 0.970 s, and accepted
+99.37% of dynamic-window scans. Only the combined method recovered in both
+ablations; its RV1103 matcher P95 was 49–50 ms. Recorded-paced execution used
+66.05% time-weighted CPU with 0.69% computation-deadline misses, while live
+operation exposed limited inter-scan margin. Global-recovery latency and live
+scheduling are the primary optimization targets.
+
+# Data and Code Availability
+
+Finalized project evidence retains raw telemetry, configurations, processed
+results, and SHA-256 manifests. Source code and publication materials are
+maintained in the
+[hharyono/SLAM repository](https://github.com/hharyono/SLAM.git); release
+availability is tied to the repository revision cited by the submitted
+article.
+
+# References {.unnumbered}
