@@ -1,7 +1,11 @@
 SPRINGER NATURE LATEX SUBMISSION SOURCES
 
 The submission manuscript is manuscript.tex. It uses the official Springer
-Nature sn-jnl class with the pdflatex, sn-apa, and iicol options.
+Nature sn-jnl class with the pdflatex and sn-apa options. The submission PDF
+uses the class's single-column review layout so tables and figures remain in
+the same reading order as manuscript.qmd. The generated review PDF uses a
+160 mm A4 text area (approximately 25 mm side margins) for readable tables and
+figures; the publisher may repaginate the accepted source.
 
 Compile from this directory:
 

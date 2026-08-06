@@ -61,7 +61,7 @@ function convertLongtables(text) {
       rows = rows.replace(/^\s*\\bottomrule\\noalign\{\}\s*/, "").trim();
 
       return [
-        "\\begin{table*}[t]",
+        "\\begin{table}[!htbp]",
         `\\caption{${caption}}\\label{${label}}`,
         "\\centering",
         "\\scriptsize",
@@ -77,10 +77,16 @@ function convertLongtables(text) {
             "headings; estimator output and Accepted evidence were not changed.",
           ]
           : []),
-        "\\end{table*}",
+        "\\end{table}",
       ].join("\n");
     },
   );
+}
+
+function keepFloatsWithinSections(text) {
+  return text
+    .replaceAll("\n\\subsection{", "\n\\FloatBarrier\n\n\\subsection{")
+    .replaceAll("\n\\section{", "\n\\FloatBarrier\n\n\\section{");
 }
 
 function texAscii(text) {
@@ -141,10 +147,7 @@ if (bodyStart < 0 || bodyEnd < 0) {
 let body = source.slice(bodyStart, bodyEnd).trim();
 body = convertLongtables(body);
 body = body
-  .replaceAll("\\begin{figure}[H]", "\\begin{figure*}[t]")
-  .replaceAll("\\begin{figure}", "\\begin{figure*}[t]")
-  .replaceAll("\\end{figure}%", "\\end{figure*}")
-  .replaceAll("\\end{figure}", "\\end{figure*]")
+  .replace(/\\begin\{figure\}(?:\[H\])?/g, "\\begin{figure}[!htbp]")
   .replace(
     /manuscript_files\/mediabag\/figures\/furniture-map-comparison\.pdf/g,
     "figure-1-furniture-map-comparison.pdf",
@@ -171,18 +174,21 @@ body = body
   )
   .replace(/^\\CSLLeftMargin/gm, "\\item[]\\CSLLeftMargin");
 
-// Correct a bracket introduced only if a generic figure used no placement.
-body = body.replaceAll("\\end{figure*]", "\\end{figure*}");
+body = keepFloatsWithinSections(body);
 
 const preamble = String.raw`% Springer Nature journal article template, December 2024 release.
 % Generated from manuscript.qmd; edit manuscript.qmd for scientific changes.
-\documentclass[pdflatex,sn-apa,iicol]{sn-jnl}
+\documentclass[pdflatex,sn-apa]{sn-jnl}
 
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
 \usepackage{longtable,booktabs,array}
 \usepackage{calc}
 \usepackage{graphicx}
+\usepackage{placeins}
+% Keep the single-column Springer review layout while using the same practical
+% A4 text width as the generic manuscript (approximately 25 mm side margins).
+\geometry{left=25mm,right=25mm,top=26mm,bottom=26mm}
 
 \newcounter{none}
 \providecommand{\tightlist}{%
