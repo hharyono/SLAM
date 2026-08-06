@@ -119,16 +119,16 @@ const markers = JSON.parse(
 );
 
 const canvasWidth = 1200;
-const canvasHeight = 540;
+const canvasHeight = 485;
 const panelWidth = 540;
 const panelGap = 34;
 const panelLeft = 43;
-const mapTop = 88;
+const mapTop = 34;
 const maxMapWidth = Math.max(baseline.width, changed.width);
 const maxMapHeight = Math.max(baseline.height, changed.height);
 const scale = Math.min(500 / maxMapWidth, 412 / maxMapHeight);
 
-function panel(map, index, title) {
+function panel(map, index, label) {
   const panelX = panelLeft + index * (panelWidth + panelGap);
   const frameX = panelX + 20;
   const frameY = mapTop;
@@ -139,7 +139,7 @@ function panel(map, index, title) {
 
   return `
     <g>
-      <text x="${panelX}" y="55" class="panel-title">${escapeXml(title)}</text>
+      <text x="${panelX}" y="25" class="panel-label">${escapeXml(label)}</text>
       <rect x="${frameX}" y="${frameY}" width="${commonWidth.toFixed(
         2,
       )}" height="${commonHeight.toFixed(
@@ -154,12 +154,12 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">
   <style>
     text { font-family: "DejaVu Sans", Arial, sans-serif; fill: #17202a; }
-    .panel-title { font-size: 22px; font-weight: 700; }
+    .panel-label { font-size: 18px; font-weight: 700; }
     .marker { font-size: 13px; font-weight: 700; paint-order: stroke; stroke: white; stroke-width: 3px; stroke-linejoin: round; }
   </style>
-  <rect width="1200" height="540" fill="#ffffff"/>
-  ${panel(baseline, 0, "A  Frozen localization reference")}
-  ${panel(changed, 1, "B  Furniture Arrangement Change")}
+  <rect width="1200" height="${canvasHeight}" fill="#ffffff"/>
+  ${panel(baseline, 0, "(a)")}
+  ${panel(changed, 1, "(b)")}
 </svg>
 `;
 

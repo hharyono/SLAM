@@ -6,7 +6,6 @@ project:
 
 lang: en
 bibliography: references/references.bib
-csl: styles/ieee.csl
 link-citations: true
 
 crossref:
@@ -23,6 +22,8 @@ format:
   pdf:
     pdf-engine: lualatex
     documentclass: article
+    cite-method: natbib
+    biblio-style: apalike
     classoption:
       - 10pt
     keep-tex: true

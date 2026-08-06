@@ -57,6 +57,8 @@ build_springer() {
     sn-article-template/sn-jnl.cls > "$springer_output/sn-jnl.cls"
   unzip -p "$springer_temp/sn-article-template.zip" \
     sn-article-template/bst/sn-basic.bst > "$springer_output/sn-basic.bst"
+  unzip -p "$springer_temp/sn-article-template.zip" \
+    sn-article-template/bst/sn-apacite.bst > "$springer_output/sn-apacite.bst"
 
   cp manuscript.qmd "$springer_output/manuscript.qmd"
   cp references/references.bib "$springer_output/references.bib"
@@ -70,6 +72,10 @@ build_springer() {
     "$springer_output/figure-1-furniture-map-comparison.pdf"
   cp build/manuscript_files/mediabag/figures/dynamic-occlusion-evidence.pdf \
     "$springer_output/figure-2-dynamic-occlusion-evidence.pdf"
+  rsvg-convert --format Eps figures/furniture-map-comparison.svg \
+    --output "$springer_output/Fig1.eps"
+  rsvg-convert --format Eps figures/dynamic-occlusion-evidence.svg \
+    --output "$springer_output/Fig2.eps"
 
   node scripts/generate-springer-nature-tex.mjs
 
@@ -81,11 +87,22 @@ build_springer() {
     echo "pdflatex is required for the Springer Nature build." >&2
     exit 1
   fi
+  if command -v bibtex >/dev/null 2>&1; then
+    bibtex_command="$(command -v bibtex)"
+  elif test -x /root/.TinyTeX/bin/x86_64-linux/bibtex; then
+    bibtex_command=/root/.TinyTeX/bin/x86_64-linux/bibtex
+  else
+    echo "bibtex is required for the Springer Nature build." >&2
+    exit 1
+  fi
 
   (
     cd "$springer_output"
     "$pdflatex_command" -interaction=nonstopmode -halt-on-error \
       manuscript.tex > manuscript-build.log
+    "$bibtex_command" manuscript >> manuscript-build.log
+    "$pdflatex_command" -interaction=nonstopmode -halt-on-error \
+      manuscript.tex >> manuscript-build.log
     "$pdflatex_command" -interaction=nonstopmode -halt-on-error \
       manuscript.tex >> manuscript-build.log
   )
@@ -94,8 +111,9 @@ build_springer() {
   (
     cd "$springer_output"
     springer_files=(
-      README.txt manuscript.qmd manuscript.tex manuscript.pdf
-      references.bib sn-jnl.cls sn-basic.bst
+      README.txt manuscript.qmd manuscript.tex manuscript.bbl manuscript.pdf
+      references.bib sn-jnl.cls sn-basic.bst sn-apacite.bst
+      Fig1.eps Fig2.eps
       figure-1-furniture-map-comparison.pdf
       figure-1-furniture-map-comparison.svg
       figure-2-dynamic-occlusion-evidence.pdf
@@ -116,7 +134,6 @@ build_springer() {
 check_sources() {
   test -s manuscript.qmd
   test -f references/references.bib
-  test -s styles/ieee.csl
   test -s templates/generic/reference.docx
   test -s scripts/generate-dynamic-occlusion-figure.mjs
   test -s scripts/generate-furniture-map-comparison.mjs

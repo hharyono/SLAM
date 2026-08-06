@@ -70,6 +70,13 @@ function convertLongtables(text) {
         rows,
         "\\bottomrule\\noalign{}",
         "\\end{tabular}",
+        ...(label === "tbl-route"
+          ? [
+            "\\par\\vspace{2pt}\\raggedright\\scriptsize",
+            "\\emph{Note.} Asterisks identify post-hoc corrected reference",
+            "headings; estimator output and Accepted evidence were not changed.",
+          ]
+          : []),
         "\\end{table*}",
       ].join("\n");
     },
@@ -93,12 +100,16 @@ function texAscii(text) {
     ["ó", "\\'{o}"],
     ["Ú", "\\'{U}"],
     ["ú", "\\'{u}"],
+    ["Ý", "\\'{Y}"],
+    ["ý", "\\'{y}"],
     ["Ä", '\\"{A}'],
     ["ä", '\\"{a}'],
     ["Ö", '\\"{O}'],
     ["ö", '\\"{o}'],
     ["Ü", '\\"{U}'],
     ["ü", '\\"{u}'],
+    ["Š", "\\v{S}"],
+    ["š", "\\v{s}"],
   ]);
 
   let converted = text;
@@ -142,7 +153,22 @@ body = body
     /manuscript_files\/mediabag\/figures\/dynamic-occlusion-evidence\.pdf/g,
     "figure-2-dynamic-occlusion-evidence.pdf",
   )
-  .replace(/^\\bibitem\[\\citeproctext\]\{[^}]+\}\n/gm, "")
+  .replaceAll(
+    "\\bibliographystyle{apalike}",
+    "",
+  )
+  .replaceAll(
+    "\\bibliography{references/references.bib}",
+    "\\bibliography{references}",
+  )
+  .replace(
+    /\\emph\{Note\.\} Asterisks identify post-hoc corrected reference headings;\nestimator output and Accepted evidence were not changed\.\n/,
+    "",
+  )
+  .replace(
+    /^\\bibitem\[\\citeproctext\]\{[^}]+\}\n/gm,
+    "\\item[]\n",
+  )
   .replace(/^\\CSLLeftMargin/gm, "\\item[]\\CSLLeftMargin");
 
 // Correct a bracket introduced only if a generic figure used no placement.
@@ -150,7 +176,7 @@ body = body.replaceAll("\\end{figure*]", "\\end{figure*}");
 
 const preamble = String.raw`% Springer Nature journal article template, December 2024 release.
 % Generated from manuscript.qmd; edit manuscript.qmd for scientific changes.
-\documentclass[pdflatex,sn-basic,Numbered,iicol]{sn-jnl}
+\documentclass[pdflatex,sn-apa,iicol]{sn-jnl}
 
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
@@ -174,8 +200,8 @@ const preamble = String.raw`% Springer Nature journal article template, December
   \else\usebox{\pandoc@box}\fi}
 \makeatother
 
-% Pandoc citeproc output is already numbered and the reference list is
-% embedded, the most portable Springer Nature submission arrangement.
+% Pandoc citeproc output is author--year and the alphabetized reference list
+% is embedded, keeping the editable source package self-contained.
 \newcommand{\citeproc}[2]{#2}
 \newlength{\cslhangindent}
 \setlength{\cslhangindent}{1.5em}

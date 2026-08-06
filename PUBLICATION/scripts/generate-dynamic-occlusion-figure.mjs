@@ -111,9 +111,9 @@ const esc = (value) =>
 const round = (value) => Number(value.toFixed(2));
 
 const width = 1200;
-const height = 660;
-const mapFrame = { x: 70, y: 135, width: 500, height: 412 };
-const table = { x: 630, y: 142, width: 505, headerHeight: 34, rowHeight: 28 };
+const height = 600;
+const mapFrame = { x: 70, y: 70, width: 500, height: 412 };
+const table = { x: 630, y: 77, width: 505, headerHeight: 34, rowHeight: 28 };
 const mapScale = Math.min(mapFrame.width / map.width, mapFrame.height / map.height);
 const renderedMapWidth = map.width * mapScale;
 const renderedMapHeight = map.height * mapScale;
@@ -280,7 +280,6 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   response at each marker, not raw LiDAR beam endpoints.</desc>
   <style>
     text { font-family: Arial, Helvetica, sans-serif; fill: #17212b; }
-    .title { font-size: 25px; font-weight: 700; }
     .subtitle { font-size: 14px; fill: #53616d; }
     .panel { font-size: 17px; font-weight: 700; }
     .legend { font-size: 12px; font-weight: 600; }
@@ -291,11 +290,9 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
     .metric-label { font-size: 11px; fill: #64727e; }
     .metric-value { font-size: 17px; font-weight: 700; }
   </style>
-  <rect width="1200" height="660" fill="#ffffff"/>
-  <text x="60" y="48" class="title">Dynamic occlusion: all checkpoints and sector evidence</text>
-  <text x="60" y="75" class="subtitle">Accepted RV1103 sessions · R1 and R2 · all M2–M7 events · 10 Hz LiDAR</text>
+  <rect width="1200" height="${height}" fill="#ffffff"/>
 
-  <text x="60" y="115" class="panel">A  Physical map, checkpoints, and object projection</text>
+  <text x="60" y="45" class="panel">(a)</text>
   <rect x="${mapFrame.x}" y="${mapFrame.y}" width="${mapFrame.width}" height="${
     mapFrame.height
   }" rx="8" fill="#edf2f5" stroke="#cad5dc"/>
@@ -305,21 +302,21 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <g clip-path="url(#map-clip)">${mapRuns}</g>
   <g clip-path="url(#map-clip)">${objectProjectionSvg}</g>
   ${markerSvg}
-  <g transform="translate(82,570)">
+  <g transform="translate(82,505)">
     <circle cx="8" cy="0" r="7" fill="#2a9d8f"/><text x="22" y="5" class="legend">M1/M8 endpoints</text>
     <circle cx="182" cy="0" r="7" fill="#e76f51"/><text x="196" y="5" class="legend">M2–M7 tested points</text>
   </g>
-  <g transform="translate(82,594)">
+  <g transform="translate(82,529)">
     <circle cx="8" cy="0" r="3.3" fill="#111827"/><text x="22" y="5" class="legend">Evidence-derived moving-object projections at M2–M7</text>
   </g>
 
-  <text x="630" y="115" class="panel">B  Near-sector evidence for every event</text>
+  <text x="630" y="45" class="panel">(b)</text>
   ${tableHeader}
   ${tableRows}
-  <text x="${table.x}" y="528" class="subtitle">L/C/R = excess near returns vs 1 s baseline (range 0.30–0.80 m).</text>
-  <text x="${table.x}" y="548" class="subtitle">Angles: L +10°…+65° · C −10°…+10° · R −65°…−10° · “—” = no excess.</text>
+  <text x="${table.x}" y="463" class="subtitle">L/C/R = excess near returns vs 1 s baseline (range 0.30–0.80 m).</text>
+  <text x="${table.x}" y="483" class="subtitle">Angles: L +10°…+65° · C −10°…+10° · R −65°…−10° · “—” = no excess.</text>
 
-  <g transform="translate(630,570)">
+  <g transform="translate(630,505)">
     <rect width="505" height="52" rx="8" fill="#f3f6f8"/>
     <g transform="translate(18,16)">
       <text class="metric-label">EVENTS</text><text y="24" class="metric-value">${eventRows.length}/${eventRows.length}</text>
@@ -339,7 +336,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
       )} m</text>
     </g>
   </g>
-  <text x="60" y="646" class="subtitle">0.05 m/pixel · finalized source telemetry · maximum event-window position drift ${maximumDrift.toFixed(
+  <text x="60" y="581" class="subtitle">0.05 m/pixel · finalized source telemetry · maximum event-window position drift ${maximumDrift.toFixed(
     3,
   )} m</text>
 </svg>`;

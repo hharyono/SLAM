@@ -17,21 +17,24 @@ author:
       - ref: institution
 date: last-modified
 abstract: |
-  Embedded two-dimensional LiDAR localization must combine accuracy,
+  Embedded two-dimensional light detection and ranging (LiDAR) localization
+  must combine accuracy,
   disturbance recovery, and bounded resource use. This work deploys a
   local–global multi-resolution correlative matcher with RV1103 as the primary
   target and evaluates it across six traceable test families and 24 finalized
   sessions; auxiliary host and RV1106 evidence is explicitly identified.
   RV1103 completed
-  16/16 nominal route checkpoints with 0.0279 m position RMSE and 0.589°
-  heading RMSE. Four physical kidnapped trials recovered in 0.529–0.970 s,
+  16/16 nominal route checkpoints with 0.0279 m position root-mean-square
+  error (RMSE) and 0.589° heading RMSE. Four physical kidnapped trials
+  recovered in 0.529–0.970 s,
   with final position error no greater than 0.0501 m. Twelve operator-timed
   dynamic-crossing windows accepted 472/475 scans; one brief loss recovered
   automatically.
   Factorial host replay showed that only the combined local–global,
   multi-resolution variant recovered in both sources. The selected method on
-  RV1103 achieved approximately 49–50 ms matcher P95. Recorded-paced replay
-  measured 66.05% time-weighted CPU, 1,456 KiB peak RSS, 0.69%
+  RV1103 achieved approximately 49–50 ms matcher 95th percentile (P95).
+  Recorded-paced replay measured 66.05% time-weighted central processing unit
+  (CPU) use, 1,456 KiB peak resident set size (RSS), 0.69%
   computation-deadline misses, 1.045 s cross-room recovery, and no false
   recovery. Live tracking remained functional but showed approximately 20%
   inter-scan overruns, exposing limited scheduling margin. The contribution
@@ -47,10 +50,11 @@ keywords:
 ---
 
 ::: {.author-information}
-**Affiliation:** Information Technology Master’s Degree Program, Pradita
-University, Tangerang, Indonesia. **Corresponding authors:** Haryono
-([haryono81@gmail.com](mailto:haryono81@gmail.com)) and Handri Santoso
-([handri.santoso@pradita.ac.id](mailto:handri.santoso@pradita.ac.id)).
+**Affiliation:** Information Technology Master’s Degree Program, Pradita University, Tangerang, Indonesia.
+
+**Corresponding authors:**
+- Haryono ([haryono81@gmail.com](mailto:haryono81@gmail.com))
+- Handri Santoso ([handri.santoso@pradita.ac.id](mailto:handri.santoso@pradita.ac.id))
 :::
 
 # Introduction
@@ -120,9 +124,11 @@ measurement on a 64 MiB target within one traceable workflow.
 
 # System and Production Method
 
-The primary target is a Luckfox Pico Plus RV1103 with 64 MiB DDR2, 128 MiB
+The primary target is a Luckfox Pico Plus RV1103 with 64 MiB second-generation
+double-data-rate (DDR2) memory, 128 MiB
 SPI NAND, Buildroot/Linux 5.10.160, and a YDLIDAR T-mini Plus connected by
-UART at 230400 bit/s [@luckfox_rv1103; @ydlidar_tmini_plus]. The LiDAR
+universal asynchronous receiver-transmitter (UART) at 230400 bit/s
+[@luckfox_rv1103; @ydlidar_tmini_plus]. The LiDAR
 operates at 10 Hz and 4 kHz ranging; valid localization ranges are
 0.05–12 m, making 100 ms the nominal scan-cycle deadline. RV1106 is reported
 only where physical evidence exists [@luckfox_rv1106]; comparisons are
@@ -149,7 +155,8 @@ to `LOST` before confirmed tracking. The deployed configuration,
 replay through the same tracker, score, map representation, and transitions.
 
 The dashboard, backend, and firmware enforce one session lifecycle:
-preflight verifies target state and map/binary SHA-256 hashes; session creation
+preflight verifies target state and map/binary Secure Hash Algorithm 256-bit
+(SHA-256) hashes; session creation
 freezes configuration and references; capture isolates the experimental
 localizer; scenario events are order-checked; stop copies evidence with
 checksums and restores normal localization; analysis validates protocol
@@ -189,7 +196,7 @@ testing separates live idle/tracking and recorded-timestamp replay.
 | Ablation | On the host, replay each source through a 2×2 method design; on RV1103, validate only the selected method. Map, initial pose, scan sequence, hash, and timestamps remain equal among variants of a source. | Expected variant set and equal within-source input; recovery, acceptance, and matcher cost. |
 | Resource | RV1103 live idle/R1/R2 and recorded-paced replay. | Complete CPU/RSS/latency fields; boundary-specific overruns and recovery. |
 
-: Six test families and their enforced evidence. {#tbl-protocols}
+: Six test families and their enforced evidence {#tbl-protocols}
 
 Dynamic evidence counts returns at 0.30–0.80 m in left (+10° to +65°), center
 (−10° to +10°), and right (−65° to −10°) sectors relative to the preceding
@@ -215,6 +222,12 @@ seven Kidnapped, two Dynamic Occluded, four Ablation, and two Resource
 sessions. Short test/source labels replace filesystem paths and long
 identifiers in the paper; the manifest preserves the exact mapping.
 
+OpenAI Codex was used during manuscript preparation to assist with source-code
+inspection, evidence organization, and language drafting. All generated
+material and numerical claims were verified by the authors against the
+version-controlled implementation and finalized experimental records. The
+authors take full responsibility for the content of the manuscript.
+
 # Results
 
 ## Ground Truth
@@ -238,8 +251,10 @@ only for RV1106, so no RV1103–RV1106 comparison is made.
 | RV1106 | Static 90° occlusion | R1 | 8/8 | 0.064 / 0.090 | 1.926 / 3.646 |
 | RV1106 | Static 90° occlusion | R2 | 8/8 | 0.059 / 0.071 | 1.935 / 3.206 |
 
-: Physical Route results. *Post-hoc corrected reference heading; estimator
-output and Accepted evidence were not changed. {#tbl-route}
+: Physical Route results {#tbl-route}
+
+*Note.* Asterisks identify post-hoc corrected reference headings; estimator
+output and Accepted evidence were not changed.
 
 RV1103 nominal performance pooled over both directions was 0.0279 m position
 RMSE and 0.589° heading RMSE, with 16/16 valid checkpoints. The only
@@ -260,12 +275,12 @@ frozen-map mismatch, but the shared correction was estimated and evaluated on
 the same records without a holdout. The corrected residuals therefore show
 internal consistency, not independently validated absolute-heading accuracy.
 
-![Frozen localization reference (left) and Furniture Arrangement Change
-(right). Both panels use the same physical scale and surveyed M1–M8
+![(a) Frozen localization reference and (b) Furniture Arrangement Change.
+Both panels use the same physical scale and surveyed M1–M8
 coordinates. Black contours are occupied LiDAR returns. Interior and boundary
 differences show that the changed scene is not identical to the reference;
 separate acquisition and normalization preclude pixel-wise subtraction. The
-localizer continued using the frozen left map.](figures/furniture-map-comparison.svg){#fig-furniture-map-comparison width=95%}
+localizer continued using the frozen reference map](figures/furniture-map-comparison.svg){#fig-furniture-map-comparison width=95%}
 
 ## Kidnapped
 
@@ -276,7 +291,7 @@ localizer continued using the frozen left map.](figures/furniture-map-comparison
 | RV1106 | Same room | 1 | 438 | 622 | 0.0500 m / 2.392° |
 | RV1106 | Cross room | 2 | 344–779 | 530–963 | 0.0501 m / 1.642° |
 
-: Physical Kidnapped recovery. Every trial succeeded within 60 s.
+: Physical Kidnapped recovery; every trial succeeded within 60 s
 {#tbl-kidnapped}
 
 RV1103 recovered all four displacements; mean first/stable latency was
@@ -294,7 +309,7 @@ descriptive observations do not establish universal platform superiority.
 | R1 | 6 | 242/242 (100%) | 64.5 / 92.3 ms | 0.035 m / 0.952° |
 | R2 | 6 | 230/233 (98.71%) | 52.2 / 91.5 ms | 0.017 m / 0.474° |
 
-: RV1103 Dynamic Occluded session summary. {#tbl-dynamic}
+: RV1103 Dynamic Occluded session summary {#tbl-dynamic}
 
 All 12 planned windows lasted 4.000–4.002 s. Overall acceptance was 472/475
 (99.37%); maximum window drift was 0.050 m and 1.465°. Eleven events remained
@@ -307,9 +322,11 @@ only 2/12 passages, so the experiment supports localization robustness to
 short stationary crossings, not general obstacle-motion recognition or
 avoidance.
 
-![All operator-timed dynamic-crossing windows at M2–M7. Values are peak excess near-range
+![(a) Physical map, checkpoints, and evidence-derived object projections; (b)
+near-sector evidence for all operator-timed dynamic-crossing windows at
+M2–M7. Values are peak excess near-range
 returns above the preceding one-second baseline; a dash means no positive
-excess. The black dots around M2–M7 in Panel A are evidence-derived schematic
+excess. The black dots around M2–M7 in panel (a) are evidence-derived schematic
 projections. At each marker, the R1 or R2 event with the largest total sector
 excess is shown; every non-zero side is retained even when the response occurs
 in only one sector. Dot count is scaled for readability. These are not raw
@@ -318,7 +335,7 @@ R2/M4 accepted 30/33 scans: scores 0.917–0.996 were accepted, while
 0.897, 0.884, and 0.891 were rejected at the 0.90 threshold. The third
 rejection caused `LOST`; global acceptance followed after 935 ms and confirmed
 tracking after 1.087 s. Its absent near-sector signal prevents attribution to
-the moving object.](figures/dynamic-occlusion-evidence.svg){#fig-dynamic-occlusion width=95% fig-pos="H"}
+the moving object](figures/dynamic-occlusion-evidence.svg){#fig-dynamic-occlusion width=95% fig-pos="H"}
 
 ## Ablation
 
@@ -343,7 +360,7 @@ S3 but executes only LG-M.
 | RV1103/S2 | LG-M | 98.23% | Yes | 50.06 | 985 |
 | RV1103/S3 | LG-M | 98.78% | Yes | 49.35 | 1,045 |
 
-: Identical-input host ablation and selected-method RV1103 validation.
+: Identical-input host ablation and selected-method RV1103 validation
 {#tbl-ablation}
 
 Only LG-M recovered in both factorial sources. Multi-resolution reduced
@@ -368,7 +385,7 @@ and is not compared with board utilization.
 one-second resource samples; all other observations are localization scans.
 The replay value marked * is time-weighted CPU. Live overruns and replay
 computation-deadline misses use the distinct boundaries defined in the
-Experimental Method.
+Experimental Method
 {#tbl-resource}
 
 Live R1/R2 accepted every scan without `LOST` or `DEGRADED`. Their cycle P95
@@ -413,7 +430,8 @@ interruptions occurred under severe memory pressure. In one inspected case,
 the board reported approximately 0.9 MiB free and 2.5 MiB available memory
 while `localize_uart` was no longer active and SSH access was unresponsive.
 The coincidence strongly indicates a memory-pressure failure, although no
-kernel OOM trace was retained to establish whether the OOM killer terminated
+kernel out-of-memory (OOM) trace was retained to establish whether the OOM
+killer terminated
 the process. Taken together, these observations identify RV1103 memory
 capacity as the primary suspected operational limitation. No corresponding
 interruption appears in the finalized RV1106 sessions. This observation is
@@ -442,13 +460,43 @@ ablations; its RV1103 matcher P95 was 49–50 ms. Recorded-paced execution used
 operation exposed limited inter-scan margin. Global-recovery latency and live
 scheduling are the primary optimization targets.
 
-# Data and Code Availability
+# Statements and Declarations
 
-Finalized project evidence retains raw telemetry, configurations, processed
-results, and SHA-256 manifests. Source code and publication materials are
-maintained in the
-[hharyono/SLAM repository](https://github.com/hharyono/SLAM.git); release
-availability is tied to the repository revision cited by the submitted
-article.
+## Funding
+This research received no external grant funding. It was conducted as part of 
+Haryono’s academic research duties at Pradita University using
+the normal institutional facilities associated with those duties.
+
+## Competing Interests
+The authors have no competing financial or nonfinancial interests to declare 
+that are relevant to
+the content of this article.
+
+## Author Contributions
+Haryono: Conceptualization, Methodology, Software, Hardware, Investigation, 
+Data curation, Formal analysis, Visualization, Writing.
+Handri Santoso: Conceptualization, Supervision.
+
+## Ethics Approval and Consent
+Ethics approval, consent to participate, and consent for publication are not 
+applicable because
+this study involved neither human participants
+nor animals and reports no identifiable personal
+data.
+
+## Data and Code Availability
+
+The data supporting this article and the implementation source are openly
+available in the
+[hharyono/SLAM repository](https://github.com/hharyono/SLAM.git). Finalized
+evidence is organized under `EXPERIMENTS/Accepted` first by execution target
+(`Host`, `RV1103`, or `RV1106`), then by test family, and finally by an
+finalized session identifier. Each session contains, where applicable,
+`config` for frozen session, map, marker, and method settings; `raw` for
+telemetry and operator events; `processed` for validated summaries and
+interpretations; `tables` and `plots` for derived outputs; and top-level
+`inventory.json`. The exact evidence revision used for the reported results is
+[commit 21bbacf](https://github.com/hharyono/SLAM/tree/21bbacf5479fc054ce3134302a1bd7140f70b682/EXPERIMENTS/Accepted).
+No access restrictions apply.
 
 # References {.unnumbered}

@@ -2,9 +2,10 @@
 
 Dear Editor,
 
-Please consider our manuscript, “Resource-Aware Local–Global
+Please consider our Original Paper, “Resource-Aware Local–Global
 Multi-Resolution Localization and Recovery on a Constrained RV1103 Embedded
-Platform,” for publication in your journal.
+Platform,” for publication in the Journal of Control, Automation and
+Electrical Systems.
 
 Reliable two-dimensional LiDAR localization on constrained embedded hardware
 requires more than pose accuracy: an implementation must track physical
@@ -30,8 +31,10 @@ replay measured 66.05% time-weighted CPU, 1,456 KiB peak RSS, and a 0.69%
 computation-deadline-miss rate. Live measurements additionally expose
 scheduling costs hidden by algorithm-only replay.
 
-The manuscript is appropriate for a journal addressing embedded intelligent
-systems, localization, sensor processing, and resource-aware edge computing.
+The manuscript is appropriate for the Journal of Control, Automation and
+Electrical Systems because it connects control-relevant state estimation,
+sensor processing, embedded implementation, recovery behavior, and
+resource-aware real-time evaluation.
 Its contribution is a reproducible embedded co-design and evaluation relating
 physical accuracy, recovery, disturbance response, method factors, and
 hardware cost. Finalized evidence retains raw telemetry, configuration,
@@ -53,3 +56,4 @@ Handri Santoso
 Information Technology Master's Degree Program
 Pradita University, Tangerang, Indonesia
 Email: handri.santoso@pradita.ac.id
+
