@@ -15,7 +15,12 @@ fi
 
 target="${1:-all}"
 
+validate_float_references() {
+  node scripts/validate-float-references.mjs
+}
+
 generate_figures() {
+  validate_float_references
   node scripts/generate-dynamic-occlusion-figure.mjs
   node scripts/generate-furniture-map-comparison.mjs
   node scripts/generate-evidence-tables.mjs
@@ -138,6 +143,7 @@ check_sources() {
   test -s scripts/generate-dynamic-occlusion-figure.mjs
   test -s scripts/generate-furniture-map-comparison.mjs
   test -s scripts/generate-evidence-tables.mjs
+  test -s scripts/validate-float-references.mjs
   generate_figures
   test -s figures/dynamic-occlusion-evidence.svg
   test -s figures/furniture-map-comparison.svg

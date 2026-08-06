@@ -181,7 +181,6 @@ while the physical arrangement differs. The separately acquired changed-scene
 grid documents the disturbance while localization continues to use the frozen
 reference. Manual movement of the board–LiDAR assembly isolates localization
 behavior from drive-control and navigation-stack effects.
-
 @tbl-protocols gives the complete experimental logic without repeating
 the common session lifecycle. Ground Truth, Route, Kidnapped, and Dynamic
 Occluded are physical tests. Host Ablation is identical-scan unpaced replay;
@@ -239,25 +238,6 @@ test provides the RV1106 ground-truth repeatability result.
 
 ## Route
 
-@tbl-route summarizes checkpoint success and position/heading error for each
-platform, condition, and route.
-
-| Platform | Condition | Route | Success | Position RMSE / P95 (m) | Heading RMSE / P95 (°) |
-|---|---|---:|---:|---:|---:|
-| RV1103 | Nominal | R1 | 8/8 | 0.031 / 0.050 | 0.632 / 0.836 |
-| RV1103 | Nominal | R2 | 8/8 | 0.025 / 0.050 | 0.542 / 0.795 |
-| RV1106 | Nominal | R1 | 8/8 | 0.040 / 0.050 | 1.697 / 3.081 |
-| RV1106 | Nominal | R2 | 8/8 | 0.040 / 0.050 | 2.588 / 3.812 |
-| RV1106 | Furniture changed | R1 | 8/8 | 0.043 / 0.063 | 1.940 / 3.637* |
-| RV1106 | Furniture changed | R2 | 8/8 | 0.031 / 0.050 | 1.298 / 2.293* |
-| RV1106 | Static 90° occlusion | R1 | 8/8 | 0.064 / 0.090 | 1.926 / 3.646 |
-| RV1106 | Static 90° occlusion | R2 | 8/8 | 0.059 / 0.071 | 1.935 / 3.206 |
-
-: Physical Route results {#tbl-route}
-
-*Note.* Asterisks identify post-hoc corrected reference headings; estimator
-output and Accepted evidence were not changed.
-
 RV1103 nominal performance pooled over both directions was 0.0279 m position
 RMSE and 0.589° heading RMSE, with 16/16 valid checkpoints. The only
 cross-board Route comparison uses nominal R1/R2, which exists on both targets:
@@ -276,9 +256,26 @@ and 1.298°. This supports internally consistent localization under the
 frozen-map mismatch, but the shared correction was estimated and evaluated on
 the same records. The corrected residuals therefore quantify internal
 cross-direction consistency after reference calibration.
+@tbl-route summarizes checkpoint success and position/heading error for each
+platform, condition, and route, while @fig-furniture-map-comparison visually
+compares the frozen localization reference with the separately acquired
+changed-scene grid.
 
-@fig-furniture-map-comparison visually compares the frozen localization
-reference with the separately acquired changed-scene grid.
+| Platform | Condition | Route | Success | Position RMSE / P95 (m) | Heading RMSE / P95 (°) |
+|---|---|---:|---:|---:|---:|
+| RV1103 | Nominal | R1 | 8/8 | 0.031 / 0.050 | 0.632 / 0.836 |
+| RV1103 | Nominal | R2 | 8/8 | 0.025 / 0.050 | 0.542 / 0.795 |
+| RV1106 | Nominal | R1 | 8/8 | 0.040 / 0.050 | 1.697 / 3.081 |
+| RV1106 | Nominal | R2 | 8/8 | 0.040 / 0.050 | 2.588 / 3.812 |
+| RV1106 | Furniture changed | R1 | 8/8 | 0.043 / 0.063 | 1.940 / 3.637* |
+| RV1106 | Furniture changed | R2 | 8/8 | 0.031 / 0.050 | 1.298 / 2.293* |
+| RV1106 | Static 90° occlusion | R1 | 8/8 | 0.064 / 0.090 | 1.926 / 3.646 |
+| RV1106 | Static 90° occlusion | R2 | 8/8 | 0.059 / 0.071 | 1.935 / 3.206 |
+
+: Physical Route results {#tbl-route}
+
+*Note.* Asterisks identify post-hoc corrected reference headings; estimator
+output and Accepted evidence were not changed.
 
 ![(a) Frozen localization reference and (b) Furniture Arrangement Change.
 Both panels use the same physical scale and surveyed M1–M8
@@ -289,6 +286,12 @@ localizer continued using the frozen reference map](figures/furniture-map-compar
 
 ## Kidnapped
 
+RV1103 recovered all four displacements; mean first/stable latency was
+810/1,036 ms. RV1106 recovered all three; corresponding means were 520/705 ms.
+For the balanced cross-room subset (two trials per target), RV1103 first/stable
+means were 871/1,118 ms and RV1106 means were 562/747 ms; all four cross-room
+trials succeeded. Same-room results remain listed but are not used for a
+balanced cross-board comparison because RV1103 has two trials and RV1106 one.
 @tbl-kidnapped reports first recovery, stable-tracking latency, and maximum
 final error for every physical displacement scenario.
 
@@ -302,24 +305,7 @@ final error for every physical displacement scenario.
 : Physical Kidnapped recovery; every trial succeeded within 60 s
 {#tbl-kidnapped}
 
-RV1103 recovered all four displacements; mean first/stable latency was
-810/1,036 ms. RV1106 recovered all three; corresponding means were 520/705 ms.
-For the balanced cross-room subset (two trials per target), RV1103 first/stable
-means were 871/1,118 ms and RV1106 means were 562/747 ms; all four cross-room
-trials succeeded. Same-room results remain listed but are not used for a
-balanced cross-board comparison because RV1103 has two trials and RV1106 one.
-
 ## Dynamic Occluded
-
-@tbl-dynamic summarizes scan acceptance, post-event tracking latency, and pose
-error for the two RV1103 Dynamic Occluded sessions.
-
-| Route | Events | Accepted scans | Post-event tracking mean / P95 | Position / heading RMSE |
-|---|---:|---:|---:|---:|
-| R1 | 6 | 242/242 (100%) | 64.5 / 92.3 ms | 0.035 m / 0.952° |
-| R2 | 6 | 230/233 (98.71%) | 52.2 / 91.5 ms | 0.017 m / 0.474° |
-
-: RV1103 Dynamic Occluded session summary {#tbl-dynamic}
 
 All 12 planned windows lasted 4.000–4.002 s. Overall acceptance was 472/475
 (99.37%); maximum window drift was 0.050 m and 1.465°. Eleven events remained
@@ -327,10 +313,16 @@ continuously accepted. R2/M4 briefly reached `LOST` and recovered without
 operator intervention. This event demonstrates the intended confidence-state
 transition and automatic whole-map recovery. Sector analysis provides
 auxiliary context, while accepted scans, drift, and recovery define the
-localization outcome.
-
+localization outcome. @tbl-dynamic summarizes the session-level metrics, while
 @fig-dynamic-occlusion presents the spatial projections and near-sector
 evidence associated with the operator-timed crossing windows.
+
+| Route | Events | Accepted scans | Post-event tracking mean / P95 | Position / heading RMSE |
+|---|---:|---:|---:|---:|
+| R1 | 6 | 242/242 (100%) | 64.5 / 92.3 ms | 0.035 m / 0.952° |
+| R2 | 6 | 230/233 (98.71%) | 52.2 / 91.5 ms | 0.017 m / 0.474° |
+
+: RV1103 Dynamic Occluded session summary {#tbl-dynamic}
 
 ![(a) Physical map, checkpoints, and evidence-derived object projections; (b)
 near-sector evidence for all operator-timed dynamic-crossing windows at
@@ -355,7 +347,6 @@ cross-room Kidnapped source; S2 is an RV1103 same-room Kidnapped source; and
 S3 is an RV1103 cross-room Kidnapped source. Equal-input control applies among
 the four host variants within S1 or within S2. Board validation reuses S2 and
 S3 but executes only LG-M.
-
 @tbl-ablation reports the identical-input factorial host results and the
 selected-method RV1103 validation.
 
@@ -386,8 +377,13 @@ and is not compared with board utilization.
 
 ## Resource
 
-@tbl-resource summarizes the live and recorded-paced RV1103 resource results
-using the distinct timing boundaries defined above.
+Resource evidence combines live idle/tracking measurements with
+recorded-paced replay. @tbl-resource summarizes the RV1103 results using the
+distinct timing boundaries defined above. Idle observations are
+one-second resource samples, whereas the other observations are localization
+scans. The marked replay CPU value is time-weighted. Live overruns and replay
+computation-deadline misses follow the respective execution boundaries defined
+in the Experimental Method.
 
 | Mode | Duration / observations | Accepted | CPU mean (%) | RSS peak (KiB) | Matcher or tracking P95 (ms) | Cycle P95 / overruns |
 |---|---:|---:|---:|---:|---:|---:|
@@ -396,12 +392,7 @@ using the distinct timing boundaries defined above.
 | Live R2 | 62.4 s / 626 | 100% | 60.96 | 2,076 | 62.93 | 105.53 / 21.41% |
 | Paced replay | 576 scans | 98.78% | 66.05* | 1,456 | 67.25 | 4/576 (0.69%) |
 
-: Live and recorded-paced RV1103 resource results. Idle observations are
-one-second resource samples; all other observations are localization scans.
-The replay value marked * is time-weighted CPU. Live overruns and replay
-computation-deadline misses use the distinct boundaries defined in the
-Experimental Method
-{#tbl-resource}
+: RV1103 live and recorded-paced resource results {#tbl-resource}
 
 Live R1/R2 accepted every scan without `LOST` or `DEGRADED`. Their cycle P95
 was 105–106 ms and about one fifth of cycles exceeded 100 ms, demonstrating

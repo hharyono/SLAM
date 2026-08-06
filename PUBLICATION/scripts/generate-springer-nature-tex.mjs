@@ -86,7 +86,14 @@ function convertLongtables(text) {
 function keepFloatsWithinSections(text) {
   return text
     .replaceAll("\n\\subsection{", "\n\\FloatBarrier\n\n\\subsection{")
-    .replaceAll("\n\\section{", "\n\\FloatBarrier\n\n\\section{");
+    .replaceAll("\n\\section{", "\n\\FloatBarrier\n\n\\section{")
+    // Resource continues the same results sequence after Ablation. Keeping its
+    // heading and lead paragraph with the preceding page avoids an artificial
+    // page break while Table 5 retains its source order.
+    .replaceAll(
+      "\n\\FloatBarrier\n\n\\subsection{Resource}",
+      "\n\\subsection{Resource}",
+    );
 }
 
 function texAscii(text) {
