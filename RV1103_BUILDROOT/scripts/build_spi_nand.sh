@@ -4,7 +4,13 @@ set -euo pipefail
 WORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT_DIR="$(cd "$WORK_DIR/.." && pwd)"
 SDK_DIR="${SDK_DIR:-$WORK_DIR/luckfox-pico}"
-CLEAN_PATH=/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV_BIN="${CONDA_PREFIX:+$CONDA_PREFIX/bin:}"
+CLEAN_PATH="${ENV_BIN}/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Conda compiler activation adds host include/library flags. They must never be
+# forwarded to the ARM cross-compiler used by the vendor SDK.
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CMAKE_ARGS CMAKE_PREFIX_PATH \
+  CONDA_BUILD_SYSROOT CONDA_TOOLCHAIN_BUILD CONDA_TOOLCHAIN_HOST \
+  CC CXX CPP AR AS LD NM OBJCOPY RANLIB STRIP
 
 SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/setup_sdk.sh"
 

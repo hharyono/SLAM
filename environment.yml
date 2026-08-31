@@ -1,0 +1,32 @@
+name: SLAM
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - nodejs=22
+  - cmake=3.31
+  - ninja
+  - compilers=1.7
+  - gcc=12
+  - gxx=12
+  - gfortran=12
+  - make=4.3
+  - bison
+  - flex
+  - dtc
+  - texinfo
+  - gperf
+  - m4
+  - patch
+  - unzip
+  - cpio
+  - file
+  - rsync
+  - perl
+  - bc
+  - wget
+  - git
+  - pkg-config
+  - openssl
+  - ncurses
+  - zlib

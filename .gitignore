@@ -19,9 +19,9 @@ __pycache__/
 !/EXPERIMENTS/Ouputs/.gitkeep
 
 # Luckfox vendor SDK and generated firmware (fetched/built locally)
-/RV1106_BUILDROOT/luckfox-pico/
+/RV1106_BUILDROOT/luckfox-pico
 /RV1106_BUILDROOT/artifacts/
-/RV1103_BUILDROOT/luckfox-pico/
+/RV1103_BUILDROOT/luckfox-pico
 /RV1103_BUILDROOT/artifacts/
 
 # Editor / OS metadata
