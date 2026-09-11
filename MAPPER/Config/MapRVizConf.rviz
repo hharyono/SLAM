@@ -96,7 +96,7 @@ Visualization Manager:
       Name: Map
       Topic:
         Depth: 5
-        Durability Policy: Volatile
+        Durability Policy: Transient Local
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -154,26 +154,16 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/Orbit
-      Distance: 9.802745819091797
-      Enable Stereo Rendering:
-        Stereo Eye Separation: 0.05999999865889549
-        Stereo Focal Distance: 1
-        Swap Stereo Eyes: false
-        Value: false
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
       Focal Point:
         X: 0
         Y: 0
         Z: 0
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
-      Invert Z Axis: false
       Name: Current View
-      Near Clip Distance: 0.009999999776482582
-      Pitch: 1.130397915840149
-      Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 0.8203988075256348
+      Scale: 50
+      Target Frame: map
+      Value: TopDownOrtho (rviz)
     Saved: ~
 Window Geometry:
   Displays:

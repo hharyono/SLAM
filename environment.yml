@@ -1,5 +1,6 @@
 name: SLAM
 channels:
+  - robostack-humble
   - conda-forge
 dependencies:
   - python=3.12
@@ -30,3 +31,8 @@ dependencies:
   - openssl
   - ncurses
   - zlib
+  - colcon-common-extensions
+  - ros-humble-ros-base
+  - ros-humble-rviz2
+  - ros-humble-slam-toolbox
+  - ros-humble-tf2-ros

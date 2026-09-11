@@ -20,7 +20,13 @@ React FE ← WebSocket ← Node BE ← TCP localhost 42020 ───┘
 `START MAPPING` menjalankan ROS remote mapper dan menyalakan LiDAR.
 `SAVE + AUTO ALIGN` memakai nama dari kartu **MAPPING SELECTION** dan menyimpan
 PGM/YAML/BIN/alignment JSON sebagai satu entri katalog di folder `maps/`.
-Nama map lama tidak ditimpa. `STOP MAPPING` mematikan LiDAR dan ROS mapping.
+Nama map lama tidak ditimpa. Preview hasil align dipertahankan sampai mapping
+berhenti atau sesi baru dimulai. Marker selama mapping menggunakan TF ROS
+`map → base_link`, dengan transformasi rotasi/crop yang sama setelah save.
+Jika TF belum tersedia atau sudah kedaluwarsa, marker disembunyikan.
+`STOP MAPPING` mematikan LiDAR dan ROS mapping, lalu menampilkan kembali map aktif.
+Map yang baru disimpan perlu diaktifkan melalui `ACTIVATE MAP ON ROBOT`
+agar localizer device menggunakan map tersebut.
 
 `ACTIVATE MAP ON ROBOT` mengirim binary terpilih ke board. Board memvalidasi,
 memasang sebagai `/etc/slam/ruang_utama.bin`, melakukan hot reload, dan

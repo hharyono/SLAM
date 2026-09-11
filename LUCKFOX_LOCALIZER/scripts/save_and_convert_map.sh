@@ -17,7 +17,15 @@ mkdir -p "$MapDir"
 # ROS environment hooks may probe optional variables that are not defined.
 # Temporarily disable nounset while sourcing the generated setup script.
 set +u
-source /opt/ros/humble/setup.bash
+RosSetup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
+if [[ ! -e "$RosSetup" && -e "${CONDA_PREFIX:-$HOME/.local/share/mamba/envs/SLAM}/setup.bash" ]]; then
+    RosSetup="${CONDA_PREFIX:-$HOME/.local/share/mamba/envs/SLAM}/setup.bash"
+fi
+if [[ ! -e "$RosSetup" ]]; then
+    echo "ROS setup tidak ditemukan: $RosSetup" >&2
+    exit 1
+fi
+source "$RosSetup"
 set -u
 
 ros2 run nav2_map_server map_saver_cli \

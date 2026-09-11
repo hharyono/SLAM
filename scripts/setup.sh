@@ -2,6 +2,10 @@
 set -euo pipefail
 
 RepoDir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+RosSetup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
+if [[ ! -e "$RosSetup" && -e "${CONDA_PREFIX:-$HOME/.local/share/mamba/envs/SLAM}/setup.bash" ]]; then
+    RosSetup="${CONDA_PREFIX:-$HOME/.local/share/mamba/envs/SLAM}/setup.bash"
+fi
 YdlidarSrc="$RepoDir/MAPPER/YdlidarRos2Ws/src/ydlidar_ros2_driver"
 Rf2oSrc="$RepoDir/MAPPER/Rf2oWs/src/rf2o_laser_odometry"
 ScanBridgeSrc="$RepoDir/MAPPER/ScanTcpBridgeWs/src/scan_tcp_bridge"
@@ -22,10 +26,11 @@ ApplyPatch() {
 git -C "$RepoDir" submodule update --init --recursive
 ApplyPatch "$YdlidarSrc" "$RepoDir/patches/ydlidar_ros2_driver.patch"
 ApplyPatch "$Rf2oSrc" "$RepoDir/patches/rf2o_laser_odometry.patch"
+ApplyPatch "$Rf2oSrc" "$RepoDir/MAPPER/patches/rf2o-fixed-scan-and-valid-pose.patch"
 
 # ROS environment hooks may probe optional variables that are not defined.
 set +u
-source /opt/ros/humble/setup.bash
+source "$RosSetup"
 set -u
 colcon --log-base "$RepoDir/MAPPER/YdlidarRos2Ws/log" build \
     --base-paths "$YdlidarSrc" \

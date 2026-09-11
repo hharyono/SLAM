@@ -1,6 +1,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <chrono>
 
 #include <arpa/inet.h>
 #include <atomic>
@@ -59,6 +62,9 @@ class ScanTcpBridge : public rclcpp::Node {
     map_subscription_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
       "/map", rclcpp::QoS(1).transient_local().reliable(),
       [this](const nav_msgs::msg::OccupancyGrid::SharedPtr map) { SendMap(*map); });
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    pose_timer_ = create_wall_timer(std::chrono::milliseconds(100), [this] { SendPose(); });
     worker_ = std::thread([this] { Serve(); });
   }
 
@@ -158,6 +164,28 @@ class ScanTcpBridge : public rclcpp::Node {
     PutFloat(&frame, yaw);
     frame.insert(frame.end(), reinterpret_cast<const std::uint8_t*>(map.data.data()),
                  reinterpret_cast<const std::uint8_t*>(map.data.data()) + map.data.size());
+    SendBackend(frame);
+  }
+
+  void SendPose() {
+    try {
+      const auto transform = tf_buffer_->lookupTransform("map", "base_link", tf2::TimePointZero);
+      if ((now() - rclcpp::Time(transform.header.stamp)).seconds() > 1.5) return;
+      const auto& p = transform.transform.translation;
+      const auto& q = transform.transform.rotation;
+      const auto yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y),
+                                 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      std::vector<std::uint8_t> frame;
+      Put32(&frame, 0x504f5331);  // POS1: pose in the ROS map frame.
+      Put32(&frame, 1); Put32(&frame, 12); Put32(&frame, map_sequence_++);
+      PutFloat(&frame, p.x); PutFloat(&frame, p.y); PutFloat(&frame, yaw);
+      SendBackend(frame);
+    } catch (const tf2::TransformException&) {
+      // Do not substitute a localizer pose from a different map frame.
+    }
+  }
+
+  void SendBackend(const std::vector<std::uint8_t>& frame) {
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in address{}; address.sin_family = AF_INET; address.sin_port = htons(map_backend_port_);
     if (fd >= 0 && inet_pton(AF_INET, map_backend_host_.c_str(), &address.sin_addr) == 1 &&
@@ -172,6 +200,9 @@ class ScanTcpBridge : public rclcpp::Node {
   std::uint32_t map_sequence_ = 0;
   std::atomic<bool> running_{true};
   std::thread worker_;
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  rclcpp::TimerBase::SharedPtr pose_timer_;
   rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher_;
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_subscription_;
 };

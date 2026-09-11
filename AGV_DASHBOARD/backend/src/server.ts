@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { alignMappingPose, readAlignment, type MapAlignment, type MappingPose } from './map-alignment.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ExperimentManager, type CreateSessionInput } from './experiments.js';
 import { RouteReferenceStore } from './route-references.js';
@@ -89,6 +90,13 @@ const SCAN_MAX_PAYLOAD_BYTES = 40 + 10_000 * 12;
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
 let liveMap: (MapMetadata & { width: number; height: number; pixels: string }) | undefined;
 let lastSavedMap: string | undefined;
+let mappingAlignment: MapAlignment | undefined;
+let mappingPose: (MappingPose & { received_ms: number }) | undefined;
+function publishMappingPose(): void {
+  const pose = mappingPose && Date.now() - mappingPose.received_ms <= 1500
+    ? alignMappingPose(mappingPose, mappingAlignment) : null;
+  broadcastToDashboards({ type: 'mapping_pose', data: pose });
+}
 let activeMapName = ReadActiveMapName();
 const pendingMapTransfers = new Map<
   number,
@@ -384,6 +392,17 @@ function createMapTransferFrame(name: string, data: Buffer, transferId: number):
 }
 
 async function runRootCommand(file: string, args: string[]): Promise<string> {
+  // Mapper and map conversion only operate on this user's ROS processes and
+  // workspace files. Running them through sudo breaks VS Code/WSL sessions
+  // that intentionally do not have passwordless sudo configured.
+  if (file === mapperScript || file === saveMapScript) {
+    const result = await execFileAsync(file, args, {
+      cwd: root,
+      timeout: 30_000,
+      maxBuffer: 1024 * 1024,
+    });
+    return `${result.stdout}${result.stderr}`.trim();
+  }
   const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
   const command = isRoot ? file : 'sudo';
   const commandArgs = isRoot ? args : ['-n', file, ...args];
@@ -767,6 +786,9 @@ app.post('/api/mapping/start', async (_req, res) => {
   }
   const robot = robots.values().next().value as RobotConnection | undefined;
   if (!robot) return res.status(409).json({ error: 'robot not connected' });
+  mappingAlignment = undefined;
+  mappingPose = undefined;
+  publishMappingPose();
   mappingState = 'starting';
   broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
   try {
@@ -900,7 +922,11 @@ app.post('/api/mapping/save', async (req, res) => {
           `${alignedMap.origin.x}, ${alignedMap.origin.y}, ${alignedMap.origin.yaw}`,
       );
     }
+    mappingAlignment = readAlignment(JSON.parse(
+      fs.readFileSync(path.join(mapDir, `${requestedMapName}.alignment.json`), 'utf8'),
+    ));
     liveMap = alignedMap;
+    publishMappingPose();
     mappingState = 'running';
     lastSavedMap = requestedMapName;
     broadcastToDashboards({ type: 'mapping_status', data: { state: mappingState } });
@@ -1098,6 +1124,17 @@ const mapServer = net.createServer((socket) => {
   });
   socket.on('end', () => {
     if (!['starting', 'running', 'saving'].includes(mappingState)) return;
+    if (incoming.length < 16 || incoming.readUInt32BE(4) !== 1) return;
+    if (incoming.readUInt32BE(0) === 0x504f5331) {
+      if (incoming.length !== 28 || incoming.readUInt32BE(8) !== 12) return;
+      const x = incoming.readFloatBE(16), y = incoming.readFloatBE(20), yaw = incoming.readFloatBE(24);
+      if (![x, y, yaw].every(Number.isFinite)) return;
+      mappingPose = { x, y, yaw, received_ms: Date.now() };
+      publishMappingPose();
+      return;
+    }
+    // Keep the aligned preview until mapping stops or a new session starts.
+    if (mappingAlignment) return;
     if (incoming.length < 40 || incoming.readUInt32BE(0) !== 0x4d415031) return;
     const payloadLength = incoming.readUInt32BE(8);
     if (incoming.length !== 16 + payloadLength || payloadLength < 24) return;
@@ -1138,6 +1175,10 @@ wss.on('connection', (socket) =>
 );
 setInterval(() => {
   const now = Date.now();
+  if (mappingPose && now - mappingPose.received_ms > 1500) {
+    mappingPose = undefined;
+    publishMappingPose();
+  }
   for (const robot of robots.values())
     if (robot.status.online && now - robot.status.received_ms > offlineMs) {
       robot.status.online = false;

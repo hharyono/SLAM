@@ -40,6 +40,7 @@ type ServerMessage =
   | { type: 'command_ack'; data: { command: string } }
   | { type: 'mapping_status'; data: { state: MappingState } }
   | { type: 'mapping_map'; data: MapData }
+  | { type: 'mapping_pose'; data: { x: number; y: number; yaw: number } | null }
   | { type: 'map_saved'; data: { name: string; replaced?: boolean } }
   | { type: 'map_activated'; data: { name: string } }
   | { type: 'map_deleted'; data: { name: string } }
@@ -2436,6 +2437,7 @@ function App() {
   const [robots, setRobots] = useState<Record<string, RobotStatus>>({});
   const [notice, setNotice] = useState('');
   const [mappingState, setMappingState] = useState<MappingState>('stopped');
+  const [mappingPose, setMappingPose] = useState<{ x: number; y: number; yaw: number } | null>(null);
   const [mapCatalog, setMapCatalog] = useState<MapCatalogEntry[]>([]);
   const [activeMap, setActiveMap] = useState<string>();
   const [selectedMap, setSelectedMap] = useState('');
@@ -2498,6 +2500,7 @@ function App() {
       if (msg.type === 'mapping_status')
         setMappingState((msg.data as { state: MappingState }).state);
       if (msg.type === 'mapping_map') setMap(msg.data as MapData);
+      if (msg.type === 'mapping_pose') setMappingPose(msg.data as { x: number; y: number; yaw: number } | null);
       if (msg.type === 'map_saved') {
         const { name, replaced } = msg.data as { name: string; replaced?: boolean };
         setSelectedMap(name);
@@ -2670,7 +2673,9 @@ function App() {
       </header>
       <section className={`layout ${view === 'experiment' ? 'experiment-layout' : ''}`}>
         <div className="map">
-          <MapView map={map} robot={robot} />
+          <MapView map={map} robot={mappingState === 'stopped' ? robot : (
+            mappingPose && robot ? { ...robot, pose: { ...mappingPose, valid: true, score: 1, mode: 'tracking' } } : undefined
+          )} />
         </div>
         {view === 'monitor' ? (
           <aside>

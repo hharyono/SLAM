@@ -18,7 +18,9 @@
         "BOARD_SSH_TARGET": "root@192.168.1.231",
         "RV1103_SSH_TARGET": "root@192.168.1.231",
         "RV1106_SSH_TARGET": "root@192.168.1.231",
-        "BOARD_SSH_KEY": "/root/.ssh/luckfox_experiment_ed25519"
+        "BOARD_SSH_KEY": "${env:HOME}/.ssh/luckfox_dashboard_ed25519",
+        "AUTO_WSL_PORTPROXY": "0",
+        "ROS_SETUP": "${env:HOME}/.local/share/mamba/envs/SLAM/setup.bash"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**", "${workspaceFolder}/**/node_modules/**"]
