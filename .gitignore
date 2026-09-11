@@ -25,6 +25,7 @@ __pycache__/
 /RV1103_BUILDROOT/artifacts/
 
 # Editor / OS metadata
+/.tools/
 *Zone.Identifier
 *Zone.Identifier:*
 .DS_Store

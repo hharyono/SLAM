@@ -17,12 +17,25 @@ TARGET_BOARD="$(realpath "$SDK_DIR/.BoardConfig.mk")"
 }
 
 for key in LF_WIFI_SSID LF_WIFI_PSK; do
-  source_line="$(grep -m1 "^export ${key}=" "$SOURCE_BOARD" || true)"
-  [[ -n "$source_line" ]] || {
-    echo "Konfigurasi $key tidak ditemukan pada BoardConfig RV1106" >&2
-    exit 1
-  }
+  value="${!key:-}"
+  if [[ -n "$value" ]]; then
+    [[ "$value" != *$'\n'* && "$value" != *'"'* ]] || {
+      echo "Konfigurasi $key mengandung karakter yang tidak didukung" >&2
+      exit 1
+    }
+    source_line="export ${key}=\"${value}\""
+  else
+    source_line="$(grep -m1 "^export ${key}=" "$SOURCE_BOARD" || true)"
+    [[ -n "$source_line" ]] || {
+      echo "Konfigurasi $key tidak ditemukan pada BoardConfig RV1106" >&2
+      exit 1
+    }
+  fi
   sed -i "s|^export ${key}=.*$|${source_line//|/\\|}|" "$TARGET_BOARD"
 done
 
-echo "Konfigurasi koneksi Wi-Fi disinkronkan dari target RV1106."
+if [[ -n "${LF_WIFI_SSID:-}" ]]; then
+  echo "Konfigurasi koneksi Wi-Fi RV1103 diterapkan dari environment build."
+else
+  echo "Konfigurasi koneksi Wi-Fi disinkronkan dari target RV1106."
+fi

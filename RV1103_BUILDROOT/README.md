@@ -21,6 +21,14 @@ Dari root repository:
 ./RV1103_BUILDROOT/scripts/build_spi_nand.sh
 ```
 
+Mengatur koneksi Wi-Fi khusus untuk image RV1103 tanpa menyimpan kredensial ke
+Git:
+
+```bash
+LF_WIFI_SSID='nama-ssid' LF_WIFI_PSK='password' \
+  ./RV1103_BUILDROOT/scripts/build_spi_nand.sh
+```
+
 Memilih varian lain:
 
 ```bash

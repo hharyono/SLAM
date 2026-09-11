@@ -471,11 +471,23 @@ function drawMetricGrid(
 
 function MapView({ map, robot }: MapViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const grayscalePixels = useMemo(
-    () =>
-      map ? Uint8Array.from(atob(map.pixels), (character) => character.charCodeAt(0)) : undefined,
-    [map],
-  );
+  const grayscalePixels = useMemo(() => {
+    if (
+      !map ||
+      !Number.isInteger(map.width) ||
+      !Number.isInteger(map.height) ||
+      map.width <= 0 ||
+      map.height <= 0 ||
+      typeof map.pixels !== 'string'
+    )
+      return undefined;
+    try {
+      const decoded = Uint8Array.from(atob(map.pixels), (character) => character.charCodeAt(0));
+      return decoded.length === map.width * map.height ? decoded : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [map]);
 
   useEffect(() => {
     if (!map || !grayscalePixels || !canvasRef.current) return;
@@ -2449,7 +2461,11 @@ function App() {
   };
   useEffect(() => {
     fetch('/api/map')
-      .then((r) => r.json() as Promise<MapData>)
+      .then(async (response) => {
+        const result = (await response.json()) as MapData & { error?: string };
+        if (!response.ok) throw new Error(result.error || `Map request failed: HTTP ${response.status}`);
+        return result;
+      })
       .then(setMap)
       .catch((e) => setNotice(String(e)));
   }, []);
@@ -2525,9 +2541,14 @@ function App() {
       socket.onmessage = handleMessage;
       socket.onopen = () => {
         fetch('/api/map')
-          .then((response) => response.json() as Promise<MapData>)
+          .then(async (response) => {
+            const result = (await response.json()) as MapData & { error?: string };
+            if (!response.ok)
+              throw new Error(result.error || `Map request failed: HTTP ${response.status}`);
+            return result;
+          })
           .then(setMap)
-          .catch(() => undefined);
+          .catch((error) => setNotice(String(error)));
       };
       socket.onerror = () => socket?.close();
       socket.onclose = () => {

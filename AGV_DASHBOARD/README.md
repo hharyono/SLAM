@@ -110,12 +110,12 @@ emergency stop motor penggerak robot yang fail-safe.
 
 ## Debug dengan F5 di VS Code
 
-1. Buka folder repository `/root/DATA/SLAM` di VS Code (gunakan **Remote - WSL**
-   jika project berada di WSL).
-   Konfigurasi debug sengaja memakai Node Linux `/usr/local/bin/node`, bukan
-   instalasi Node Windows.
-2. Pastikan `npm install` sudah dijalankan pada folder `frontend` dan `backend`.
-3. Buka panel **Run and Debug** dan pilih `AGV: Debug FE + BE`.
+1. Buka folder repository di VS Code menggunakan **Remote - WSL**.
+2. Jalankan `bash AGV_DASHBOARD/scripts/setup-node.sh` satu kali. Script ini
+   memasang Node Linux lokal ke `.tools/node` tanpa memerlukan `sudo`, lalu
+   memasang dependensi frontend dan backend.
+3. Buka panel **Run and Debug** dan pilih
+   `AGV: Run Both (Frontend + Backend)`.
 4. Tekan **F5**.
 
 VS Code akan menjalankan backend pada `http://localhost:8080`, frontend Vite

@@ -5,7 +5,7 @@
       "name": "AGV: Backend (TypeScript)",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeExecutable": "${workspaceFolder}/.tools/node/bin/node",
       "runtimeArgs": ["--import", "tsx"],
       "args": ["src/server.ts"],
       "cwd": "${workspaceFolder}/AGV_DASHBOARD/backend",
@@ -16,6 +16,8 @@
         "MAP_NAME": "ruang_utama",
         "EXPERIMENT_OUTPUT_DIR": "${workspaceFolder}/EXPERIMENTS/Ouputs",
         "BOARD_SSH_TARGET": "root@192.168.1.231",
+        "RV1103_SSH_TARGET": "root@192.168.1.231",
+        "RV1106_SSH_TARGET": "root@192.168.1.231",
         "BOARD_SSH_KEY": "/root/.ssh/luckfox_experiment_ed25519"
       },
       "console": "integratedTerminal",
@@ -25,7 +27,7 @@
       "name": "AGV: Frontend (React)",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeExecutable": "${workspaceFolder}/.tools/node/bin/node",
       "runtimeArgs": ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0"],
       "cwd": "${workspaceFolder}/AGV_DASHBOARD/frontend",
       "console": "integratedTerminal",
@@ -39,7 +41,7 @@
   ],
   "compounds": [
     {
-      "name": "AGV: Debug FE + BE",
+      "name": "AGV: Run Both (Frontend + Backend)",
       "configurations": ["AGV: Backend (TypeScript)", "AGV: Frontend (React)"],
       "stopAll": true
     }
