@@ -2497,6 +2497,10 @@ function App() {
   const [mapActivationPending, setMapActivationPending] = useState(false);
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [waypointSending, setWaypointSending] = useState(false);
+  const [waypointReading, setWaypointReading] = useState(false);
+  const [originSetting, setOriginSetting] = useState(false);
+  const [originLatitude, setOriginLatitude] = useState('-7.608038171102201');
+  const [originLongitude, setOriginLongitude] = useState('110.93883455425673');
   const [experimentPreflight, setExperimentPreflight] = useState<ExperimentPreflight>();
   const refreshMapCatalog = async () => {
     const response = await fetch('/api/maps');
@@ -2733,6 +2737,60 @@ function App() {
       setWaypointSending(false);
     }
   };
+  const setEkfOriginHere = async () => {
+    const latitude = Number(originLatitude);
+    const longitude = Number(originLongitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      setNotice('Enter valid latitude and longitude coordinates');
+      return;
+    }
+    setOriginSetting(true);
+    setNotice(`Setting EKF origin to ${latitude}, ${longitude}...`);
+    try {
+      const response = await fetch('/api/ardupilot/origin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          altitude: 0,
+        }),
+      });
+      const result = (await response.json()) as {
+        error?: string; latitude?: number; longitude?: number;
+      };
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      setNotice(`EKF origin verified at ${result.latitude?.toFixed(7)}, ${result.longitude?.toFixed(7)}; resend waypoints`);
+    } catch (error) {
+      setNotice(`Set EKF origin failed: ${(error as Error).message}`);
+    } finally {
+      setOriginSetting(false);
+    }
+  };
+  const readWaypoints = async () => {
+    if (!robot?.online || !robot.pose.valid) {
+      setNotice('Robot must be online with a valid localization pose');
+      return;
+    }
+    setWaypointReading(true);
+    setNotice('Reading ArduPilot mission...');
+    try {
+      const response = await fetch('/api/ardupilot/mission/read', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_pose: { x: robot.pose.x, y: robot.pose.y } }),
+      });
+      const result = (await response.json()) as {
+        error?: string; count?: number; waypoints?: MetricPoint[]; mission_items?: number;
+      };
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      setWaypoints((result.waypoints || []).map((point, index) => ({ ...point, id: Date.now()+index })));
+      setNotice(`Read ${result.count} waypoint(s) from ArduPilot`);
+    } catch (error) {
+      setNotice(`Read waypoint failed: ${(error as Error).message}`);
+    } finally {
+      setWaypointReading(false);
+    }
+  };
   return (
     <main>
       <header>
@@ -2743,13 +2801,6 @@ function App() {
               onClick={() => setView('monitor')}
             >
               MONITORING
-            </button>
-            <button
-              disabled={waypointSending}
-              onClick={sendWaypoints}
-              title="Upload clicked map points as an ArduPilot AUTO mission"
-            >
-              {waypointSending ? 'SENDING…' : 'SEND WP'}
             </button>
             <button
               className={view === 'experiment' ? 'active' : ''}
@@ -2772,6 +2823,31 @@ function App() {
             <b>{waypoints.length} WP</b>
             <button disabled={!waypoints.length} onClick={() => setWaypoints((items) => items.slice(0, -1))}>UNDO</button>
             <button disabled={!waypoints.length} onClick={() => setWaypoints([])}>CLEAR</button>
+            <input
+              aria-label="EKF origin latitude"
+              value={originLatitude}
+              onChange={(event) => setOriginLatitude(event.target.value)}
+              placeholder="Latitude"
+            />
+            <input
+              aria-label="EKF origin longitude"
+              value={originLongitude}
+              onChange={(event) => setOriginLongitude(event.target.value)}
+              placeholder="Longitude"
+            />
+            <button disabled={originSetting} onClick={setEkfOriginHere}>
+              {originSetting ? 'SETTING…' : 'SET EKF ORIGIN'}
+            </button>
+            <button
+              disabled={waypointSending || !waypoints.length}
+              onClick={sendWaypoints}
+              title="Upload clicked map points as an ArduPilot AUTO mission"
+            >
+              {waypointSending ? 'SENDING…' : 'SEND WP'}
+            </button>
+            <button disabled={waypointReading} onClick={readWaypoints}>
+              {waypointReading ? 'READING…' : 'READ WP'}
+            </button>
           </div>
         </div>
         {view === 'monitor' ? (

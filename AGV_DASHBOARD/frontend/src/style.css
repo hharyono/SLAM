@@ -111,6 +111,16 @@ h1 {
   font: 700 11px ui-monospace, monospace;
 }
 .waypoint-toolbar button { min-height: 28px; padding: 4px 9px; font-size: 10px; }
+.waypoint-toolbar input {
+  width: 154px;
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  color: #e2e8f0;
+  background: #111827;
+  font: 600 10px ui-monospace, monospace;
+}
 aside {
   display: flex;
   flex-direction: column;

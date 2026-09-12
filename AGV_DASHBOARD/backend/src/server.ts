@@ -92,6 +92,8 @@ const ardupilotHost = process.env.ARDUPILOT_BRIDGE_HOST || boardAddress;
 const ardupilotPort = Number(process.env.ARDUPILOT_BRIDGE_PORT || 5760);
 const mavlinkMapHeading = Number(process.env.MAVLINK_MAP_HEADING_RAD || 0);
 const missionUploader = path.join(here, '../scripts/upload_mavlink_mission.py');
+const missionReader = path.join(here, '../scripts/read_mavlink_mission.py');
+const originSetter = path.join(here, '../scripts/set_ekf_origin.py');
 const SCAN_PROTOCOL_MAGIC = 0x53434e31; // ASCII: SCN1
 const SCAN_MAX_PAYLOAD_BYTES = 40 + 10_000 * 12;
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
@@ -502,6 +504,37 @@ app.post('/api/ardupilot/mission', async (req, res) => {
     const result = await execFileAsync('python3', [missionUploader, '--host', ardupilotHost,
       '--port', String(ardupilotPort), '--heading', String(mavlinkMapHeading), '--data', payload],
       { timeout: 25_000, maxBuffer: 1024 * 1024 });
+    res.json(JSON.parse(result.stdout.trim()));
+  } catch (error) {
+    const detail = error as Error & { stderr?: string };
+    res.status(502).json({ error: detail.stderr?.trim() || detail.message });
+  }
+});
+app.post('/api/ardupilot/mission/read', async (req, res) => {
+  try {
+    const body = req.body as { current_pose?: { x?: unknown; y?: unknown } };
+    if (![body.current_pose?.x, body.current_pose?.y].every((value) =>
+      typeof value === 'number' && Number.isFinite(value)))
+      return res.status(400).json({ error: 'a valid current localization pose is required' });
+    const result = await execFileAsync('python3', [missionReader, '--host', ardupilotHost,
+      '--port', String(ardupilotPort), '--heading', String(mavlinkMapHeading),
+      '--data', JSON.stringify(body)], { timeout: 30_000, maxBuffer: 1024 * 1024 });
+    res.json(JSON.parse(result.stdout.trim()));
+  } catch (error) {
+    const detail = error as Error & { stderr?: string };
+    res.status(502).json({ error: detail.stderr?.trim() || detail.message });
+  }
+});
+app.post('/api/ardupilot/origin', async (req, res) => {
+  try {
+    const { latitude, longitude, altitude = 0 } = req.body as Record<string, unknown>;
+    if (![latitude, longitude, altitude].every((value) =>
+      typeof value === 'number' && Number.isFinite(value)))
+      return res.status(400).json({ error: 'latitude, longitude, and altitude must be finite numbers' });
+    const result = await execFileAsync('python3', [originSetter, '--host', ardupilotHost,
+      '--port', String(ardupilotPort), '--latitude', String(latitude),
+      '--longitude', String(longitude), '--altitude', String(altitude)],
+      { timeout: 20_000, maxBuffer: 1024 * 1024 });
     res.json(JSON.parse(result.stdout.trim()));
   } catch (error) {
     const detail = error as Error & { stderr?: string };
