@@ -2725,6 +2725,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           waypoints: waypoints.map(({ x, y }) => ({ x, y })),
+          origin: { latitude: Number(originLatitude), longitude: Number(originLongitude) },
           current_pose: { x: robot.pose.x, y: robot.pose.y },
         }),
       });
@@ -2777,7 +2778,10 @@ function App() {
     try {
       const response = await fetch('/api/ardupilot/mission/read', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ current_pose: { x: robot.pose.x, y: robot.pose.y } }),
+        body: JSON.stringify({
+          origin: { latitude: Number(originLatitude), longitude: Number(originLongitude) },
+          current_pose: { x: robot.pose.x, y: robot.pose.y },
+        }),
       });
       const result = (await response.json()) as {
         error?: string; count?: number; waypoints?: MetricPoint[]; mission_items?: number;

@@ -49,47 +49,54 @@ def main():
     if system is None or lat is None: raise RuntimeError('ArduPilot heartbeat/global position not received')
     if lat == 0 and lon == 0:
         raise RuntimeError('ArduPilot EKF origin is not set (GLOBAL_POSITION_INT is 0,0)')
-    pose=data['current_pose']; ch,sh=math.cos(a.heading),math.sin(a.heading)
+    origin=data['origin']; ch,sh=math.cos(a.heading),math.sin(a.heading)
     def ne(point):
-        dx=point['x']-pose['x']; dy=point['y']-pose['y']
+        dx=point['x']; dy=point['y']
         return ch*dx+sh*dy, sh*dx-ch*dy
-    latitude=lat/1e7; result=[]
+    latitude=origin['latitude']; longitude=origin['longitude']; result=[]
     for point in data['waypoints']:
         north,east=ne(point)
         wp_lat=latitude+north/111319.49079327358
-        wp_lon=lon/1e7+east/(111319.49079327358*math.cos(math.radians(latitude)))
+        wp_lon=longitude+east/(111319.49079327358*math.cos(math.radians(latitude)))
         result.append((round(wp_lat*1e7),round(wp_lon*1e7)))
+    # ArduPilot reserves mission sequence 0 for HOME and may replace its
+    # coordinates with the vehicle position. Keep clicked waypoints at seq 1..
+    # so the first user waypoint is not silently replaced by HOME.
+    mission_items=[(lat,lon), *result]
     target_component=1
-    mission_count=struct.pack('<HBBB',len(result),system,target_component,0)
+    mission_count=struct.pack('<HBBB',len(mission_items),system,target_component,0)
     link.send(44,mission_count,221)
-    sent=set(); requests=[]; deadline=time.monotonic()+25; last_progress=time.monotonic()
+    sent=set(); requests=[]; deadline=time.monotonic()+35; last_progress=time.monotonic()
     while time.monotonic()<deadline:
+        if len(sent)==len(mission_items) and time.monotonic()-last_progress>=2:
+            print(json.dumps({'count':len(result),'target_system':system,
+                              'result':'mavlink2_int_items_complete'})); return
         try:
             msg,sysid,comp,payload=link.receive(min(deadline,time.monotonic()+2))
         except TimeoutError:
-            # Restart the transaction when a request or ACK was lost. ArduPilot
-            # will request sequence zero again and duplicate item requests are safe.
-            link.send(44,mission_count,221); sent.clear(); last_progress=time.monotonic()
+            # ArduPilot 4.5 can emit a legacy MISSION_REQUEST immediately, then
+            # retry the same sequence as MISSION_REQUEST_INT after about 1 s.
+            # Keep the transaction alive so that retry is not reset to seq 0.
             continue
         if msg in (40,51) and len(payload)>=4:
             seq=struct.unpack_from('<H',payload,0)[0]
             requests.append({'message':msg,'sequence':seq})
-            if seq>=len(result): raise RuntimeError(f'ArduPilot requested invalid mission item {seq}')
-            x,y=result[seq]
-            if msg == 51:
-                item=struct.pack('<ffffiifHHBBBBBB',0,0.5,0,math.nan,x,y,0.0,seq,16,
-                                 system,target_component,6,1 if seq==0 else 0,1,0)
-                link.send(73,item,38)
-            else:
-                item=struct.pack('<fffffffHHBBBBBB',0,0.5,0,math.nan,x/1e7,y/1e7,0.0,
-                                 seq,16,system,target_component,3,1 if seq==0 else 0,1,0)
-                link.send(39,item,254)
+            if seq>=len(mission_items): raise RuntimeError(f'ArduPilot requested invalid mission item {seq}')
+            x,y=mission_items[seq]
+            # Rover 4.5.6 queues legacy MISSION_REQUEST (40) between items even
+            # on a MAVLink 2 link. Its common item handler accepts the precise
+            # MISSION_ITEM_INT response. Always respond with ID 73 so global
+            # coordinates never pass through float32 degrees.
+            item=struct.pack('<ffffiifHHBBBBBB',0,0.5,0,math.nan,x,y,0.0,seq,16,
+                             system,target_component,6,1 if seq==0 else 0,1,0)
+            link.send(73,item,38)
             sent.add(seq); last_progress=time.monotonic()
         elif msg==47 and len(payload)>=3:
             result_code=payload[2]
             if result_code!=0: raise RuntimeError(f'ArduPilot rejected mission: MAV_MISSION_RESULT={result_code}')
-            if len(sent)!=len(result): raise RuntimeError('ArduPilot ACK arrived before all items were requested')
+            if len(sent)!=len(mission_items): raise RuntimeError('ArduPilot ACK arrived before all items were requested')
             print(json.dumps({'count':len(result),'target_system':system,'result':'accepted'})); return
-    raise TimeoutError(f'timeout waiting for ArduPilot MISSION_ACK; requests={requests[-12:]}')
+    raise TimeoutError('timeout waiting for MAVLink 2 mission transfer; '
+                       f'INT items sent={sorted(sent)}, requests={requests[-16:]}')
 
 if __name__=='__main__': main()

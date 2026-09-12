@@ -42,14 +42,16 @@ def main():
             except TimeoutError:
                 if attempt==2: raise TimeoutError(f'mission item {seq} not received')
     link.send(47,bytes([system,target_component,0,0]),153)
-    pose=data['current_pose']; latitude=lat/1e7; ch,sh=math.cos(args.heading),math.sin(args.heading)
+    origin=data['origin']; latitude=origin['latitude']; longitude=origin['longitude']
+    ch,sh=math.cos(args.heading),math.sin(args.heading)
     points=[]
-    for command,frame,x,y in items:
+    for seq,(command,frame,x,y) in enumerate(items):
+        # Mission item 0 is ArduPilot HOME, not a user-created waypoint.
+        if seq==0: continue
         if command!=16 or frame not in (0,3,5,6,10,11): continue
         north=(x/1e7-latitude)*111319.49079327358
-        east=(y/1e7-lon/1e7)*111319.49079327358*math.cos(math.radians(latitude))
-        points.append({'x':pose['x']+ch*north+sh*east,
-                       'y':pose['y']+sh*north-ch*east})
+        east=(y/1e7-longitude)*111319.49079327358*math.cos(math.radians(latitude))
+        points.append({'x':ch*north+sh*east, 'y':sh*north-ch*east})
     print(json.dumps({'count':len(points),'waypoints':points,'mission_items':count}))
 
 if __name__=='__main__': main()
