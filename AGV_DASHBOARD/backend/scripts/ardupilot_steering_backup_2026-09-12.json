@@ -1,0 +1,9 @@
+{
+  "ATC_STR_RAT_FF": 0.26,
+  "ATC_STR_RAT_P": 0.26,
+  "ATC_STR_RAT_I": 1.0,
+  "ATC_STR_ANG_P": 6.0,
+  "ATC_STR_RAT_MAX": 360.0,
+  "ATC_STR_ACC_MAX": 360.0,
+  "PSC_VEL_P": 1.0
+}
