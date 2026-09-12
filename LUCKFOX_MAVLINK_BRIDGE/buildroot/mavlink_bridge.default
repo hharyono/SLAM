@@ -1,0 +1,7 @@
+# Pico Mini: UART5_M1 must already be enabled in the flashed device tree.
+ENABLED=1
+UART=/dev/ttyS5
+BAUD=115200
+BIND_ADDRESS=0.0.0.0
+TCP_PORT=5760
+UPLOAD_PORT=5761

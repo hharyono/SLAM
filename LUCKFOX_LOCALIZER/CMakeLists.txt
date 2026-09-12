@@ -17,6 +17,10 @@ target_include_directories(robot_backend_client PUBLIC include)
 target_link_libraries(robot_backend_client PUBLIC slam_map pthread)
 target_compile_options(robot_backend_client PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(mavlink_output src/mavlink_output.cpp)
+target_include_directories(mavlink_output PUBLIC include)
+target_compile_options(mavlink_output PRIVATE -Wall -Wextra -Wpedantic)
+
 add_library(scan_tcp_client src/scan_tcp_client.cpp)
 target_include_directories(scan_tcp_client PUBLIC include)
 target_link_libraries(scan_tcp_client PUBLIC pthread)
@@ -51,7 +55,7 @@ if(YDLIDAR_SDK_ROOT)
   add_executable(localize_uart tools/localize_uart.cpp)
   target_include_directories(localize_uart PRIVATE
     ${YDLIDAR_INCLUDE_DIR} ${YDLIDAR_SDK_ROOT})
-  target_link_libraries(localize_uart PRIVATE uart_localizer robot_backend_client scan_tcp_client ${YDLIDAR_LIBRARY} pthread)
+  target_link_libraries(localize_uart PRIVATE uart_localizer robot_backend_client scan_tcp_client mavlink_output ${YDLIDAR_LIBRARY} pthread)
 endif()
 
 add_executable(localize_replay tools/localize_replay.cpp)
@@ -59,6 +63,10 @@ target_link_libraries(localize_replay PRIVATE slam_map)
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(mavlink_tests tests/mavlink_tests.cpp)
+  target_link_libraries(mavlink_tests PRIVATE mavlink_output)
+  add_test(NAME mavlink_tests COMMAND mavlink_tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/vision_position_estimate.hex)
   add_executable(map_tests tests/map_tests.cpp)
   target_link_libraries(map_tests PRIVATE slam_map)
   add_test(NAME map_tests COMMAND map_tests)

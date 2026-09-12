@@ -96,6 +96,21 @@ h1 {
   height: 100%;
   object-fit: contain;
 }
+.map canvas.waypoint-map { cursor: crosshair; }
+.waypoint-toolbar {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  color: #fff;
+  background: #0f172ae6;
+  font: 700 11px ui-monospace, monospace;
+}
+.waypoint-toolbar button { min-height: 28px; padding: 4px 9px; font-size: 10px; }
 aside {
   display: flex;
   flex-direction: column;

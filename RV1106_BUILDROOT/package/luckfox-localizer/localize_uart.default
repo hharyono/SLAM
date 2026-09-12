@@ -37,5 +37,17 @@ export LUCKFOX_EXPERIMENT_ID=runtime
 export LUCKFOX_EXPERIMENT_CONDITION=nominal
 export LUCKFOX_EXPERIMENT_RUN_TYPE=runtime
 export LUCKFOX_EXPERIMENT_ROUTE_ID=runtime
-export LUCKFOX_TELEMETRY_LOG=/tmp/localize_scans.jsonl
+# Runtime telemetry is disabled because /tmp is RAM-backed on the 32 MB RV1103.
+# Experiment sessions provide their own bounded telemetry path when required.
+export LUCKFOX_TELEMETRY_LOG=
 export LUCKFOX_RAW_SCAN_LOG=
+
+# MAVLink output is opt-in on RV1106 (UART4 must be enabled first).
+# RV1103 build sets this to /dev/ttyS4 after integration.
+export LUCKFOX_MAVLINK_PORT=
+export LUCKFOX_MAVLINK_BAUD=115200
+export LUCKFOX_MAVLINK_SYSID=1
+export LUCKFOX_MAVLINK_COMPID=197
+export LUCKFOX_MAVLINK_MAP_HEADING_RAD=0
+export LUCKFOX_MAVLINK_ORIGIN_X=0
+export LUCKFOX_MAVLINK_ORIGIN_Y=0

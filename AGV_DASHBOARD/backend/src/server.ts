@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import net, { type Socket } from 'node:net';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -74,17 +74,24 @@ const robots = new Map<string, RobotConnection>();
 const execFileAsync = promisify(execFile);
 const mapperScript = path.join(root, 'MAPPER/Config/mapper');
 const saveMapScript = path.join(root, 'LUCKFOX_LOCALIZER/scripts/save_and_convert_map.sh');
-const portProxyScript = path.join(root, 'AGV_DASHBOARD/scripts/setup-wsl-portproxy.ps1');
+const windowsForwarderScript = path.join(
+  root,
+  'AGV_DASHBOARD/scripts/windows-tcp-forwarder.cjs',
+);
 const experimentOutputDir =
   process.env.EXPERIMENT_OUTPUT_DIR || path.join(root, 'EXPERIMENTS', 'Ouputs');
 const routeReferences = new RouteReferenceStore(experimentOutputDir);
-const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.231';
+const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.50';
 const rv1103SshTarget = process.env.RV1103_SSH_TARGET || boardSshTarget;
 const rv1106SshTarget = process.env.RV1106_SSH_TARGET || boardSshTarget;
 const boardSshKey = process.env.BOARD_SSH_KEY || '/root/.ssh/luckfox_experiment_ed25519';
 const boardAddress = process.env.BOARD_ADDRESS || boardSshTarget.split('@').at(-1)!;
 const scanStreamPort = Number(process.env.SCAN_STREAM_TCP_PORT || 42010);
 const scanRelayPort = Number(process.env.SCAN_RELAY_TCP_PORT || 42011);
+const ardupilotHost = process.env.ARDUPILOT_BRIDGE_HOST || boardAddress;
+const ardupilotPort = Number(process.env.ARDUPILOT_BRIDGE_PORT || 5760);
+const mavlinkMapHeading = Number(process.env.MAVLINK_MAP_HEADING_RAD || 0);
+const missionUploader = path.join(here, '../scripts/upload_mavlink_mission.py');
 const SCAN_PROTOCOL_MAGIC = 0x53434e31; // ASCII: SCN1
 const SCAN_MAX_PAYLOAD_BYTES = 40 + 10_000 * 12;
 let mappingState: 'stopped' | 'starting' | 'running' | 'stopping' | 'saving' | 'error' = 'stopped';
@@ -107,7 +114,7 @@ app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-function ensureWslPortProxy(): void {
+function ensureWslPortForwarder(): void {
   if (process.env.AUTO_WSL_PORTPROXY === '0') return;
 
   let isWsl = false;
@@ -121,38 +128,22 @@ function ensureWslPortProxy(): void {
   }
   if (!isWsl) return;
 
-  const distro = process.env.WSL_DISTRO_NAME || 'Ubuntu2204ArduP';
-  const powershell = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
-  if (!fs.existsSync(powershell) || !fs.existsSync(portProxyScript)) {
-    console.warn('WSL portproxy helper not found; the board may be unable to connect.');
+  const windowsNode = '/mnt/c/Program Files/nodejs/node.exe';
+  const match = windowsForwarderScript.match(/^\/mnt\/([a-z])\/(.*)$/i);
+  if (!fs.existsSync(windowsNode) || !match) {
+    console.warn('Windows Node forwarder unavailable; the board may be unable to connect.');
     return;
   }
 
-  const windowsScript = `\\\\wsl.localhost\\${distro}${portProxyScript.replaceAll('/', '\\')}`;
-  execFile(
-    powershell,
-    [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      windowsScript,
-      '-WslDistro',
-      distro,
-      '-BoardAddress',
-      boardAddress,
-      '-RobotPort',
-      String(robotPort),
-      '-ScanPort',
-      String(scanStreamPort),
-    ],
-    { timeout: 60_000 },
-    (error, stdout, stderr) => {
-      const output = `${stdout}${stderr}`.trim();
-      if (output) console.log(`WSL portproxy: ${output}`);
-      if (error) console.warn(`WSL portproxy failed: ${error.message}`);
-    },
+  const windowsScript = `${match[1].toUpperCase()}:\\${match[2].replaceAll('/', '\\')}`;
+  const child = spawn(
+    windowsNode,
+    [windowsScript, boardAddress, String(robotPort), String(scanStreamPort)],
+    { detached: true, stdio: 'ignore', windowsHide: true },
   );
+  child.on('error', (error) => console.warn(`Windows TCP forwarder failed: ${error.message}`));
+  child.unref();
+  console.log(`Windows TCP forwarder requested for ${boardAddress}`);
 }
 
 function broadcastToDashboards(message: unknown): void {
@@ -494,6 +485,28 @@ app.post('/api/robots/:id/mission/:action', (req, res) => {
   );
   broadcastToDashboards({ type: 'command_sent', robot_id: req.params.id, command: commandName });
   return res.status(202).json({ accepted: true, command: commandName, command_id: commandId });
+});
+app.post('/api/ardupilot/mission', async (req, res) => {
+  try {
+    const body = req.body as {
+      waypoints?: Array<{ x?: unknown; y?: unknown }>;
+      current_pose?: { x?: unknown; y?: unknown };
+    };
+    if (!Array.isArray(body.waypoints) || body.waypoints.length < 1 || body.waypoints.length > 100)
+      return res.status(400).json({ error: 'waypoints must contain 1 to 100 points' });
+    const values = [body.current_pose?.x, body.current_pose?.y,
+      ...body.waypoints.flatMap((point) => [point.x, point.y])];
+    if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value)))
+      return res.status(400).json({ error: 'all waypoint and current-pose coordinates must be finite numbers' });
+    const payload = JSON.stringify(body);
+    const result = await execFileAsync('python3', [missionUploader, '--host', ardupilotHost,
+      '--port', String(ardupilotPort), '--heading', String(mavlinkMapHeading), '--data', payload],
+      { timeout: 25_000, maxBuffer: 1024 * 1024 });
+    res.json(JSON.parse(result.stdout.trim()));
+  } catch (error) {
+    const detail = error as Error & { stderr?: string };
+    res.status(502).json({ error: detail.stderr?.trim() || detail.message });
+  }
 });
 
 app.get('/api/experiments', (_req, res) => res.json(experiments.List()));
@@ -1187,7 +1200,7 @@ setInterval(() => {
 }, 500);
 robotServer.listen(robotPort, '0.0.0.0', () => {
   console.log(`Robot TCP binary listening on :${robotPort}`);
-  ensureWslPortProxy();
+  ensureWslPortForwarder();
 });
 scanServer.listen(scanStreamPort, '0.0.0.0', () => {
   console.log(

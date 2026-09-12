@@ -17,7 +17,15 @@ SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/setup_sdk.sh"
 SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/select_board.sh"
 SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/sync_wifi_config.sh"
 SDK_DIR="$SDK_DIR" "$ROOT_DIR/RV1106_BUILDROOT/scripts/integrate_localizer.sh"
+SDK_DIR="$SDK_DIR" "$ROOT_DIR/LUCKFOX_MAVLINK_BRIDGE/scripts/integrate_buildroot.sh"
 SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/enable_uart3.sh"
+SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/enable_uart4.sh"
+if [[ "${RV1103_BOARD_MODEL:-plus}" == mini ]]; then
+  SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/enable_uart5.sh"
+fi
+# Enable the separate ExternalNav output in the RV1103 image.
+sed -i 's|^export LUCKFOX_MAVLINK_PORT=.*|export LUCKFOX_MAVLINK_PORT=/dev/ttyS4|' \
+  "$SDK_DIR/sysdrv/source/buildroot/buildroot-2023.02.6/package/luckfox-localizer/localize_uart.default"
 SDK_DIR="$SDK_DIR" "$WORK_DIR/scripts/enable_usb_host.sh"
 SDK_DIR="$SDK_DIR" "$ROOT_DIR/RV1106_BUILDROOT/scripts/enable_rtl8188eus.sh"
 SDK_DIR="$SDK_DIR" "$ROOT_DIR/RV1106_BUILDROOT/scripts/enable_wifi_only_build.sh"

@@ -247,3 +247,10 @@ Program target perlu:
 Untuk robot bergerak, prediksi awal sebaiknya berasal dari encoder/IMU. Scan
 matcher saja tidak dapat membedakan gerak besar secara andal jika tebakan awal
 keluar dari search window.
+
+## Output MAVLink 2 ke ArduPilot
+
+`localize_uart` mendukung `VISION_POSITION_ESTIMATE` untuk ExternalNav XY melalui
+`/dev/ttyS4` (115200 baud); YDLidar tetap `/dev/ttyS3` (230400 baud).
+Baca [konfigurasi MAVLink dan ArduPilot](docs/MAVLINK_ARDUPILOT.md) untuk wiring,
+konversi peta ke NED, parameter EKF, batasan 2D, dan cara verifikasi.

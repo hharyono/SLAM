@@ -1,0 +1,61 @@
+#!/bin/sh
+DAEMON=/usr/bin/mavlink_bridge
+CONFIG=/etc/default/mavlink_bridge
+PIDFILE=/var/run/mavlink_bridge.pid
+LOGFILE=/tmp/mavlink_bridge.log
+ENABLED=1
+UART=/dev/ttyS5
+BAUD=115200
+BIND_ADDRESS=0.0.0.0
+TCP_PORT=5760
+UPLOAD_PORT=5761
+[ -r "$CONFIG" ] && . "$CONFIG"
+
+running() {
+    [ -r "$PIDFILE" ] || return 1
+    read -r bridge_pid < "$PIDFILE"
+    case "$bridge_pid" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$bridge_pid" -gt 1 ] || return 1
+    kill -0 "$bridge_pid" 2>/dev/null || return 1
+    [ "$(readlink "/proc/$bridge_pid/exe")" = "$DAEMON" ]
+}
+start() {
+    [ "$ENABLED" = 1 ] || { echo "mavlink_bridge disabled in $CONFIG"; return 0; }
+    running && { echo "mavlink_bridge already running (pid $bridge_pid)"; return 0; }
+    [ -x "$DAEMON" ] || { echo "Missing $DAEMON"; return 1; }
+    rm -f "$PIDFILE"
+    # Bind-all works before DHCP; the application retries a missing UART itself.
+    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x "$DAEMON" -- \
+        --serial "$UART" --baud "$BAUD" --bind "$BIND_ADDRESS" --port "$TCP_PORT" \
+        --upload-port "$UPLOAD_PORT" \
+        >> "$LOGFILE" 2>&1 || return 1
+    sleep 1
+    running && { echo "mavlink_bridge started on TCP $TCP_PORT (pid $bridge_pid)"; return 0; }
+    echo "mavlink_bridge failed; see $LOGFILE"
+    return 1
+}
+stop() {
+    if running; then
+        kill -TERM "$bridge_pid" || return 1
+        remaining=5
+        while running && [ "$remaining" -gt 0 ]; do
+            sleep 1
+            remaining=$((remaining - 1))
+        done
+        running && { echo "mavlink_bridge did not stop"; return 1; }
+    fi
+    rm -f "$PIDFILE"
+    echo "mavlink_bridge stopped"
+}
+case "$1" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop && start ;;
+    status)
+        if running; then
+            echo "mavlink_bridge running (pid $bridge_pid), $UART <-> TCP $BIND_ADDRESS:$TCP_PORT"
+        else
+            echo "mavlink_bridge stopped"; exit 1
+        fi ;;
+    *) echo "Usage: $0 {start|stop|restart|status}"; exit 2 ;;
+esac

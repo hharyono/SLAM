@@ -130,11 +130,11 @@ dipasang langsung pada `backend/src/server.ts` dan `frontend/src/main.tsx`.
 
 ## Koneksi Luckfox ke backend WSL
 
-Saat backend dimulai di WSL, backend otomatis memeriksa portproxy Windows dan
-menjalankan helper untuk distro pada `WSL_DISTRO_NAME` (default
-`Ubuntu2204ArduP`) jika forwarding belum sehat. Windows menampilkan prompt UAC
-hanya ketika rule perlu dibuat atau diperbaiki. Set `AUTO_WSL_PORTPROXY=0`
-untuk menonaktifkan pemeriksaan otomatis.
+Saat backend dimulai di WSL, backend otomatis menjalankan forwarder TCP memakai
+Node.js Windows. Forwarder memilih alamat Windows yang satu subnet dengan
+`BOARD_SSH_TARGET`, lalu meneruskan port `42000` dan `42010` ke backend WSL.
+Tidak diperlukan PowerShell, hak Administrator, atau konfigurasi manual. Set
+`AUTO_WSL_PORTPROXY=0` untuk menonaktifkan forwarder otomatis.
 
 Board tidak dapat mengakses IP NAT WSL secara langsung. Jalankan script berikut
 dari **Windows PowerShell as Administrator**, terutama setelah WSL restart:
@@ -145,7 +145,7 @@ powershell -ExecutionPolicy Bypass -File \
 ```
 
 Script mendeteksi IP WSL dan alamat adapter Windows yang memiliki rute ke board
-(`BOARD_SSH_TARGET`, default `192.168.1.231`), kemudian membuat port forwarding
+(`BOARD_SSH_TARGET`, default `192.168.1.50`), kemudian membuat port forwarding
 TCP `42000` (status/command) dan `42010` (ScanFrame). Saat rule belum sehat,
 backend meminta izin Administrator melalui UAC dan menunggu hasil aktivasi.
 Gunakan IP Windows yang dicetak script sebagai `LUCKFOX_BACKEND_HOST` pada

@@ -24,6 +24,7 @@ type MapData = {
   height: number;
   pixels: string;
 };
+type Waypoint = MetricPoint & { id: number };
 type MapCatalogEntry = {
   name: string;
   active: boolean;
@@ -290,6 +291,8 @@ type ExperimentPreflight = {
 };
 
 type MapViewProps = {
+  waypoints?: Waypoint[];
+  onMapClick?: (point: MetricPoint) => void;
   map?: MapData;
   robot?: RobotStatus;
 };
@@ -470,7 +473,7 @@ function drawMetricGrid(
   context.restore();
 }
 
-function MapView({ map, robot }: MapViewProps) {
+function MapView({ map, robot, waypoints = [], onMapClick }: MapViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const grayscalePixels = useMemo(() => {
     if (
@@ -530,6 +533,34 @@ function MapView({ map, robot }: MapViewProps) {
 
     drawMetricGrid(context, canvas, map, transform);
 
+    if (waypoints.length) {
+      const points = waypoints.map((waypoint) =>
+        transform.toCanvas(worldToImage(waypoint, map)),
+      );
+      context.save();
+      context.strokeStyle = '#f97316';
+      context.lineWidth = 3;
+      context.setLineDash([8, 5]);
+      context.beginPath();
+      points.forEach((point, index) =>
+        index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y),
+      );
+      context.stroke();
+      context.setLineDash([]);
+      points.forEach((point, index) => {
+        context.fillStyle = '#f97316';
+        context.beginPath();
+        context.arc(point.x, point.y, 13, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = '#fff';
+        context.font = '800 12px ui-monospace, monospace';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(String(index + 1), point.x, point.y);
+      });
+      context.restore();
+    }
+
     if (robot?.pose) {
       const robotCanvas = transform.toCanvas(
         worldToImage({ x: robot.pose.x, y: robot.pose.y }, map),
@@ -572,9 +603,30 @@ function MapView({ map, robot }: MapViewProps) {
       context.fill();
       context.restore();
     }
-  }, [grayscalePixels, map, robot]);
+  }, [grayscalePixels, map, robot, waypoints]);
 
-  return <canvas ref={canvasRef} width="900" height="650" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      width="900"
+      height="650"
+      className={onMapClick ? 'waypoint-map' : ''}
+      onClick={(event) => {
+        if (!map || !canvasRef.current || !onMapClick) return;
+        const canvas = canvasRef.current;
+        const bounds = canvas.getBoundingClientRect();
+        const canvasPoint = {
+          x: ((event.clientX - bounds.left) * canvas.width) / bounds.width,
+          y: ((event.clientY - bounds.top) * canvas.height) / bounds.height,
+        };
+        const imagePoint = mapTransform(canvas, map).fromCanvas(canvasPoint);
+        if (
+          imagePoint.x >= 0 && imagePoint.x <= map.width &&
+          imagePoint.y >= 0 && imagePoint.y <= map.height
+        ) onMapClick(imageToWorld(imagePoint, map));
+      }}
+    />
+  );
 }
 
 type ExperimentPanelProps = {
@@ -2443,6 +2495,8 @@ function App() {
   const [selectedMap, setSelectedMap] = useState('');
   const [newMapName, setNewMapName] = useState('map_01');
   const [mapActivationPending, setMapActivationPending] = useState(false);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [waypointSending, setWaypointSending] = useState(false);
   const [experimentPreflight, setExperimentPreflight] = useState<ExperimentPreflight>();
   const refreshMapCatalog = async () => {
     const response = await fetch('/api/maps');
@@ -2648,6 +2702,37 @@ function App() {
     await refreshMapCatalog();
     setNotice(`Map deleted from catalog; backup: maps/${result.recoverable_path}`);
   };
+  const addWaypoint = (point: MetricPoint) =>
+    setWaypoints((current) => [...current, { ...point, id: Date.now() }]);
+  const sendWaypoints = async () => {
+    if (!robot?.online || !robot.pose.valid) {
+      setNotice('Robot must be online with a valid localization pose');
+      return;
+    }
+    if (!waypoints.length) {
+      setNotice('Click the map to create at least one waypoint');
+      return;
+    }
+    setWaypointSending(true);
+    setNotice(`Uploading ${waypoints.length} waypoint(s) to ArduPilot...`);
+    try {
+      const response = await fetch('/api/ardupilot/mission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          waypoints: waypoints.map(({ x, y }) => ({ x, y })),
+          current_pose: { x: robot.pose.x, y: robot.pose.y },
+        }),
+      });
+      const result = (await response.json()) as { error?: string; count?: number };
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      setNotice(`${result.count} waypoint(s) accepted by ArduPilot; switch to AUTO to run`);
+    } catch (error) {
+      setNotice(`Waypoint upload failed: ${(error as Error).message}`);
+    } finally {
+      setWaypointSending(false);
+    }
+  };
   return (
     <main>
       <header>
@@ -2658,6 +2743,13 @@ function App() {
               onClick={() => setView('monitor')}
             >
               MONITORING
+            </button>
+            <button
+              disabled={waypointSending}
+              onClick={sendWaypoints}
+              title="Upload clicked map points as an ArduPilot AUTO mission"
+            >
+              {waypointSending ? 'SENDING…' : 'SEND WP'}
             </button>
             <button
               className={view === 'experiment' ? 'active' : ''}
@@ -2675,7 +2767,12 @@ function App() {
         <div className="map">
           <MapView map={map} robot={mappingState === 'stopped' ? robot : (
             mappingPose && robot ? { ...robot, pose: { ...mappingPose, valid: true, score: 1, mode: 'tracking' } } : undefined
-          )} />
+          )} waypoints={waypoints} onMapClick={mappingState === 'stopped' ? addWaypoint : undefined} />
+          <div className="waypoint-toolbar">
+            <b>{waypoints.length} WP</b>
+            <button disabled={!waypoints.length} onClick={() => setWaypoints((items) => items.slice(0, -1))}>UNDO</button>
+            <button disabled={!waypoints.length} onClick={() => setWaypoints([])}>CLEAR</button>
+          </div>
         </div>
         {view === 'monitor' ? (
           <aside>

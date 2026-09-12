@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LUCKFOX_MAVLINK_BRIDGE
+	bool "luckfox-mavlink-bridge"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Standalone bidirectional serial/TCP bridge for Mission Planner.

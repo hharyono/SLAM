@@ -2,8 +2,8 @@
 # It is safe to run again whenever WSL receives a different NAT address.
 
 param(
-    [string]$WslDistro = 'Ubuntu2204ArduP',
-    [string]$BoardAddress = '192.168.1.231',
+    [string]$WslDistro = 'Ubuntu',
+    [string]$BoardAddress = '192.168.1.50',
     [string]$ListenAddress,
     [int]$RobotPort = 42000,
     [int]$ScanPort = 42010,

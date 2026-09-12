@@ -1,4 +1,5 @@
 #include "luckfox/map.hpp"
+#include "luckfox/mavlink_output.hpp"
 #include "luckfox/robot_backend_client.hpp"
 #include "luckfox/scan_tcp_client.hpp"
 #include "luckfox/telemetry.hpp"
@@ -104,6 +105,28 @@ int main(int argc, char** argv) try {
   config.minimum_range = EnvironmentFloat("LUCKFOX_MINIMUM_RANGE_M", config.minimum_range);
   config.maximum_range = EnvironmentFloat("LUCKFOX_MAXIMUM_RANGE_M", config.maximum_range);
 
+  std::unique_ptr<luckfox::MavlinkOutput> mavlink;
+  luckfox::MavlinkConfig mavlink_config;
+  mavlink_config.port = EnvironmentString("LUCKFOX_MAVLINK_PORT", "/dev/ttyS4");
+  if (!mavlink_config.port.empty()) {
+    // Resolve aliases too, to avoid reconfiguring the lidar's serial device.
+    char lidar_path[4096], output_path[4096];
+    if (mavlink_config.port == config.port ||
+        (::realpath(config.port.c_str(), lidar_path) &&
+         ::realpath(mavlink_config.port.c_str(), output_path) &&
+         std::strcmp(lidar_path, output_path) == 0))
+      throw std::runtime_error("MAVLink and YDLidar must use different serial ports");
+    mavlink_config.baud = EnvironmentUnsigned("LUCKFOX_MAVLINK_BAUD", 115200);
+    mavlink_config.system_id = EnvironmentUnsigned("LUCKFOX_MAVLINK_SYSID", 1);
+    mavlink_config.component_id = EnvironmentUnsigned("LUCKFOX_MAVLINK_COMPID", 197);
+    mavlink_config.map_heading_rad = EnvironmentFloat("LUCKFOX_MAVLINK_MAP_HEADING_RAD", 0);
+    mavlink_config.origin_x = EnvironmentFloat("LUCKFOX_MAVLINK_ORIGIN_X", 0);
+    mavlink_config.origin_y = EnvironmentFloat("LUCKFOX_MAVLINK_ORIGIN_Y", 0);
+    mavlink.reset(new luckfox::MavlinkOutput(mavlink_config));
+    std::cerr << "mavlink_port=" << mavlink_config.port << " baud=" << mavlink_config.baud
+              << " message=VISION_POSITION_ESTIMATE frame=NED\n";
+  }
+
   luckfox::SearchOptions search;
   search.linear_window = EnvironmentFloat("LUCKFOX_LINEAR_WINDOW_M", search.linear_window);
   search.angular_window = EnvironmentFloat("LUCKFOX_ANGULAR_WINDOW_RAD", search.angular_window);
@@ -178,6 +201,7 @@ int main(int argc, char** argv) try {
     if (!mission_requested) {
       if (localizer.IsRunning()) {
         localizer.Stop();
+        if (mavlink) mavlink->Reset();
         if (backend) backend->UpdateMissionRunning(false);
         std::cerr << "lidar_state=STOPPED\n";
       }
@@ -204,6 +228,16 @@ int main(int argc, char** argv) try {
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - cycle_started).count());
     telemetry.Log(++scan_sequence, scan, result, scan_cycle_us);
+    if (mavlink) {
+      // SDK timestamp is the start of scan, in UNIX nanoseconds. Preserve the
+      // sensor time (and scan/matcher latency), never timestamp an old pose now.
+      const auto now_us = static_cast<std::uint64_t>(
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch()).count());
+      const bool sent = mavlink->Send(result, scan.stamp_ns / 1000, now_us);
+      if (result.valid && result.state == luckfox::LocalizationState::Tracking && !sent)
+        std::cerr << "mavlink_pose_skipped=stale_timestamp_or_busy_port\n";
+    }
     if (scan_stream) scan_stream->UpdateScan(scan);
     if (backend) backend->UpdatePose(result);
     std::cout << "x=" << result.pose.x << " y=" << result.pose.y

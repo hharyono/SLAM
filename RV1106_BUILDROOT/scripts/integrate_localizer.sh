@@ -9,7 +9,7 @@ PKG_DIR="$BR_DIR/package/luckfox-localizer"
 YDLIDAR_PKG_DIR="$BR_DIR/package/ydlidar-sdk"
 SOURCE_DIR="$ROOT_DIR/LUCKFOX_LOCALIZER"
 YDLIDAR_SOURCE_DIR="$ROOT_DIR/MAPPER/YDLidar-SDK"
-MAP_FILE="${MAP_FILE:-$ROOT_DIR/maps/ruang_utama.bin}"
+MAP_FILE="${MAP_FILE:-$ROOT_DIR/maps/map_013.bin}"
 
 [[ -d "$BR_DIR/package" ]] || { echo "Buildroot SDK tidak ditemukan: $BR_DIR" >&2; exit 1; }
 [[ -d "$SOURCE_DIR/include" ]] || { echo "Source localizer tidak ditemukan: $SOURCE_DIR" >&2; exit 1; }
@@ -30,6 +30,7 @@ cp "$SOURCE_DIR/src/crc32.cpp" "$SOURCE_DIR/src/map_io.cpp" \
   "$SOURCE_DIR/src/localizer.cpp" "$SOURCE_DIR/src/uart_localizer.cpp" \
   "$SOURCE_DIR/src/robot_backend_client.cpp" "$SOURCE_DIR/src/telemetry.cpp" \
   "$PKG_DIR/src/src/"
+cp "$SOURCE_DIR/src/mavlink_output.cpp" "$PKG_DIR/src/src/"
 cp "$SOURCE_DIR/src/scan_tcp_client.cpp" "$PKG_DIR/src/src/"
 cp "$SOURCE_DIR/tools/map_inspect.cpp" "$SOURCE_DIR/tools/localize_scan.cpp" \
   "$SOURCE_DIR/tools/localize_uart.cpp" "$SOURCE_DIR/tools/localize_replay.cpp" \
