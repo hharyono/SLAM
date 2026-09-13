@@ -83,7 +83,8 @@ std::vector<std::uint8_t> EncodeVisionPosition(
   return b;
 }
 
-MavlinkOutput::MavlinkOutput(MavlinkConfig config) : config_(std::move(config)) {
+MavlinkOutput::MavlinkOutput(MavlinkConfig config)
+    : config_(std::move(config)), reset_counter_(config_.initial_reset_counter) {
   Validate(config_);
   const auto speed = Speed(config_.baud);
   fd_ = ::open(config_.port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
@@ -107,9 +108,9 @@ void MavlinkOutput::Reset() noexcept { reset_pending_ = true; }
 
 bool MavlinkOutput::Send(const LocalizationResult& r, std::uint64_t time,
                          std::uint64_t now) {
-  if (r.global_search || r.state == LocalizationState::Recovered ||
-      r.state == LocalizationState::Lost || r.state == LocalizationState::GlobalSearch)
-    Reset();
+  // LOST/recovery changes how the pose is found, but not its map frame.
+  // Reporting these transitions as resets makes ArduPilot repeatedly realign
+  // ExternalNav and eventually shifts the navigation frame.
   if (!r.valid || r.state != LocalizationState::Tracking || time == 0 ||
       time > now || now - time > config_.max_age_us || time <= last_timestamp_ ||
       !std::isfinite(r.pose.x) || !std::isfinite(r.pose.y) || !std::isfinite(r.pose.yaw))

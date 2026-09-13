@@ -39,23 +39,34 @@ def main():
     p=argparse.ArgumentParser(); p.add_argument('--host', required=True); p.add_argument('--port',type=int,default=5760)
     p.add_argument('--data',required=True); p.add_argument('--heading',type=float,default=0); a=p.parse_args()
     data=json.loads(a.data); link=Link(a.host,a.port); deadline=time.monotonic()+8
-    system=component=None; lat=lon=None
-    while time.monotonic()<deadline and (system is None or lat is None):
+    system=component=None; lat=lon=None; attitude_yaw=None
+    while time.monotonic()<deadline and (system is None or lat is None or
+                                          attitude_yaw is None):
         msg,sysid,comp,payload=link.receive(deadline)
         if msg==0 and sysid != 255: system,component=sysid,comp
         elif msg==33 and len(payload)>=12:
             lat,lon=struct.unpack_from('<ii',payload,4)
             if system is None: system,component=sysid,comp
-    if system is None or lat is None: raise RuntimeError('ArduPilot heartbeat/global position not received')
+        elif msg==30 and len(payload)>=16:
+            attitude_yaw=struct.unpack_from('<f',payload,12)[0]
+    if system is None or lat is None or attitude_yaw is None:
+        raise RuntimeError('ArduPilot position/attitude not received')
     if lat == 0 and lon == 0:
         raise RuntimeError('ArduPilot EKF origin is not set (GLOBAL_POSITION_INT is 0,0)')
-    origin=data['origin']; ch,sh=math.cos(a.heading),math.sin(a.heading)
+    current=data['current_pose']
+    # ArduPilot rotates VisualOdom into its AHRS frame at initial alignment.
+    # Measure that live rotation instead of assuming map +X is still NED North.
+    frame_heading=math.remainder(attitude_yaw + a.heading + current['yaw'], 2*math.pi)
+    ch,sh=math.cos(frame_heading),math.sin(frame_heading)
     def ne(point):
         dx=point['x']; dy=point['y']
         return ch*dx+sh*dy, sh*dx-ch*dy
-    latitude=origin['latitude']; longitude=origin['longitude']; result=[]
+    # ArduPilot aligns ExternalNav to its existing EKF position and can retain
+    # an offset after a visual-odometry reset. Anchor map XY to the vehicle's
+    # current GLOBAL_POSITION_INT so mission bearings remain correct.
+    latitude=lat/1e7; longitude=lon/1e7; result=[]
     for point in data['waypoints']:
-        north,east=ne(point)
+        north,east=ne({'x':point['x']-current['x'], 'y':point['y']-current['y']})
         wp_lat=latitude+north/111319.49079327358
         wp_lon=longitude+east/(111319.49079327358*math.cos(math.radians(latitude)))
         result.append((round(wp_lat*1e7),round(wp_lon*1e7)))
@@ -87,7 +98,11 @@ def main():
             # on a MAVLink 2 link. Its common item handler accepts the precise
             # MISSION_ITEM_INT response. Always respond with ID 73 so global
             # coordinates never pass through float32 degrees.
-            item=struct.pack('<ffffiifHHBBBBBB',0,0.5,0,math.nan,x,y,0.0,seq,16,
+            # Match the rover's practical 25 cm stopping tolerance. A smaller
+            # radius can leave the mission waiting after motor output falls
+            # below the drivetrain's effective movement threshold.
+            acceptance_radius=0.0 if seq==0 else 0.25
+            item=struct.pack('<ffffiifHHBBBBBB',0,acceptance_radius,0,math.nan,x,y,0.0,seq,16,
                              system,target_component,6,1 if seq==0 else 0,1,0)
             link.send(73,item,38)
             sent.add(seq); last_progress=time.monotonic()

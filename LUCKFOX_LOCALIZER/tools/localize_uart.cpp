@@ -119,6 +119,12 @@ int main(int argc, char** argv) try {
     mavlink_config.baud = EnvironmentUnsigned("LUCKFOX_MAVLINK_BAUD", 115200);
     mavlink_config.system_id = EnvironmentUnsigned("LUCKFOX_MAVLINK_SYSID", 1);
     mavlink_config.component_id = EnvironmentUnsigned("LUCKFOX_MAVLINK_COMPID", 197);
+    // Give ArduPilot an observably different estimator-reset value after every
+    // daemon restart. Millisecond boot time avoids repeating zero while the FC
+    // remains powered and the localizer service is restarted.
+    mavlink_config.initial_reset_counter = static_cast<std::uint8_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
     mavlink_config.map_heading_rad = EnvironmentFloat("LUCKFOX_MAVLINK_MAP_HEADING_RAD", 0);
     mavlink_config.origin_x = EnvironmentFloat("LUCKFOX_MAVLINK_ORIGIN_X", 0);
     mavlink_config.origin_y = EnvironmentFloat("LUCKFOX_MAVLINK_ORIGIN_Y", 0);
@@ -174,9 +180,10 @@ int main(int argc, char** argv) try {
       std::cerr << "mission_command="
                 << (command == luckfox::MissionCommand::Start ? "START" : "STOP") << '\n';
     });
-    backend->SetMapInstalledCallback([&localizer](const std::string& path) {
+    backend->SetMapInstalledCallback([&localizer, &mavlink](const std::string& path) {
       try {
         localizer.ReloadMap(luckfox::LoadMap(path));
+        if (mavlink) mavlink->Reset();
         std::cerr << "map_reloaded=" << path << " next_mode=global\n";
         return true;
       } catch (const std::exception& error) {
@@ -201,7 +208,6 @@ int main(int argc, char** argv) try {
     if (!mission_requested) {
       if (localizer.IsRunning()) {
         localizer.Stop();
-        if (mavlink) mavlink->Reset();
         if (backend) backend->UpdateMissionRunning(false);
         std::cerr << "lidar_state=STOPPED\n";
       }

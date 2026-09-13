@@ -120,9 +120,10 @@ pengukuran error aktual. Skor scan matching tidak disamakan dengan variance.
   standar menggunakan waktu UNIX host. Timestamp nol, mundur/duplikat, masa
   depan, atau lebih tua dari 250 ms ditolak. SDK/sensor dengan timestamp clock
   device yang berbeda perlu sinkronisasi clock sebelum dipakai.
-- Relokalisasi/map reload dan restart mission menandai reset; paket valid
-  berikutnya menaikkan `reset_counter` setelah sesi pernah mengirim posisi.
-  Counter berukuran 8 bit dan dapat wrap. Awal proses baru mulai dari nol.
+- Hanya pemasangan map baru yang menandai perubahan frame dan menaikkan
+  `reset_counter`. Tracking loss, global search, recovery, serta STOP/START
+  tetap memakai koordinat absolut map yang sama dan tidak boleh memicu reset
+  EKF. Counter berukuran 8 bit dan dapat wrap.
 - Write serial dibatasi 20 ms; scan dilewati bila antrean TX masih berisi data.
   Kegagalan membuka/mengonfigurasi/menulis UART menghentikan proses dengan error
   di log, sehingga masalah koneksi tidak tersembunyi. UART lidar dan MAVLink

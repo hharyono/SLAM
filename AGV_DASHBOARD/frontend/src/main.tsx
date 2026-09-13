@@ -2726,7 +2726,7 @@ function App() {
         body: JSON.stringify({
           waypoints: waypoints.map(({ x, y }) => ({ x, y })),
           origin: { latitude: Number(originLatitude), longitude: Number(originLongitude) },
-          current_pose: { x: robot.pose.x, y: robot.pose.y },
+          current_pose: { x: robot.pose.x, y: robot.pose.y, yaw: robot.pose.yaw },
         }),
       });
       const result = (await response.json()) as { error?: string; count?: number };
@@ -2780,7 +2780,7 @@ function App() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           origin: { latitude: Number(originLatitude), longitude: Number(originLongitude) },
-          current_pose: { x: robot.pose.x, y: robot.pose.y },
+          current_pose: { x: robot.pose.x, y: robot.pose.y, yaw: robot.pose.yaw },
         }),
       });
       const result = (await response.json()) as {

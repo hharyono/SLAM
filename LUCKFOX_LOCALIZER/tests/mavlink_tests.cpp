@@ -64,12 +64,13 @@ int main(int argc, char** argv) try {
   Check(!output.Send(r,1000030,1000040),"unconfirmed recovery sent");
   r.state=luckfox::LocalizationState::Tracking;
   Check(output.Send(r,1000050,1000060),"confirmed recovery not sent");
-  Check(receive()==luckfox::EncodeVisionPosition(cfg,r.pose,1000050,1,1),"reset counter missing");
+  Check(receive()==luckfox::EncodeVisionPosition(cfg,r.pose,1000050,1,0),
+        "recovery incorrectly changed map-frame reset counter");
   r.pose.x=std::numeric_limits<float>::quiet_NaN();
   Check(!output.Send(r,1000070,1000080),"NaN pose sent");
   r.pose.x=2; output.Reset();
   Check(output.Send(r,1000090,1000100),"restart pose missing");
-  Check(receive()==luckfox::EncodeVisionPosition(cfg,r.pose,1000090,2,2),"restart reset missing");
+  Check(receive()==luckfox::EncodeVisionPosition(cfg,r.pose,1000090,2,1),"explicit reset missing");
   ::close(master);
   rejected=false;
   try { output.Send(r,1000110,1000120); } catch (const std::runtime_error&) { rejected=true; }

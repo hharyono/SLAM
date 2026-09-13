@@ -493,10 +493,12 @@ app.post('/api/ardupilot/mission', async (req, res) => {
     const body = req.body as {
       waypoints?: Array<{ x?: unknown; y?: unknown }>;
       origin?: { latitude?: unknown; longitude?: unknown };
+      current_pose?: { x?: unknown; y?: unknown; yaw?: unknown };
     };
     if (!Array.isArray(body.waypoints) || body.waypoints.length < 1 || body.waypoints.length > 100)
       return res.status(400).json({ error: 'waypoints must contain 1 to 100 points' });
     const values = [body.origin?.latitude, body.origin?.longitude,
+      body.current_pose?.x, body.current_pose?.y, body.current_pose?.yaw,
       ...body.waypoints.flatMap((point) => [point.x, point.y])];
     if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value)))
       return res.status(400).json({ error: 'all waypoint and EKF-origin coordinates must be finite numbers' });
@@ -512,8 +514,12 @@ app.post('/api/ardupilot/mission', async (req, res) => {
 });
 app.post('/api/ardupilot/mission/read', async (req, res) => {
   try {
-    const body = req.body as { origin?: { latitude?: unknown; longitude?: unknown } };
-    if (![body.origin?.latitude, body.origin?.longitude].every((value) =>
+    const body = req.body as {
+      origin?: { latitude?: unknown; longitude?: unknown };
+      current_pose?: { x?: unknown; y?: unknown; yaw?: unknown };
+    };
+    if (![body.origin?.latitude, body.origin?.longitude,
+          body.current_pose?.x, body.current_pose?.y, body.current_pose?.yaw].every((value) =>
       typeof value === 'number' && Number.isFinite(value)))
       return res.status(400).json({ error: 'valid EKF origin latitude and longitude are required' });
     const result = await execFileAsync('python3', [missionReader, '--host', ardupilotHost,

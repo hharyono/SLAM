@@ -12,6 +12,8 @@ struct MavlinkConfig {
   unsigned baud = 115200;
   unsigned system_id = 1;       // Match ArduPilot SYSID_THISMAV.
   unsigned component_id = 197; // MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY.
+  // Must change when the external estimator process itself restarts.
+  std::uint8_t initial_reset_counter = 0;
   // Map is right handed: +yaw is counterclockwise, +Y is left of +X.
   // Heading of map +X measured clockwise from North, in radians.
   float map_heading_rad = 0;
