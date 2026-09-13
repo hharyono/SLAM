@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Upload clicked SLAM points as an ArduPilot AUTO mission over MAVLink 2."""
-import argparse, json, math, socket, struct, time
+import argparse, json, math, socket, statistics, struct, time
 
 EXTRA = {0: 50, 33: 104, 44: 221, 47: 153, 51: 196, 73: 38}
 
@@ -35,21 +35,31 @@ class Link:
             except socket.timeout: pass
         raise TimeoutError('timeout waiting for ArduPilot MAVLink response')
 
-def main():
-    p=argparse.ArgumentParser(); p.add_argument('--host', required=True); p.add_argument('--port',type=int,default=5760)
-    p.add_argument('--data',required=True); p.add_argument('--heading',type=float,default=0); a=p.parse_args()
-    data=json.loads(a.data); link=Link(a.host,a.port); deadline=time.monotonic()+8
-    system=component=None; lat=lon=None
-    while time.monotonic()<deadline and (system is None or lat is None):
-        msg,sysid,comp,payload=link.receive(deadline)
-        if msg==0 and sysid != 255: system,component=sysid,comp
+def measure_map_global_offset(link, origin, timeout=8):
+    """Measure the EKF translation applied to ExternalNav after this boot."""
+    deadline=time.monotonic()+timeout; system=component=None; vision=None; samples=[]
+    while time.monotonic()<deadline and (system is None or len(samples)<8):
+        msg,sysid,comp,payload=link.receive(deadline); now=time.monotonic()
+        if msg==0 and sysid not in (0,255): system,component=sysid,comp
+        elif msg==102 and len(payload)>=16:
+            north,east=struct.unpack_from('<ff',payload,8); vision=(north,east,now)
         elif msg==33 and len(payload)>=12:
             lat,lon=struct.unpack_from('<ii',payload,4)
             if system is None: system,component=sysid,comp
-    if system is None or lat is None:
-        raise RuntimeError('ArduPilot position not received')
-    if lat == 0 and lon == 0:
-        raise RuntimeError('ArduPilot EKF origin is not set (GLOBAL_POSITION_INT is 0,0)')
+            if vision and now-vision[2]<=0.15:
+                global_north=(lat/1e7-origin['latitude'])*111319.49079327358
+                global_east=(lon/1e7-origin['longitude'])*111319.49079327358*math.cos(
+                    math.radians(origin['latitude']))
+                samples.append((global_north-vision[0],global_east-vision[1]))
+    if system is None: raise RuntimeError('ArduPilot heartbeat not received')
+    if len(samples)<3:
+        raise RuntimeError('not enough synchronized ExternalNav/global-position samples')
+    return system,component,statistics.median(x[0] for x in samples),statistics.median(x[1] for x in samples)
+
+def main():
+    p=argparse.ArgumentParser(); p.add_argument('--host', required=True); p.add_argument('--port',type=int,default=5760)
+    p.add_argument('--data',required=True); p.add_argument('--heading',type=float,default=0); a=p.parse_args()
+    data=json.loads(a.data); link=Link(a.host,a.port)
     # EKF3 uses ExternalNav yaw, so the map-to-NED rotation is the configured
     # constant. Combining asynchronous dashboard yaw and FC ATTITUDE samples
     # here made successive reads/uploads oscillate left and right.
@@ -58,21 +68,20 @@ def main():
     def ne(point):
         dx=point['x']; dy=point['y']
         return ch*dx+sh*dy, sh*dx-ch*dy
-    # Keep the map-to-global translation fixed at the configured EKF origin.
-    # Anchoring it to the vehicle's current fused global position makes every
-    # upload acquire a few centimetres of EKF position error and moves the
-    # mission on the map after an FC restart.
     origin=data['origin']
+    system,component,north_offset,east_offset=measure_map_global_offset(link,origin)
     latitude=origin['latitude']; longitude=origin['longitude']; result=[]
     for point in data['waypoints']:
         north,east=ne(point)
-        wp_lat=latitude+north/111319.49079327358
-        wp_lon=longitude+east/(111319.49079327358*math.cos(math.radians(latitude)))
+        wp_lat=latitude+(north+north_offset)/111319.49079327358
+        wp_lon=longitude+(east+east_offset)/(111319.49079327358*math.cos(math.radians(latitude)))
         result.append((round(wp_lat*1e7),round(wp_lon*1e7)))
     # ArduPilot reserves mission sequence 0 for HOME and may replace its
     # coordinates with the vehicle position. Keep clicked waypoints at seq 1..
     # so the first user waypoint is not silently replaced by HOME.
-    mission_items=[(lat,lon), *result]
+    home_lat=round((latitude+north_offset/111319.49079327358)*1e7)
+    home_lon=round((longitude+east_offset/(111319.49079327358*math.cos(math.radians(latitude))))*1e7)
+    mission_items=[(home_lat,home_lon), *result]
     target_component=1
     mission_count=struct.pack('<HBBB',len(mission_items),system,target_component,0)
     link.send(44,mission_count,221)
@@ -80,6 +89,8 @@ def main():
     while time.monotonic()<deadline:
         if len(sent)==len(mission_items) and time.monotonic()-last_progress>=2:
             print(json.dumps({'count':len(result),'target_system':system,
+                              'alignment_offset_north':north_offset,
+                              'alignment_offset_east':east_offset,
                               'result':'mavlink2_int_items_complete'})); return
         try:
             msg,sysid,comp,payload=link.receive(min(deadline,time.monotonic()+2))
@@ -109,7 +120,9 @@ def main():
             result_code=payload[2]
             if result_code!=0: raise RuntimeError(f'ArduPilot rejected mission: MAV_MISSION_RESULT={result_code}')
             if len(sent)!=len(mission_items): raise RuntimeError('ArduPilot ACK arrived before all items were requested')
-            print(json.dumps({'count':len(result),'target_system':system,'result':'accepted'})); return
+            print(json.dumps({'count':len(result),'target_system':system,
+                              'alignment_offset_north':north_offset,
+                              'alignment_offset_east':east_offset,'result':'accepted'})); return
     raise TimeoutError('timeout waiting for MAVLink 2 mission transfer; '
                        f'INT items sent={sorted(sent)}, requests={requests[-16:]}')
 
