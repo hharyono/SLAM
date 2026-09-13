@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-13T12:18:00+07:00",
+  "captured_at": "2026-09-13T12:28:00+07:00",
   "parameters": {
     "AHRS_EKF_TYPE": 3.0,
     "ATC_DECEL_MAX": 0.0,
@@ -23,7 +23,7 @@
     "FS_CRASH_CHECK": 0.0,
     "MOT_SLEWRATE": 100.0,
     "MOT_THR_MAX": 100.0,
-    "MOT_THR_MIN": 0.0,
+    "MOT_THR_MIN": 15.0,
     "OA_TYPE": 0.0,
     "PSC_POS_P": 0.55,
     "PSC_VEL_D": 0.0,

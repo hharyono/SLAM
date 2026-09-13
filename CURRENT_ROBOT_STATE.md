@@ -63,6 +63,8 @@ The deployed processes were verified as:
   `PSC_VEL_IMAX=1.0`
 - Steering controller: angle P 3.5; rate P/I/FF 0.16/0.13/0.26
 - Pivot: 20 degree trigger, 40 deg/s requested rate
+- Motor minimum throttle: `MOT_THR_MIN=15%` so low-speed pivot output
+  clears the drivetrain's measured static deadband.
 
 `PSC_VEL_I=0.20` is intentional. With I at zero, the rover stopped about
 0.33 m from an active waypoint: the controller output remained below the
