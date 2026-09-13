@@ -61,8 +61,8 @@ The deployed processes were verified as:
 - Position controller: `PSC_POS_P=0.55`
 - Velocity controller: `PSC_VEL_P=0.65`, `PSC_VEL_I=0.20`,
   `PSC_VEL_IMAX=1.0`
-- Steering controller: angle P 3.5; rate P/I/FF 0.16/0.13/0.26
-- Pivot: 20 degree trigger, 40 deg/s requested rate
+- Steering controller: angle P 4.0; rate P/I/FF 0.18/0.13/0.26
+- Pivot: 10 degree trigger, 50 deg/s requested rate
 - Motor minimum throttle: `MOT_THR_MIN=15%` so low-speed pivot output
   clears the drivetrain's measured static deadband.
 
