@@ -6,4 +6,6 @@ CLaserOdometry2DNode:
     base_frame_id: base_link
     odom_frame_id: odom
     init_pose_from_topic: ""
-    freq: 15.0
+    # Poll faster than the ~10 Hz scan source; RF2O still processes each scan
+    # only once, but does not add avoidable latency before publishing odometry.
+    freq: 20.0
