@@ -94,6 +94,11 @@ is not an instruction to arm automatically.
   `WP_RADIUS` setting.
 - Dashboard controls include Clear, EKF-origin latitude/longitude,
   **SET EKF ORIGIN HERE**, **SEND WP**, and **READ WP**.
+- After a successful SEND WP, the backend stores the authored XY points under
+  `maps/.ardupilot-missions/<active-map>.json`. After a flight-controller
+  restart, SET EKF ORIGIN measures the new EKF translation and automatically
+  re-uploads those saved map points. This changes the ArduPilot global mission
+  so its physical targets remain fixed on the SLAM map across EKF boots.
 
 Before a new map/session, set the EKF origin, confirm ExternalNav is accepted,
 create or read the mission, and test while supervised. Parameter changes to

@@ -107,6 +107,30 @@ function publishMappingPose(): void {
   broadcastToDashboards({ type: 'mapping_pose', data: pose });
 }
 let activeMapName = ReadActiveMapName();
+type SavedMapMission = {
+  map_name: string;
+  waypoints: Array<{ x: number; y: number }>;
+  origin: { latitude: number; longitude: number };
+  saved_unix_ms: number;
+};
+const missionStoreDir = path.join(mapDir, '.ardupilot-missions');
+function missionStoreFile(): string {
+  return path.join(missionStoreDir, `${activeMapName}.json`);
+}
+function saveMapMission(mission: SavedMapMission): void {
+  fs.mkdirSync(missionStoreDir, { recursive: true });
+  fs.writeFileSync(missionStoreFile(), `${JSON.stringify(mission, null, 2)}\n`);
+}
+function readMapMission(): SavedMapMission | undefined {
+  try {
+    const mission = JSON.parse(fs.readFileSync(missionStoreFile(), 'utf8')) as SavedMapMission;
+    if (mission.map_name !== activeMapName || !Array.isArray(mission.waypoints) || !mission.waypoints.length)
+      return undefined;
+    return mission;
+  } catch {
+    return undefined;
+  }
+}
 const pendingMapTransfers = new Map<
   number,
   { catalog_name: string; robot_id: string; activate: boolean }
@@ -506,6 +530,12 @@ app.post('/api/ardupilot/mission', async (req, res) => {
     const result = await execFileAsync('python3', [missionUploader, '--host', ardupilotHost,
       '--port', String(ardupilotPort), '--heading', String(mavlinkMapHeading), '--data', payload],
       { timeout: 45_000, maxBuffer: 1024 * 1024 });
+    saveMapMission({
+      map_name: activeMapName,
+      waypoints: body.waypoints as Array<{ x: number; y: number }>,
+      origin: body.origin as { latitude: number; longitude: number },
+      saved_unix_ms: Date.now(),
+    });
     res.json(JSON.parse(result.stdout.trim()));
   } catch (error) {
     const detail = error as Error & { stderr?: string };
@@ -541,7 +571,27 @@ app.post('/api/ardupilot/origin', async (req, res) => {
       '--port', String(ardupilotPort), '--latitude', String(latitude),
       '--longitude', String(longitude), '--altitude', String(altitude)],
       { timeout: 20_000, maxBuffer: 1024 * 1024 });
-    res.json(JSON.parse(result.stdout.trim()));
+    const response = JSON.parse(result.stdout.trim()) as Record<string, unknown>;
+    const savedMission = readMapMission();
+    if (savedMission) {
+      const missionData = JSON.stringify({
+        waypoints: savedMission.waypoints,
+        origin: { latitude, longitude },
+        current_pose: { x: 0, y: 0, yaw: 0 },
+      });
+      const upload = await execFileAsync('python3', [missionUploader, '--host', ardupilotHost,
+        '--port', String(ardupilotPort), '--heading', String(mavlinkMapHeading),
+        '--data', missionData], { timeout: 45_000, maxBuffer: 1024 * 1024 });
+      const uploadResult = JSON.parse(upload.stdout.trim()) as { count?: number };
+      savedMission.origin = { latitude: Number(latitude), longitude: Number(longitude) };
+      savedMission.saved_unix_ms = Date.now();
+      saveMapMission(savedMission);
+      response.mission_reanchored = true;
+      response.mission_waypoints = uploadResult.count;
+    } else {
+      response.mission_reanchored = false;
+    }
+    res.json(response);
   } catch (error) {
     const detail = error as Error & { stderr?: string };
     res.status(502).json({ error: detail.stderr?.trim() || detail.message });

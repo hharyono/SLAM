@@ -2759,9 +2759,12 @@ function App() {
       });
       const result = (await response.json()) as {
         error?: string; latitude?: number; longitude?: number;
+        mission_reanchored?: boolean; mission_waypoints?: number;
       };
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-      setNotice(`EKF origin verified at ${result.latitude?.toFixed(7)}, ${result.longitude?.toFixed(7)}; resend waypoints`);
+      setNotice(result.mission_reanchored
+        ? `EKF origin verified; ${result.mission_waypoints} saved map waypoint(s) re-anchored to this EKF boot`
+        : `EKF origin verified at ${result.latitude?.toFixed(7)}, ${result.longitude?.toFixed(7)}; send waypoints once to enable automatic re-anchor`);
     } catch (error) {
       setNotice(`Set EKF origin failed: ${(error as Error).message}`);
     } finally {
