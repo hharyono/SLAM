@@ -39,24 +39,21 @@ def main():
     p=argparse.ArgumentParser(); p.add_argument('--host', required=True); p.add_argument('--port',type=int,default=5760)
     p.add_argument('--data',required=True); p.add_argument('--heading',type=float,default=0); a=p.parse_args()
     data=json.loads(a.data); link=Link(a.host,a.port); deadline=time.monotonic()+8
-    system=component=None; lat=lon=None; attitude_yaw=None
-    while time.monotonic()<deadline and (system is None or lat is None or
-                                          attitude_yaw is None):
+    system=component=None; lat=lon=None
+    while time.monotonic()<deadline and (system is None or lat is None):
         msg,sysid,comp,payload=link.receive(deadline)
         if msg==0 and sysid != 255: system,component=sysid,comp
         elif msg==33 and len(payload)>=12:
             lat,lon=struct.unpack_from('<ii',payload,4)
             if system is None: system,component=sysid,comp
-        elif msg==30 and len(payload)>=16:
-            attitude_yaw=struct.unpack_from('<f',payload,12)[0]
-    if system is None or lat is None or attitude_yaw is None:
-        raise RuntimeError('ArduPilot position/attitude not received')
+    if system is None or lat is None:
+        raise RuntimeError('ArduPilot position not received')
     if lat == 0 and lon == 0:
         raise RuntimeError('ArduPilot EKF origin is not set (GLOBAL_POSITION_INT is 0,0)')
-    current=data['current_pose']
-    # ArduPilot rotates VisualOdom into its AHRS frame at initial alignment.
-    # Measure that live rotation instead of assuming map +X is still NED North.
-    frame_heading=math.remainder(attitude_yaw + a.heading + current['yaw'], 2*math.pi)
+    # EKF3 uses ExternalNav yaw, so the map-to-NED rotation is the configured
+    # constant. Combining asynchronous dashboard yaw and FC ATTITUDE samples
+    # here made successive reads/uploads oscillate left and right.
+    frame_heading=math.remainder(a.heading, 2*math.pi)
     ch,sh=math.cos(frame_heading),math.sin(frame_heading)
     def ne(point):
         dx=point['x']; dy=point['y']

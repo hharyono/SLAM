@@ -84,10 +84,10 @@ is not an instruction to arm automatically.
 - Clicked map coordinates are uploaded with `MISSION_ITEM_INT` over MAVLink 2.
 - Mission sequence 0 is reserved for ArduPilot HOME; user points start at 1.
 - Upload and read use the configured EKF-origin latitude/longitude as a fixed
-  map-to-global translation. Live SLAM and ArduPilot yaw still determine the
-  frame rotation, but normal `GLOBAL_POSITION_INT` estimation error never
-  translates the mission. A mission uploaded with this mapping reads back at
-  the same map XY after restart and setting the same EKF origin.
+  map-to-global translation and `MAVLINK_MAP_HEADING_RAD` as a fixed rotation.
+  They do not reconstruct rotation from asynchronous dashboard and ArduPilot
+  yaw samples. A mission uploaded with this mapping reads back at the same map
+  XY repeatedly and after setting the same EKF origin following a restart.
 - The uploader requests a 0.30 m waypoint acceptance radius, matching the live
   `WP_RADIUS` setting.
 - Dashboard controls include Clear, EKF-origin latitude/longitude,
