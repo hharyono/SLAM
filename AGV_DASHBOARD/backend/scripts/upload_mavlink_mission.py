@@ -61,12 +61,14 @@ def main():
     def ne(point):
         dx=point['x']; dy=point['y']
         return ch*dx+sh*dy, sh*dx-ch*dy
-    # ArduPilot aligns ExternalNav to its existing EKF position and can retain
-    # an offset after a visual-odometry reset. Anchor map XY to the vehicle's
-    # current GLOBAL_POSITION_INT so mission bearings remain correct.
-    latitude=lat/1e7; longitude=lon/1e7; result=[]
+    # Keep the map-to-global translation fixed at the configured EKF origin.
+    # Anchoring it to the vehicle's current fused global position makes every
+    # upload acquire a few centimetres of EKF position error and moves the
+    # mission on the map after an FC restart.
+    origin=data['origin']
+    latitude=origin['latitude']; longitude=origin['longitude']; result=[]
     for point in data['waypoints']:
-        north,east=ne({'x':point['x']-current['x'], 'y':point['y']-current['y']})
+        north,east=ne(point)
         wp_lat=latitude+north/111319.49079327358
         wp_lon=longitude+east/(111319.49079327358*math.cos(math.radians(latitude)))
         result.append((round(wp_lat*1e7),round(wp_lon*1e7)))

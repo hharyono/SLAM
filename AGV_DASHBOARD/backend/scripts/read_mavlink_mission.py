@@ -46,7 +46,11 @@ def main():
             except TimeoutError:
                 if attempt==2: raise TimeoutError(f'mission item {seq} not received')
     link.send(47,bytes([system,target_component,0,0]),153)
-    current=data['current_pose']; latitude=lat/1e7; longitude=lon/1e7
+    current=data['current_pose']
+    # Decode against the same fixed EKF origin used by mission upload. The
+    # live GLOBAL_POSITION_INT contains normal EKF estimation error and must
+    # not translate every waypoint when READ WP is pressed.
+    origin=data['origin']; latitude=origin['latitude']; longitude=origin['longitude']
     frame_heading=math.remainder(attitude_yaw + args.heading + current['yaw'], 2*math.pi)
     ch,sh=math.cos(frame_heading),math.sin(frame_heading)
     points=[]
@@ -56,8 +60,8 @@ def main():
         if command!=16 or frame not in (0,3,5,6,10,11): continue
         north=(x/1e7-latitude)*111319.49079327358
         east=(y/1e7-longitude)*111319.49079327358*math.cos(math.radians(latitude))
-        points.append({'x':current['x']+ch*north+sh*east,
-                       'y':current['y']+sh*north-ch*east})
+        points.append({'x':ch*north+sh*east,
+                       'y':sh*north-ch*east})
     print(json.dumps({'count':len(points),'waypoints':points,'mission_items':count}))
 
 if __name__=='__main__': main()
