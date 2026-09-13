@@ -57,7 +57,7 @@ The deployed processes were verified as:
 - ExternalNav delay: 100 ms
 - EKF origin used during this session:
   `-7.608038171102201, 110.93883455425673`
-- Current waypoint tuning: `WP_RADIUS=0.25 m`, `WP_SPEED=0.25 m/s`
+- Current waypoint tuning: `WP_RADIUS=0.30 m`, `WP_SPEED=0.25 m/s`
 - Position controller: `PSC_POS_P=0.55`
 - Velocity controller: `PSC_VEL_P=0.65`, `PSC_VEL_I=0.20`,
   `PSC_VEL_IMAX=1.0`
@@ -84,7 +84,7 @@ is not an instruction to arm automatically.
 - Upload and read use the live relationship between SLAM pose, ArduPilot
   attitude, and `GLOBAL_POSITION_INT`. This compensates the ExternalNav frame
   alignment performed by EKF3 and prevents waypoint displacement after read.
-- The uploader requests a 0.25 m waypoint acceptance radius, matching the live
+- The uploader requests a 0.30 m waypoint acceptance radius, matching the live
   `WP_RADIUS` setting.
 - Dashboard controls include Clear, EKF-origin latitude/longitude,
   **SET EKF ORIGIN HERE**, **SEND WP**, and **READ WP**.

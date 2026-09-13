@@ -98,10 +98,10 @@ def main():
             # on a MAVLink 2 link. Its common item handler accepts the precise
             # MISSION_ITEM_INT response. Always respond with ID 73 so global
             # coordinates never pass through float32 degrees.
-            # Match the rover's practical 25 cm stopping tolerance. A smaller
+            # Match the rover's practical 30 cm stopping tolerance. A smaller
             # radius can leave the mission waiting after motor output falls
             # below the drivetrain's effective movement threshold.
-            acceptance_radius=0.0 if seq==0 else 0.25
+            acceptance_radius=0.0 if seq==0 else 0.30
             item=struct.pack('<ffffiifHHBBBBBB',0,acceptance_radius,0,math.nan,x,y,0.0,seq,16,
                              system,target_component,6,1 if seq==0 else 0,1,0)
             link.send(73,item,38)
