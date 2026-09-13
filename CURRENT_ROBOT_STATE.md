@@ -58,6 +58,7 @@ The deployed processes were verified as:
 - EKF origin used during this session:
   `-7.608038171102201, 110.93883455425673`
 - Current waypoint tuning: `WP_RADIUS=0.25 m`, `WP_SPEED=0.25 m/s`
+- Position controller: `PSC_POS_P=0.35`
 - Velocity controller: `PSC_VEL_P=0.65`, `PSC_VEL_I=0.20`,
   `PSC_VEL_IMAX=1.0`
 - Steering controller: angle P 3.5; rate P/I/FF 0.16/0.13/0.26
@@ -67,6 +68,10 @@ The deployed processes were verified as:
 0.33 m from an active waypoint: the controller output remained below the
 drivetrain's effective movement threshold and the mission could not advance.
 The small integral term lets output build gradually against static friction.
+
+`PSC_POS_P=0.35` strengthens cross-track correction. At 0.20 the measured
+heading agreed with the final WP10-to-WP11 leg within one degree, but the rover
+still accumulated about 0.46 m of lateral error and passed beside WP11.
 
 The JSON snapshot was read back from the flight controller over MAVLink 2. Its
 `runtime` section only describes the instant it was captured (ARMED/AUTO); it
