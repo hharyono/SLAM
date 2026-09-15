@@ -1,8 +1,10 @@
 camera_device: /dev/video11
 uart_device: /dev/ttyS5
 uart_baud: 115200
-width: 1280
-height: 720
+mavlink_bridge_host: 127.0.0.1
+mavlink_bridge_port: 5761
+width: 432
+height: 240
 tag_id: 0
 tag_size_m: 0.200
 camera_offset_x_m: 0.0
@@ -12,5 +14,6 @@ max_reprojection_error_px: 2.0
 min_decision_margin: 35.0
 max_hamming: 0
 lost_timeout_ms: 300
-apriltag_threads: 2
-quad_decimate: 1.5
+inference_hz: 10
+apriltag_threads: 1
+quad_decimate: 2.0

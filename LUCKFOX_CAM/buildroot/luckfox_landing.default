@@ -1,0 +1,5 @@
+ENABLED=1
+APP_DIR=/root/LUCKFOX_CAM
+CAMERA_CONFIG=/root/LUCKFOX_CAM/Config/Camera.yaml
+LANDING_CONFIG=/root/LUCKFOX_CAM/Config/Landing.yaml
+RTSP_MODE=1

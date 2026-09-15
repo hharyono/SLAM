@@ -24,7 +24,7 @@ namespace {
 using Clock = std::chrono::steady_clock;
 volatile std::sig_atomic_t stopping = 0;
 void Stop(int) { stopping = 1; }
-constexpr std::size_t kCapacity = 65536;
+constexpr std::size_t kCapacity = 8192;
 constexpr auto kStall = std::chrono::seconds(2);
 
 struct Fd {
@@ -55,6 +55,17 @@ struct Queue {
   }
   bool Stalled() const { return size && Clock::now() - progress >= kStall; }
 };
+bool MoveMavlinkFrame(Queue& from, Queue& to) {
+  while (from.size && from.bytes[from.offset] != 0xfe && from.bytes[from.offset] != 0xfd)
+    from.Consume(1);
+  if (from.size < 2) return false;
+  const auto* p=from.bytes.data()+from.offset;
+  if (p[0]==0xfd && from.size<3) return false;
+  const std::size_t total=p[0]==0xfe?static_cast<std::size_t>(p[1])+8:
+      static_cast<std::size_t>(p[1])+12+((p[2]&1)?13:0);
+  if(from.size<total||kCapacity-to.size<total)return false;
+  to.Append(p,total);from.Consume(total);return true;
+}
 struct Config {
   std::string serial = "/dev/ttyS5", bind = "0.0.0.0";
   unsigned baud = 115200, port = 5760, upload_port = 5761;
@@ -113,9 +124,10 @@ int Listen(const Config& c, unsigned port) {
 bool Retryable() { return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR; }
 
 int Run(const Config& cfg) {
-  Fd listener(Listen(cfg, cfg.port)), upload_listener(Listen(cfg, cfg.upload_port)), serial, client;
-  bool upload_client = false;
-  Queue to_serial, to_tcp;
+  Fd listener(Listen(cfg, cfg.port)), upload_listener(Listen(cfg, cfg.upload_port));
+  Fd serial, gcs, upload;
+  Queue to_serial, from_gcs, from_upload, to_gcs, to_upload;
+  bool upload_turn=false;
   std::uint64_t serial_bytes = 0, tcp_bytes = 0;
   auto serial_retry = Clock::now();
   auto serial_log = Clock::time_point{};
@@ -124,15 +136,17 @@ int Run(const Config& cfg) {
   auto last_serial_tx = Clock::now();
   std::cerr << "listening=" << cfg.bind << ':' << cfg.port
             << " upload=" << cfg.bind << ':' << cfg.upload_port << " serial=" << cfg.serial
-            << " baud=" << cfg.baud << " mode=raw_bidirectional upload_priority=1\n";
-  auto Disconnect = [&](const char* reason) {
-    if (client.value >= 0) std::cerr << "client_disconnected=" << reason << '\n';
-    client.Reset(); upload_client = false; to_serial.Clear(); to_tcp.Clear();
-    // Never replay this client's queued commands into a later TCP session.
-    if (serial.value >= 0) ::tcflush(serial.value, TCOFLUSH);
+            << " baud=" << cfg.baud << " mode=dual_client upload_tx_priority=1\n";
+  auto DisconnectGcs = [&](const char* reason) {
+    if (gcs.value >= 0) std::cerr << "gcs_disconnected=" << reason << '\n';
+    gcs.Reset(); to_gcs.Clear(); from_gcs.Clear();
+  };
+  auto DisconnectUpload = [&](const char* reason) {
+    if (upload.value >= 0) std::cerr << "upload_disconnected=" << reason << '\n';
+    upload.Reset(); to_upload.Clear(); from_upload.Clear();
   };
   auto SerialLost = [&]() {
-    Disconnect("serial_unavailable"); serial.Reset();
+    DisconnectGcs("serial_unavailable"); DisconnectUpload("serial_unavailable"); serial.Reset();
     serial_retry = Clock::now() + std::chrono::seconds(1);
     std::cerr << "serial_disconnected=" << cfg.serial << '\n';
   };
@@ -149,14 +163,16 @@ int Run(const Config& cfg) {
         serial_retry = Clock::now() + std::chrono::seconds(1);
       }
     }
-    pollfd p[4] = {
+    pollfd p[5] = {
       {listener.value, POLLIN, 0},
       {upload_listener.value, POLLIN, 0},
       {serial.value, static_cast<short>(POLLIN | (to_serial.size ? POLLOUT : 0)), 0},
-      {client.value, static_cast<short>((to_serial.size < kCapacity ? POLLIN : 0) |
-                                      (to_tcp.size ? POLLOUT : 0)), 0}
+      {gcs.value, static_cast<short>((from_gcs.size < kCapacity ? POLLIN : 0) |
+                                    (to_gcs.size ? POLLOUT : 0)), 0},
+      {upload.value, static_cast<short>((from_upload.size < kCapacity ? POLLIN : 0) |
+                                       (to_upload.size ? POLLOUT : 0)), 0}
     };
-    const int ready = ::poll(p, 4, 100);
+    const int ready = ::poll(p, 5, 100);
     if (ready < 0) { if (errno == EINTR) continue; Fail("poll"); }
     if (p[0].revents & (POLLERR | POLLHUP | POLLNVAL))
       throw std::runtime_error("TCP listener failed");
@@ -164,40 +180,51 @@ int Run(const Config& cfg) {
       throw std::runtime_error("upload TCP listener failed");
     // Handle failures before data; a closed session never leaves commands queued.
     if (serial.value >= 0 && (p[2].revents & (POLLERR | POLLHUP | POLLNVAL))) SerialLost();
-    if (client.value >= 0 && (p[3].revents & (POLLERR | POLLHUP | POLLNVAL))) Disconnect("tcp_closed");
-    if (client.value >= 0 && (p[3].revents & POLLIN)) {
-      const auto n = ::recv(client.value, buf.data(), std::min(buf.size(), kCapacity-to_serial.size), 0);
-      if (n > 0) { to_serial.Append(buf.data(), n); tcp_bytes += n; }
-      else if (n == 0 || !Retryable()) Disconnect("tcp_closed");
+    if (gcs.value >= 0 && (p[3].revents & (POLLERR | POLLHUP | POLLNVAL))) DisconnectGcs("tcp_closed");
+    if (upload.value >= 0 && (p[4].revents & (POLLERR | POLLHUP | POLLNVAL))) DisconnectUpload("tcp_closed");
+    if (gcs.value >= 0 && (p[3].revents & POLLIN)) {
+      const auto n = ::recv(gcs.value, buf.data(), std::min(buf.size(), kCapacity-from_gcs.size), 0);
+      if (n > 0) { from_gcs.Append(buf.data(), n); tcp_bytes += n; }
+      else if (n == 0 || !Retryable()) DisconnectGcs("tcp_closed");
+    }
+    if (upload.value >= 0 && (p[4].revents & POLLIN)) {
+      const auto n = ::recv(upload.value,buf.data(),std::min(buf.size(),kCapacity-from_upload.size),0);
+      if (n > 0) { from_upload.Append(buf.data(),n); tcp_bytes += n; }
+      else if (n == 0 || !Retryable()) DisconnectUpload("tcp_closed");
     }
     if (serial.value >= 0 && (p[2].revents & POLLIN)) {
       const auto n = ::read(serial.value, buf.data(), buf.size());
       if (n > 0) {
         serial_bytes += n;
         // Drain telemetry even with no GCS: a new session starts with live data.
-        if (client.value >= 0 && !to_tcp.Append(buf.data(), n)) Disconnect("tcp_queue_full");
+        if (gcs.value >= 0 && !to_gcs.Append(buf.data(),n)) DisconnectGcs("tcp_queue_full");
+        if (upload.value >= 0 && !to_upload.Append(buf.data(),n)) DisconnectUpload("tcp_queue_full");
       } else if (n == 0 || !Retryable()) SerialLost();
     }
-    if (serial.value >= 0 && client.value >= 0 && to_serial.size && (p[2].revents & POLLOUT)) {
+    if(!to_serial.size){
+      bool moved=upload_turn?MoveMavlinkFrame(from_upload,to_serial):MoveMavlinkFrame(from_gcs,to_serial);
+      if(!moved)moved=upload_turn?MoveMavlinkFrame(from_gcs,to_serial):MoveMavlinkFrame(from_upload,to_serial);
+      if(moved)upload_turn=!upload_turn;
+    }
+    if (serial.value >= 0 && to_serial.size && (p[2].revents & POLLOUT)) {
       const auto n = ::write(serial.value, to_serial.bytes.data()+to_serial.offset, to_serial.size);
       if (n > 0) { to_serial.Consume(n); last_serial_tx = Clock::now(); }
       else if (n < 0 && !Retryable()) SerialLost();
     }
-    if (client.value >= 0 && to_tcp.size && (p[3].revents & POLLOUT)) {
-      const auto n = ::send(client.value, to_tcp.bytes.data()+to_tcp.offset, to_tcp.size, MSG_NOSIGNAL);
-      if (n > 0) { to_tcp.Consume(n); last_socket_tx = Clock::now(); }
-      else if (n < 0 && !Retryable()) Disconnect("tcp_write_failed");
+    if (gcs.value >= 0 && to_gcs.size && (p[3].revents & POLLOUT)) {
+      const auto n=::send(gcs.value,to_gcs.bytes.data()+to_gcs.offset,to_gcs.size,MSG_NOSIGNAL);
+      if(n>0){to_gcs.Consume(n);last_socket_tx=Clock::now();}
+      else if(n<0&&!Retryable())DisconnectGcs("tcp_write_failed");
     }
-    if (client.value >= 0) {
-      int serial_pending = 0, tcp_pending = 0;
-      if (::ioctl(serial.value, TIOCOUTQ, &serial_pending) < 0) SerialLost();
-      else if (::ioctl(client.value, TIOCOUTQ, &tcp_pending) < 0) Disconnect("tcp_queue_query_failed");
-      else if (to_tcp.Stalled() || to_serial.Stalled() ||
-               (tcp_pending && Clock::now()-last_socket_tx >= kStall) ||
-               (serial_pending && Clock::now()-last_serial_tx >= kStall))
-        Disconnect("forwarding_stalled");
+    if (upload.value >= 0 && to_upload.size && (p[4].revents & POLLOUT)) {
+      const auto n=::send(upload.value,to_upload.bytes.data()+to_upload.offset,to_upload.size,MSG_NOSIGNAL);
+      if(n>0){to_upload.Consume(n);last_socket_tx=Clock::now();}
+      else if(n<0&&!Retryable())DisconnectUpload("tcp_write_failed");
     }
-    // Upload connections preempt the GCS; while active, GCS reconnects are rejected.
+    if (to_serial.Stalled()) { if(upload.value>=0)DisconnectUpload("forwarding_stalled");else DisconnectGcs("forwarding_stalled"); }
+    if (to_gcs.Stalled()) DisconnectGcs("forwarding_stalled");
+    if (to_upload.Stalled()) DisconnectUpload("forwarding_stalled");
+    // Port 5760 monitoring remains connected while port 5761 has serial TX priority.
     for (int listener_index = 1; listener_index >= 0; --listener_index) {
       if (!(p[listener_index].revents & POLLIN)) continue;
       sockaddr_in addr{}; socklen_t len = sizeof(addr);
@@ -205,11 +232,11 @@ int Run(const Config& cfg) {
       const int fd = ::accept4(p[listener_index].fd, reinterpret_cast<sockaddr*>(&addr), &len,
                                SOCK_NONBLOCK | SOCK_CLOEXEC);
       if (fd >= 0) {
-        if (serial.value < 0 || (client.value >= 0 && (!uploading || upload_client))) {
+        Fd& target=uploading?upload:gcs;
+        if (serial.value < 0 || target.value >= 0) {
           ::close(fd);
           std::cerr << "client_rejected=" << (serial.value < 0 ? "serial_unavailable" : "busy") << '\n';
         } else {
-          if (client.value >= 0) Disconnect("mission_upload_preempted_gcs");
           int one=1, sendbuf=32768, idle=10, interval=3, count=3;
           const bool ok = ::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == 0 &&
               ::setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) == 0 &&
@@ -219,25 +246,26 @@ int Run(const Config& cfg) {
               ::setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) == 0;
           if (!ok) { ::close(fd); std::cerr << "client_rejected=socket_configuration\n"; }
           else {
-            // Drop telemetry accumulated before this GCS connected.
-            ::tcflush(serial.value, TCIFLUSH);
-            to_serial.Clear(); to_tcp.Clear(); client.Reset(fd); upload_client = uploading;
+            if(uploading){from_upload.Clear();to_upload.Clear();}
+            else to_gcs.Clear();
+            target.Reset(fd);
             last_socket_tx = last_serial_tx = Clock::now();
             char ip[INET_ADDRSTRLEN]{};
             ::inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
             std::cerr << "client_connected=" << ip << ':' << ntohs(addr.sin_port)
-                      << " role=" << (uploading ? "mission_upload" : "gcs") << '\n';
+                      << " role=" << (uploading ? "upload_or_landing" : "gcs") << '\n';
           }
         }
       } else if (!Retryable()) Fail("accept");
     }
     if (Clock::now()-stats_time >= std::chrono::seconds(10)) {
       std::cerr << "serial_rx_bytes=" << serial_bytes << " tcp_rx_bytes=" << tcp_bytes
-                << " client=" << (client.value >= 0) << " serial=" << (serial.value >= 0) << '\n';
+                << " gcs=" << (gcs.value >= 0) << " upload=" << (upload.value >= 0)
+                << " serial=" << (serial.value >= 0) << '\n';
       stats_time = Clock::now();
     }
   }
-  Disconnect("shutdown");
+  DisconnectGcs("shutdown"); DisconnectUpload("shutdown");
   std::cerr << "bridge_stopped\n";
   return 0;
 }
