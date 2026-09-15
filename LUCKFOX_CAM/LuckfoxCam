@@ -1,0 +1,16 @@
+#!/bin/sh
+APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+case "$1" in
+  Cal|cal)
+    shift
+    exec python3 "$APP_DIR/tools/calibrate_charuco.py" --output "$APP_DIR/Config/Camera.yaml" "$@"
+    ;;
+  Landing|landing)
+    shift
+    exec "$APP_DIR/build/rv1103/luckfox_landing" --camera "$APP_DIR/Config/Camera.yaml" --config "$APP_DIR/Config/Landing.yaml" "$@"
+    ;;
+  *)
+    echo "Usage: $0 {Cal|Landing} [options]" >&2
+    exit 2
+    ;;
+esac
