@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import net from 'node:net'
 import { WebSocketServer, WebSocket } from 'ws'
-import { MavlinkParser, decode } from './mavlink.js'
+import { MavlinkParser, decode, gcsHeartbeat, requestAllStreams } from './mavlink.js'
 
 const RV_HOST=process.env.RV_HOST||'192.168.1.55'
 const MAVLINK_PORT=Number(process.env.MAVLINK_PORT||5760)
@@ -37,11 +37,14 @@ parser.on('frame',frame=>{const msg=decode(frame);if(!msg)return;state.connected
   else if(msg.kind==='gps'){state.lat=msg.lat;state.lon=msg.lon;state.altitude=msg.altitude;state.gpsFix=msg.fix;state.satellites=msg.satellites}
   else if(msg.kind==='position'){state.lat=msg.lat;state.lon=msg.lon;state.altitude=msg.altitude;state.relativeAltitude=msg.relativeAltitude;state.heading=msg.heading}
   else if(msg.kind==='hud'){state.groundSpeed=msg.groundSpeed;state.heading=msg.heading;state.altitude=msg.altitude;state.climb=msg.climb}
-  else if(msg.kind==='statusText'&&/PrecLand:/i.test(msg.text)){let status:PreclandStatus|undefined;if(/Target Found/i.test(msg.text))status='INITIALIZING';else if(/Init Complete/i.test(msg.text))status='TARGET_ACQUIRED';else if(/Target Lost/i.test(msg.text))status='TARGET_LOST';else if(/Init Failed/i.test(msg.text))status='INIT_FAILED';if(status){const time=Date.now();state.precland={status,message:msg.text,lastUpdate:time};state.preclandEvents=[...state.preclandEvents.slice(-99),{time,text:msg.text,status}];console.log(`[ArduPilot] ${msg.text}`)}}
+  else if(msg.kind==='statusText'){const time=Date.now();let status:PreclandStatus='UNKNOWN';if(/PrecLand:/i.test(msg.text)){if(/Target Found/i.test(msg.text))status='INITIALIZING';else if(/Init Complete/i.test(msg.text))status='TARGET_ACQUIRED';else if(/Target Lost/i.test(msg.text))status='TARGET_LOST';else if(/Init Failed/i.test(msg.text))status='INIT_FAILED';if(status!=='UNKNOWN')state.precland={status,message:msg.text,lastUpdate:time}}state.preclandEvents=[...state.preclandEvents.slice(-99),{time,text:msg.text,status}];console.log(`[ArduPilot] ${msg.text}`)}
 })
 let mavlink:net.Socket|undefined
-function connectMavlink(){mavlink?.destroy();mavlink=net.createConnection({host:RV_HOST,port:MAVLINK_PORT},()=>{state.connected=true});mavlink.on('data',d=>parser.push(d));mavlink.on('error',()=>{});mavlink.on('close',()=>{state.connected=false;setTimeout(connectMavlink,1500)})}
-connectMavlink();setInterval(()=>{if(Date.now()-state.lastUpdate>3000)state.connected=false},500)
+let lastStreamRequest=0
+function sendMavlink(buffer:Buffer){if(mavlink?.writable)mavlink.write(buffer)}
+function requestStreams(){sendMavlink(requestAllStreams());lastStreamRequest=Date.now()}
+function connectMavlink(){mavlink?.destroy();mavlink=net.createConnection({host:RV_HOST,port:MAVLINK_PORT},()=>{sendMavlink(gcsHeartbeat());requestStreams()});mavlink.on('data',d=>parser.push(d));mavlink.on('error',()=>{});mavlink.on('close',()=>{state.connected=false;setTimeout(connectMavlink,1500)})}
+connectMavlink();setInterval(()=>{sendMavlink(gcsHeartbeat());if(Date.now()-lastStreamRequest>5000)requestStreams();if(Date.now()-state.lastUpdate>3000)state.connected=false},1000)
 
 function updateLanding(raw:string){const m=/TAG=(\w+)\s+infer=([\d.]+)Hz\s+X=([-\d.]+)\s+Y=([-\d.]+)\s+Z=([-\d.]+)\s+MAV=(\w+)/.exec(raw);state.landing={raw,tag:m?.[1]||'UNKNOWN',inference:m?Number(m[2]):null,x:m?Number(m[3]):null,y:m?Number(m[4]):null,z:m?Number(m[5]):null,mavValid:m?.[6]==='VALID',lastUpdate:Date.now()}}
 let statusClient:net.Socket|undefined,statusBuffer=''

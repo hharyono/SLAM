@@ -78,7 +78,10 @@ Pesan yang dikirim adalah MAVLink2 `LANDING_TARGET`, frame
 `MAV_FRAME_BODY_FRD`, `position_valid=1`: X forward, Y right, Z down dalam meter.
 Konfigurasi tag, offset kamera, dan quality gate ada di `Config/Landing.yaml`.
 Pose memakai median tiga frame; deteksi ditolak berdasarkan ID, hamming,
-decision margin dan reprojection error. Target dinyatakan hilang setelah 300 ms.
+decision margin dan reprojection error. Target dinyatakan hilang secara lokal
+setelah 300 ms. Saat target hilang, aplikasi berhenti mengirim `LANDING_TARGET`;
+ArduPilot akan membersihkan estimator melalui timeout PrecLand internal dan
+melaporkan `PrecLand: Target Lost`.
 
 Set ArduPilot:
 

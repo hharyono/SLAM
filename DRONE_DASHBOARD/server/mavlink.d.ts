@@ -3,6 +3,8 @@ export type MavFrame = {
     id: number;
     payload: Buffer;
 };
+export declare function gcsHeartbeat(): Buffer<ArrayBuffer>;
+export declare function requestAllStreams(rateHz?: number): Buffer<ArrayBuffer>;
 export declare class MavlinkParser extends EventEmitter {
     private data;
     push(chunk: Buffer): void;

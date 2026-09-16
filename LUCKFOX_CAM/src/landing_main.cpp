@@ -108,7 +108,13 @@ int main(int ac,char**av){
       P best{};bool ok=false;
       for(int n=0;n<zarray_size(z);n++){apriltag_detection_t*x;zarray_get(z,n,&x);P p;if(x->id==q.id&&x->hamming<=q.ham&&x->decision_margin>=q.margin&&solvePnP(x,cam,q.size,p)&&p.err<=q.maxerr){best=p;ok=true;break;}}
       if(ok){hist[hn%3]=best;hn++;seen=now;lost=false;if(hn>=3){auto&a=hist[0],&b=hist[1],&c=hist[2];double cx=med(a.x,b.x,c.x),cy=med(a.y,b.y,c.y),cz=med(a.z,b.z,c.z);float bx=q.ox+cy,by=q.oy+cx,bz=q.oz+cz;uart.landing(bx,by,bz,true);}}
-      else if(seen&&now-seen>(uint64_t)q.lost*1000&&!lost){uart.landing(0,0,0,false);lost=true;}
+      else if(seen&&now-seen>(uint64_t)q.lost*1000&&!lost){
+        // Do not send a synthetic LANDING_TARGET when the tag is lost.
+        // ArduPilot treats position_valid=0 as an angle-only observation, not
+        // as a target-invalid marker.  Silence lets its PrecLand timeout clear
+        // the estimator and report "PrecLand: Target Lost" safely.
+        lost=true;
+      }
       if(!pipe.publish(frame))std::cerr<<"VENC dropped frame\n";
       apriltag_detections_destroy(z);
       report_frames++;

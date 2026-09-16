@@ -1,4 +1,39 @@
 import { EventEmitter } from 'node:events';
+let txSequence = 0;
+function crcAccumulate(byte, crc) { let tmp = byte ^ (crc & 0xff); tmp ^= tmp << 4; return ((crc >> 8) ^ (tmp << 8) ^ (tmp << 3) ^ (tmp >> 4)) & 0xffff; }
+function encodeV1(id, payload, crcExtra) {
+    const frame = Buffer.alloc(6 + payload.length + 2);
+    frame[0] = 0xfe;
+    frame[1] = payload.length;
+    frame[2] = txSequence++ & 0xff;
+    frame[3] = 255;
+    frame[4] = 190;
+    frame[5] = id;
+    payload.copy(frame, 6);
+    let crc = 0xffff;
+    for (let i = 1; i < 6 + payload.length; i++)
+        crc = crcAccumulate(frame[i], crc);
+    crc = crcAccumulate(crcExtra, crc);
+    frame.writeUInt16LE(crc, 6 + payload.length);
+    return frame;
+}
+export function gcsHeartbeat() {
+    const payload = Buffer.alloc(9);
+    payload[4] = 6;
+    payload[5] = 8;
+    payload[7] = 4;
+    payload[8] = 3;
+    return encodeV1(0, payload, 50);
+}
+export function requestAllStreams(rateHz = 4) {
+    const payload = Buffer.alloc(6);
+    payload.writeUInt16LE(rateHz, 0);
+    payload[2] = 1;
+    payload[3] = 1;
+    payload[4] = 0;
+    payload[5] = 1;
+    return encodeV1(66, payload, 148);
+}
 export class MavlinkParser extends EventEmitter {
     data = Buffer.alloc(0);
     push(chunk) {

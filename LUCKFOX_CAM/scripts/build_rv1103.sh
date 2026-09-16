@@ -49,3 +49,21 @@ done
   "$MEDIA_DIR/out/lib/librga.a" -Wl,--end-group \
   -ldrm -lpthread -ldl -lm -o "$BUILD_DIR/luckfox_landing"
 echo "Landing binary ARM: $BUILD_DIR/luckfox_landing"
+
+# Calibration-only camera stream: full-resolution frames, no AprilTag/MAVLink.
+"$TOOLCHAIN_DIR/arm-rockchip830-linux-uclibcgnueabihf-g++" -std=gnu++17 -O2 \
+  -Wall -Wextra -march=armv7-a -mfpu=neon -mfloat-abi=hard \
+  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
+  -DRKPLATFORM=ON -DARCH64=OFF -DISP_HW_V30 -DRV1106 -DUAPI2 \
+  -I"$MEDIA_DIR/samples/example/common" -I"$MEDIA_DIR/samples/example/common/isp3.x" \
+  -I"$MEDIA_DIR/out/include" -I"$MEDIA_DIR/out/include/rkaiq" \
+  -I"$MEDIA_DIR/out/include/rkaiq/uAPI2" -I"$MEDIA_DIR/out/include/rkaiq/common" \
+  -I"$MEDIA_DIR/out/include/rkaiq/xcore" -I"$MEDIA_DIR/out/include/rkaiq/algos" \
+  -I"$MEDIA_DIR/out/include/rkaiq/iq_parser" -I"$MEDIA_DIR/out/include/rkaiq/iq_parser_v2" \
+  "$APP_DIR/src/calibration_stream_main.cpp" "$APP_DIR/src/streaming_pipeline.cpp" \
+  -Wl,--start-group "$MEDIA_DIR/samples/example/common/lib/libsample_comm.a" \
+  "$MEDIA_DIR/out/lib/librockit_full.a" "$MEDIA_DIR/out/lib/librockchip_mpp.a" \
+  "$MEDIA_DIR/out/lib/librkaiq.a" "$MEDIA_DIR/out/lib/librtsp.a" \
+  "$MEDIA_DIR/out/lib/librga.a" -Wl,--end-group \
+  -ldrm -lpthread -ldl -lm -o "$BUILD_DIR/luckfox_cam_call"
+echo "Calibration stream binary ARM: $BUILD_DIR/luckfox_cam_call"
