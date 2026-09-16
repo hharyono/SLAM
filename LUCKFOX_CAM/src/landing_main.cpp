@@ -67,6 +67,13 @@ static double med(double a,double b,double c){return a+b+c-std::min({a,b,c})-std
 struct IgnoreSigpipe { IgnoreSigpipe(){ signal(SIGPIPE,SIG_IGN); } };
 static IgnoreSigpipe ignore_sigpipe;
 
+struct StatusPublisher {
+  int fd=-1;sockaddr_in address{};
+  StatusPublisher(){fd=socket(AF_INET,SOCK_DGRAM,0);if(fd>=0){int yes=1;setsockopt(fd,SOL_SOCKET,SO_BROADCAST,&yes,sizeof(yes));address.sin_family=AF_INET;address.sin_port=htons(14551);inet_pton(AF_INET,"255.255.255.255",&address.sin_addr);}}
+  ~StatusPublisher(){if(fd>=0)close(fd);}
+  void sendLine(const char*line){if(fd>=0)sendto(fd,line,strlen(line),MSG_DONTWAIT,(sockaddr*)&address,sizeof(address));}
+};
+
 int main(int ac,char**av){
   std::string cp="Config/Camera.yaml",lp="Config/Landing.yaml";
   int rtsp_mode=1;
@@ -93,7 +100,7 @@ int main(int ac,char**av){
     StreamingPipeline::Frame frame;auto*tf=tag36h11_create();auto*td=apriltag_detector_create();
     apriltag_detector_add_family(td,tf);td->nthreads=q.threads;td->quad_decimate=q.decimate;td->refine_edges=0;
     std::array<P,3> hist{};int hn=0;uint64_t seen=0;bool lost=false;
-    uint64_t report_start=usec();unsigned report_frames=0;
+    uint64_t report_start=usec();unsigned report_frames=0;StatusPublisher status;
     signal(SIGINT,sig);signal(SIGTERM,sig);
     while(run){
       if(!pipe.acquire(frame,200))continue;
@@ -106,7 +113,7 @@ int main(int ac,char**av){
       apriltag_detections_destroy(z);
       report_frames++;
       uint64_t report_now=usec();
-      if(report_now-report_start>=200000){double rate=report_frames*1000000.0/(report_now-report_start);std::cerr<<"TAG="<<(ok?"FOUND":"LOST")<<" infer="<<rate<<"Hz X="<<(ok?best.x:0.0)<<" Y="<<(ok?best.y:0.0)<<"\n";report_start=report_now;report_frames=0;}
+      if(report_now-report_start>=200000){double rate=report_frames*1000000.0/(report_now-report_start);char line[160];snprintf(line,sizeof(line),"TAG=%s infer=%.2fHz X=%.3f Y=%.3f Z=%.3f",ok?"FOUND":"LOST",rate,ok?best.x:0.0,ok?best.y:0.0,ok?best.z:0.0);std::cerr<<line<<"\n";status.sendLine(line);report_start=report_now;report_frames=0;}
     }
     pipe.release(frame);apriltag_detector_destroy(td);tag36h11_destroy(tf);
   }catch(const std::exception&e){std::cerr<<"luckfox_landing: "<<e.what()<<"\n";return 1;}

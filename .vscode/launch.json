@@ -43,12 +43,49 @@
         "uriFormat": "%s",
         "action": "debugWithChrome"
       }
+    },
+    {
+      "name": "Drone: Backend (TypeScript)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/.tools/node/bin/node",
+      "runtimeArgs": ["--import", "tsx"],
+      "args": ["server/index.ts"],
+      "cwd": "${workspaceFolder}/DRONE_DASHBOARD",
+      "env": {
+        "RV_HOST": "192.168.1.55",
+        "MAVLINK_PORT": "5760",
+        "RTSP_URL": "rtsp://192.168.1.55:8554/live",
+        "PORT": "3001"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/**/node_modules/**"]
+    },
+    {
+      "name": "Drone: Frontend (React)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/.tools/node/bin/node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0"],
+      "cwd": "${workspaceFolder}/DRONE_DASHBOARD",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/**/node_modules/**"],
+      "serverReadyAction": {
+        "pattern": "Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome"
+      }
     }
   ],
   "compounds": [
     {
       "name": "AGV: Run Both (Frontend + Backend)",
       "configurations": ["AGV: Backend (TypeScript)", "AGV: Frontend (React)"],
+      "stopAll": true
+    },
+    {
+      "name": "Drone: Run Both (Frontend + Backend)",
+      "configurations": ["Drone: Backend (TypeScript)", "Drone: Frontend (React)"],
       "stopAll": true
     }
   ]

@@ -1,0 +1,6 @@
+{
+  "name": "luckfox-drone-dashboard", "private": true, "version": "1.0.0", "type": "module",
+  "scripts": {"dev":"concurrently -k \"npm:dev:server\" \"npm:dev:web\"","dev:server":"tsx watch server/index.ts","dev:web":"vite","build":"tsc -b && vite build","start":"tsx server/index.ts"},
+  "dependencies": {"express":"^5.1.0","mpegts.js":"^1.8.0","react":"^19.1.1","react-dom":"^19.1.1","ws":"^8.18.3"},
+  "devDependencies": {"@types/express":"^5.0.3","@types/node":"^24.3.0","@types/react":"^19.1.12","@types/react-dom":"^19.1.9","@types/ws":"^8.18.1","@vitejs/plugin-react":"^5.0.2","concurrently":"^9.2.1","tsx":"^4.20.5","typescript":"^5.9.2","vite":"^7.1.5"}
+}
