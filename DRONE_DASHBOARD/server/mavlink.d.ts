@@ -12,6 +12,9 @@ export declare function decode(frame: MavFrame): {
     readonly customMode: number;
     readonly baseMode: number;
     readonly systemStatus: number;
+    readonly sensorsPresent?: undefined;
+    readonly sensorsEnabled?: undefined;
+    readonly sensorsHealth?: undefined;
     readonly voltage?: undefined;
     readonly current?: undefined;
     readonly battery?: undefined;
@@ -25,8 +28,13 @@ export declare function decode(frame: MavFrame): {
     readonly groundSpeed?: undefined;
     readonly throttle?: undefined;
     readonly climb?: undefined;
+    readonly severity?: undefined;
+    readonly text?: undefined;
 } | {
     readonly kind: "system";
+    readonly sensorsPresent: number;
+    readonly sensorsEnabled: number;
+    readonly sensorsHealth: number;
     readonly voltage: number;
     readonly current: number;
     readonly battery: number;
@@ -43,6 +51,8 @@ export declare function decode(frame: MavFrame): {
     readonly groundSpeed?: undefined;
     readonly throttle?: undefined;
     readonly climb?: undefined;
+    readonly severity?: undefined;
+    readonly text?: undefined;
 } | {
     readonly kind: "gps";
     readonly lat: number;
@@ -53,6 +63,9 @@ export declare function decode(frame: MavFrame): {
     readonly customMode?: undefined;
     readonly baseMode?: undefined;
     readonly systemStatus?: undefined;
+    readonly sensorsPresent?: undefined;
+    readonly sensorsEnabled?: undefined;
+    readonly sensorsHealth?: undefined;
     readonly voltage?: undefined;
     readonly current?: undefined;
     readonly battery?: undefined;
@@ -61,6 +74,8 @@ export declare function decode(frame: MavFrame): {
     readonly groundSpeed?: undefined;
     readonly throttle?: undefined;
     readonly climb?: undefined;
+    readonly severity?: undefined;
+    readonly text?: undefined;
 } | {
     readonly kind: "position";
     readonly lat: number;
@@ -71,6 +86,9 @@ export declare function decode(frame: MavFrame): {
     readonly customMode?: undefined;
     readonly baseMode?: undefined;
     readonly systemStatus?: undefined;
+    readonly sensorsPresent?: undefined;
+    readonly sensorsEnabled?: undefined;
+    readonly sensorsHealth?: undefined;
     readonly voltage?: undefined;
     readonly current?: undefined;
     readonly battery?: undefined;
@@ -79,6 +97,8 @@ export declare function decode(frame: MavFrame): {
     readonly groundSpeed?: undefined;
     readonly throttle?: undefined;
     readonly climb?: undefined;
+    readonly severity?: undefined;
+    readonly text?: undefined;
 } | {
     readonly kind: "hud";
     readonly groundSpeed: number;
@@ -89,6 +109,9 @@ export declare function decode(frame: MavFrame): {
     readonly customMode?: undefined;
     readonly baseMode?: undefined;
     readonly systemStatus?: undefined;
+    readonly sensorsPresent?: undefined;
+    readonly sensorsEnabled?: undefined;
+    readonly sensorsHealth?: undefined;
     readonly voltage?: undefined;
     readonly current?: undefined;
     readonly battery?: undefined;
@@ -97,4 +120,29 @@ export declare function decode(frame: MavFrame): {
     readonly fix?: undefined;
     readonly satellites?: undefined;
     readonly relativeAltitude?: undefined;
+    readonly severity?: undefined;
+    readonly text?: undefined;
+} | {
+    readonly kind: "statusText";
+    readonly severity: number;
+    readonly text: string;
+    readonly customMode?: undefined;
+    readonly baseMode?: undefined;
+    readonly systemStatus?: undefined;
+    readonly sensorsPresent?: undefined;
+    readonly sensorsEnabled?: undefined;
+    readonly sensorsHealth?: undefined;
+    readonly voltage?: undefined;
+    readonly current?: undefined;
+    readonly battery?: undefined;
+    readonly lat?: undefined;
+    readonly lon?: undefined;
+    readonly altitude?: undefined;
+    readonly fix?: undefined;
+    readonly satellites?: undefined;
+    readonly relativeAltitude?: undefined;
+    readonly heading?: undefined;
+    readonly groundSpeed?: undefined;
+    readonly throttle?: undefined;
+    readonly climb?: undefined;
 } | undefined;

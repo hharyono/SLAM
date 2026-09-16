@@ -68,10 +68,10 @@ struct IgnoreSigpipe { IgnoreSigpipe(){ signal(SIGPIPE,SIG_IGN); } };
 static IgnoreSigpipe ignore_sigpipe;
 
 struct StatusPublisher {
-  int fd=-1;sockaddr_in address{};
-  StatusPublisher(){fd=socket(AF_INET,SOCK_DGRAM,0);if(fd>=0){int yes=1;setsockopt(fd,SOL_SOCKET,SO_BROADCAST,&yes,sizeof(yes));address.sin_family=AF_INET;address.sin_port=htons(14551);inet_pton(AF_INET,"255.255.255.255",&address.sin_addr);}}
-  ~StatusPublisher(){if(fd>=0)close(fd);}
-  void sendLine(const char*line){if(fd>=0)sendto(fd,line,strlen(line),MSG_DONTWAIT,(sockaddr*)&address,sizeof(address));}
+  int listener=-1,client=-1;
+  StatusPublisher(){listener=socket(AF_INET,SOCK_STREAM,0);if(listener>=0){int yes=1;setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes));fcntl(listener,F_SETFL,fcntl(listener,F_GETFL,0)|O_NONBLOCK);sockaddr_in a{};a.sin_family=AF_INET;a.sin_port=htons(14551);a.sin_addr.s_addr=INADDR_ANY;if(bind(listener,(sockaddr*)&a,sizeof(a))<0||listen(listener,1)<0){close(listener);listener=-1;}}}
+  ~StatusPublisher(){if(client>=0)close(client);if(listener>=0)close(listener);}
+  void sendLine(const char*line){if(listener<0)return;if(client<0)client=accept(listener,nullptr,nullptr);if(client<0)return;char out[192];int n=snprintf(out,sizeof(out),"%s\n",line);if(send(client,out,n,MSG_DONTWAIT|MSG_NOSIGNAL)<0&&errno!=EAGAIN&&errno!=EWOULDBLOCK){close(client);client=-1;}}
 };
 
 int main(int ac,char**av){
@@ -113,7 +113,7 @@ int main(int ac,char**av){
       apriltag_detections_destroy(z);
       report_frames++;
       uint64_t report_now=usec();
-      if(report_now-report_start>=200000){double rate=report_frames*1000000.0/(report_now-report_start);char line[160];snprintf(line,sizeof(line),"TAG=%s infer=%.2fHz X=%.3f Y=%.3f Z=%.3f",ok?"FOUND":"LOST",rate,ok?best.x:0.0,ok?best.y:0.0,ok?best.z:0.0);std::cerr<<line<<"\n";status.sendLine(line);report_start=report_now;report_frames=0;}
+      if(report_now-report_start>=200000){double rate=report_frames*1000000.0/(report_now-report_start);char line[176];snprintf(line,sizeof(line),"TAG=%s infer=%.2fHz X=%.3f Y=%.3f Z=%.3f MAV=%s",ok?"FOUND":"LOST",rate,ok?best.x:0.0,ok?best.y:0.0,ok?best.z:0.0,(ok&&hn>=3)?"VALID":"INVALID");std::cerr<<line<<"\n";status.sendLine(line);report_start=report_now;report_frames=0;}
     }
     pipe.release(frame);apriltag_detector_destroy(td);tag36h11_destroy(tf);
   }catch(const std::exception&e){std::cerr<<"luckfox_landing: "<<e.what()<<"\n";return 1;}

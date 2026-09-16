@@ -8,7 +8,7 @@ heading, status arm, dan status koneksi MAVLink.
 
 - Node.js 20 atau lebih baru
 - npm
-- FFmpeg tersedia di `PATH`
+- FFmpeg dari environment SLAM (`~/.local/share/mamba/envs/SLAM/bin/ffmpeg`)
 - PC berada pada jaringan yang sama dengan RV
 
 Ubuntu/WSL:
@@ -22,10 +22,15 @@ sudo apt install nodejs npm ffmpeg
 
 ```bash
 cd /mnt/c/DATA/GITS/Slam/SLAM/DRONE_DASHBOARD
+export PATH="$PWD/../.tools/node/bin:$PATH"
 cp .env.example .env
 npm install
 npm run dev
 ```
+
+Dashboard memakai Node Linux workspace yang sama dengan AGV Dashboard. Jangan
+menjalankan `npm` dari `C:\\Program Files\\nodejs`, karena native dependency
+Rollup Windows tidak dapat digunakan oleh VS Code Remote/WSL.
 
 Buka `http://localhost:5173`. Backend Node berada di port 3001. Konfigurasi
 default menghubungi MAVLink `192.168.1.55:5760`, RTSP
