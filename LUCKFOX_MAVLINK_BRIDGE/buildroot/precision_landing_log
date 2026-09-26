@@ -1,0 +1,76 @@
+#!/bin/sh
+ROOT=/root/logs/precision-landing-sessions
+CONTROL=$ROOT/active-session
+BRIDGE_LOG=/root/logs/precision-landing/mavlink-bridge-latest.log
+
+active_dir() { [ -r "$CONTROL" ] && { read -r value < "$CONTROL"; printf '%s' "$value"; }; }
+valid_dir() { case "$1" in "$ROOT"/*) return 0;; *) return 1;; esac; }
+
+start_log() {
+    [ -z "$(active_dir)" ] || { echo "logging already active" >&2; return 1; }
+    session=${1:-flight-$(date '+%Y%m%dT%H%M%S')}
+    case "$session" in ''|*[!A-Za-z0-9._-]*) echo "invalid session id" >&2; return 1;; esac
+    dir=$ROOT/$session
+    [ ! -e "$dir" ] || { echo "session already exists" >&2; return 1; }
+    /etc/init.d/S99luckfox_landing status >/dev/null 2>&1 || {
+        echo "multi-tag landing service is not running" >&2
+        return 1
+    }
+    mkdir -p "$dir" || return 1
+    mode=multi-tag-ids-0-1-2
+    camera_log=/root/logs/precision-landing/multi-tag.log
+    landing_config=/root/LUCKFOX_CAM/Config/Landing.yaml
+    landing_pdf=/root/LUCKFOX_CAM/Calibration/a4_three_tag_landing_pad_ids_0_1_2.pdf
+    landing_binary=/root/LUCKFOX_CAM/build/rv1103/luckfox_landing
+    printf '{"sessionId":"%s","startedAt":"%s","host":"%s","mode":"%s"}\n' "$session" "$(date -Iseconds)" "$(hostname)" "$mode" > "$dir/metadata.json"
+    printf '%s\n' "$mode" > "$dir/mode.txt"
+    cp /root/LUCKFOX_CAM/Config/Camera.yaml "$dir/Camera.yaml" 2>/dev/null || true
+    cp "$landing_config" "$dir/Landing.yaml" 2>/dev/null || true
+    printf '%s\n' "$landing_pdf" > "$dir/landing-pad.path"
+    { sha256sum /root/LUCKFOX_CAM/Config/Camera.yaml "$landing_config" "$landing_pdf" "$landing_binary" 2>/dev/null || true; } > "$dir/checksums.sha256"
+    { date; uptime; free -m 2>/dev/null || true; df -h /; ps w; } > "$dir/system-start.txt" 2>&1
+    printf '%s\n' "$camera_log" > "$dir/camera-source.path"
+    wc -c < "$camera_log" > "$dir/camera-source.offset" 2>/dev/null || printf '0\n' > "$dir/camera-source.offset"
+    tail -n 0 -F "$camera_log" > "$dir/precision-landing.log" 2>&1 & echo $! > "$dir/camera-tail.pid"
+    tail -n 0 -F "$BRIDGE_LOG" > "$dir/mavlink-bridge.log" 2>&1 & echo $! > "$dir/bridge-tail.pid"
+    tmp=$ROOT/.active-session.$$
+    printf '%s\n' "$dir" > "$tmp" && mv "$tmp" "$CONTROL"
+    echo "$dir"
+}
+
+stop_log() {
+    dir=$(active_dir); valid_dir "$dir" || { echo "logging is not active" >&2; return 1; }
+    rm -f "$CONTROL"
+    sleep 2
+    for file in "$dir/camera-tail.pid" "$dir/bridge-tail.pid"; do
+        [ -r "$file" ] || continue; read -r pid < "$file"
+        case "$pid" in ''|*[!0-9]*) continue;; esac
+        kill "$pid" 2>/dev/null || true
+    done
+    rm -f "$dir/camera-tail.pid" "$dir/bridge-tail.pid"
+    # Rebuild the detector log from the exact source byte offset.  This makes
+    # collection independent of tail -F scheduling/buffering on the small RV.
+    if [ -r "$dir/camera-source.path" ] && [ -r "$dir/camera-source.offset" ]; then
+        read -r camera_log < "$dir/camera-source.path"
+        read -r camera_offset < "$dir/camera-source.offset"
+        case "$camera_log:$camera_offset" in
+            /root/logs/precision-landing/*:[0-9]*)
+                camera_size=$(wc -c < "$camera_log" 2>/dev/null || printf '0')
+                [ "$camera_size" -ge "$camera_offset" ] 2>/dev/null || camera_offset=0
+                tail -c "+$((camera_offset + 1))" "$camera_log" > "$dir/precision-landing.log" 2>&1 || true;;
+        esac
+    fi
+    rm -f "$dir/camera-source.path" "$dir/camera-source.offset"
+    { date; uptime; free -m 2>/dev/null || true; df -h /; ps w; dmesg | tail -n 100; } > "$dir/system-stop.txt" 2>&1
+    printf '{"stoppedAt":"%s"}\n' "$(date -Iseconds)" > "$dir/completed.json"
+    sync
+    echo "$dir"
+}
+
+case "$1" in
+    start) start_log "$2";;
+    stop) stop_log;;
+    status) dir=$(active_dir); if valid_dir "$dir"; then echo "$dir"; else echo inactive; fi;;
+    clear) [ -z "$(active_dir)" ] || { echo "stop logging first" >&2; exit 1; }; find "$ROOT" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +;;
+    *) echo "Usage: $0 {start [SESSION_ID]|stop|status|clear}" >&2; exit 2;;
+esac

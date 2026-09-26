@@ -7,7 +7,7 @@ case "$1" in
     ;;
   Landing|landing)
     shift
-    exec "$APP_DIR/build/rv1103/luckfox_landing" --camera "$APP_DIR/Config/Camera.yaml" --config "$APP_DIR/Config/Landing.yaml" "$@"
+    exec "$APP_DIR/build/rv1103/luckfox_landing" --camera "$APP_DIR/Config/Camera.yaml" --config "$APP_DIR/Config/Landing.yaml" -rtsp 0 "$@"
     ;;
   *)
     echo "Usage: $0 {Cal|Landing} [options]" >&2

@@ -1,14 +1,19 @@
 #!/bin/sh
-DAEMON=/root/LUCKFOX_CAM/build/rv1103/luckfox_landing
 CONFIG=/etc/default/luckfox_landing
 PIDFILE=/var/run/luckfox_landing.pid
-LOGFILE=/tmp/luckfox_landing.log
+LOG_DIR=/root/logs/precision-landing
 ENABLED=1
 APP_DIR=/root/LUCKFOX_CAM
 CAMERA_CONFIG=$APP_DIR/Config/Camera.yaml
-LANDING_CONFIG=$APP_DIR/Config/Landing.yaml
-RTSP_MODE=1
+RTSP_MODE=0
 [ -r "$CONFIG" ] && . "$CONFIG"
+# The deployed landing pad uses the three unique AprilTag IDs from
+# a4_three_tag_landing_pad_ids_0_1_2.pdf. Keep these paths fixed so an older
+# defaults file cannot silently select the single-tag experiment.
+DAEMON=/root/LUCKFOX_CAM/build/rv1103/luckfox_landing
+APP_DIR=/root/LUCKFOX_CAM
+CAMERA_CONFIG=$APP_DIR/Config/Camera.yaml
+LANDING_CONFIG=$APP_DIR/Config/Landing.yaml
 
 module_loaded() { grep -q "^$1 " /proc/modules 2>/dev/null; }
 load_module() {
@@ -39,13 +44,20 @@ start() {
     [ "$ENABLED" = 1 ] || { echo "luckfox_landing disabled"; return 0; }
     running && { echo "luckfox_landing already running (pid $landing_pid)"; return 0; }
     [ -x "$DAEMON" ] || { echo "Missing $DAEMON"; return 1; }
+    mkdir -p "$LOG_DIR" || return 1
+    LOGFILE="$LOG_DIR/multi-tag.log"
+    : > "$LOGFILE"
+    ln -sf "$LOGFILE" "$LOG_DIR/camera-latest.log"
     load_camera_modules >> "$LOGFILE" 2>&1 || { echo "Camera initialization failed; see $LOGFILE"; return 1; }
     rm -f "$PIDFILE"
     cd "$APP_DIR" || return 1
-    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x "$DAEMON" -- \
-        --camera "$CAMERA_CONFIG" --config "$LANDING_CONFIG" -rtsp "$RTSP_MODE" >> "$LOGFILE" 2>&1 || return 1
+    # BusyBox start-stop-daemon -b redirects the child stdio to /dev/null.
+    # Start through a shell that redirects first, then execs the daemon so the
+    # pidfile still identifies luckfox_landing and PL_FRAME diagnostics persist.
+    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x /bin/sh -- -c \
+        "exec '$DAEMON' --camera '$CAMERA_CONFIG' --config '$LANDING_CONFIG' -rtsp '$RTSP_MODE' >> '$LOGFILE' 2>&1" || return 1
     sleep 2
-    running && { echo "luckfox_landing running (pid $landing_pid), rtsp://0.0.0.0:8554/live"; return 0; }
+    running && { echo "multi-tag IDs 0,1,2 landing running (pid $landing_pid), log=$LOGFILE, rtsp=$RTSP_MODE"; return 0; }
     echo "luckfox_landing failed; see $LOGFILE"; return 1
 }
 stop() {
@@ -66,6 +78,6 @@ case "$1" in
     start) start;; stop) stop;; restart) stop && start;;
     enable) set_enabled 1 && start;;
     disable) stop && set_enabled 0 && echo "luckfox_landing disabled";;
-    status) running && echo "luckfox_landing running (pid $landing_pid), rtsp://0.0.0.0:8554/live" || { echo "luckfox_landing stopped"; exit 1; };;
+    status) running && echo "multi-tag IDs 0,1,2 landing running (pid $landing_pid), rtsp=$RTSP_MODE" || { echo "multi-tag IDs 0,1,2 landing stopped"; exit 1; };;
     *) echo "Usage: $0 {start|stop|restart|status|enable|disable}"; exit 2;;
 esac

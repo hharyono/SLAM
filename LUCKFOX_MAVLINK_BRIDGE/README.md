@@ -7,7 +7,8 @@ system/component ID, dan signature diteruskan apa adanya.
 
 ```mermaid
 flowchart LR
-    MP["Mission Planner\nTCP client"] <-->|"Wi-Fi/LAN :5760"| BR["RV1103\nmavlink_bridge"]
+    DASH["Dashboard\nTCP client"] <-->|"Wi-Fi/LAN :5760"| BR["RV1103\nmavlink_bridge"]
+    MP["Mission Planner\nTCP client"] <-->|"Wi-Fi/LAN :5763"| BR
     BR <-->|"ttyS5 · 115200 · TX/RX"| FC["ArduPilot\nport telemetry MAVLink"]
     LOC["LUCKFOX_LOCALIZER"] -->|"ttyS4 · ExternalNav"| FC
     LIDAR["YDLidar"] -->|"ttyS3"| LOC
@@ -20,8 +21,10 @@ Default:
 | UART ke ArduPilot | `/dev/ttyS5` |
 | Baud UART | `115200`, 8N1, tanpa RTS/CTS |
 | Bind TCP | `0.0.0.0` (semua interface IPv4) |
-| Port TCP | `5760` |
-| Klien aktif | Satu Mission Planner |
+| Port dashboard/monitor | `5760` |
+| Port upload | `5761` |
+| Port Mission Planner | `5763` |
+| Klien aktif | Satu klien per port |
 | Autostart | `/etc/init.d/S98mavlink_bridge` |
 | Konfigurasi | `/etc/default/mavlink_bridge` |
 | Log | `/tmp/mavlink_bridge.log` |
@@ -72,14 +75,15 @@ dikonfigurasi: bridge hanya membawa byte signature, tidak memvalidasinya.
 1. Pastikan PC dan RV1103 terhubung jaringan yang sama.
 2. Cari IP RV1103 dengan `ip -4 addr show wlan0` pada board.
 3. Di pilihan koneksi Mission Planner, pilih **TCP**, lalu **CONNECT**.
-4. Isi alamat IP **RV1103**, misalnya `192.168.1.50`, dan port **5760**.
+4. Isi alamat IP **RV1103**, misalnya `192.168.1.55`, dan port **5763**.
 5. Tunggu heartbeat ArduPilot dan pembacaan parameter.
 
 TCP client Mission Planner terhubung ke server RV1103, bukan sebaliknya.
 `0.0.0.0` adalah alamat bind server; jangan memasukkannya sebagai alamat tujuan
 Mission Planner. Dukungan koneksi TCP GCS dijelaskan pada
 [dokumentasi ArduPilot](https://ardupilot.org/dev/docs/using-sitl-for-ardupilot-testing.html).
-Port `5760` ini raw TCP, bukan HTTP/WebSocket.
+Port `5763` ini raw TCP khusus Mission Planner, bukan HTTP/WebSocket. Port
+`5760` tetap tersedia untuk dashboard/monitor dan `5761` untuk upload mission.
 
 Baud pada konfigurasi bridge harus cocok dengan UART FC; TCP sendiri tidak
 memiliki baud rate. TCP tidak memakai autentikasi/TLS pada aplikasi ini;
@@ -105,6 +109,8 @@ UART=/dev/ttyS5
 BAUD=115200
 BIND_ADDRESS=0.0.0.0
 TCP_PORT=5760
+UPLOAD_PORT=5761
+MISSION_PORT=5763
 ```
 
 Setelah diedit, jalankan `/etc/init.d/S98mavlink_bridge restart`.
@@ -113,7 +119,7 @@ Menjalankan manual untuk diagnosis:
 ```sh
 /etc/init.d/S98mavlink_bridge stop
 /usr/bin/mavlink_bridge --serial /dev/ttyS5 --baud 115200 \
-  --bind 0.0.0.0 --port 5760
+  --bind 0.0.0.0 --port 5760 --upload-port 5761 --mission-port 5763
 ```
 
 Baud yang didukung: 57600, 115200, 230400, 460800, 921600.
@@ -163,7 +169,10 @@ Image hasil: `RV1103_BUILDROOT/luckfox-pico/output/image/update.img`.
 
 ## Perilaku koneksi dan batasan
 
-- Satu klien aktif; koneksi kedua ditutup agar tidak mencampur perintah dua GCS.
+- Tersedia satu klien aktif pada setiap port: dashboard/monitor `5760`, upload
+  `5761`, dan Mission Planner `5763`. Koneksi kedua pada port yang sama ditutup.
+- Telemetri UART dibroadcast ke semua klien aktif. Frame MAVLink dari ketiga
+  klien dijadwalkan bergiliran dan tidak dicampur di tengah frame.
 - UART belum tersedia/terputus: retry setiap 1 detik. Koneksi TCP ditutup saat
   UART putus; sambungkan ulang Mission Planner setelah UART pulih.
 - Tidak ada GCS: telemetry tetap dibaca dan dibuang, bukan disimpan untuk sesi

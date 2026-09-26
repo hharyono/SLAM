@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, os, pathlib, sys, threading, time
+import argparse, os, pathlib, signal, sys, threading, time
 # Avoid loading an incompatible Qt plugin inherited from Conda/desktop shells.
 os.environ.pop("QT_PLUGIN_PATH",None)
 os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH",None)
@@ -15,7 +15,10 @@ def main():
     p.add_argument("--width",type=int,default=1280); p.add_argument("--height",type=int,default=720)
     p.add_argument("--squares-x",type=int,default=7); p.add_argument("--squares-y",type=int,default=5)
     p.add_argument("--square-mm",type=float,default=30); p.add_argument("--marker-mm",type=float,default=22)
-    p.add_argument("--samples",type=int,default=25); a=p.parse_args()
+    p.add_argument("--samples",type=int,default=40)
+    p.add_argument("--headless",action="store_true")
+    p.add_argument("--wait-for-stop",action="store_true",help="collect until SIGINT/SIGTERM, up to --samples")
+    a=p.parse_args()
     ar=cv2.aruco; dictionary=ar.getPredefinedDictionary(ar.DICT_4X4_50)
     board=ar.CharucoBoard((a.squares_x,a.squares_y),a.square_mm/1000,a.marker_mm/1000,dictionary)
     detector_params=ar.DetectorParameters()
@@ -49,9 +52,13 @@ def main():
             with lock:
                 latest["frame"]=frame; latest["seq"]+=1
     reader=threading.Thread(target=read_latest,daemon=True); reader.start()
-    corners=[]; ids=[]; last=None; last_t=0
+    corners=[]; ids=[]; last=None; last_t=0; stopping=False
+    def request_stop(_signum,_frame):
+        nonlocal stopping
+        stopping=True
+    signal.signal(signal.SIGINT,request_stop);signal.signal(signal.SIGTERM,request_stop)
     seen=0
-    while cap.isOpened() and len(corners)<a.samples:
+    while cap.isOpened() and not stopping and len(corners)<a.samples:
         with lock:
             seq=latest["seq"]
             frame=None if seq==seen or latest["frame"] is None else latest["frame"].copy()
@@ -65,16 +72,21 @@ def main():
             diverse=last is None or np.linalg.norm(signature-last)>35
             if diverse and time.monotonic()-last_t>0.45:
                 corners.append(cc.copy());ids.append(ci.copy());last=signature;last_t=time.monotonic()
+                print(f"SAMPLE {len(corners)}/{a.samples}",flush=True)
             ar.drawDetectedCornersCharuco(frame,cc,ci)
-        cv2.putText(frame,f"AUTO {len(corners)}/{a.samples}  ESC cancel",(20,35),0,0.8,(0,255,0),2)
-        cv2.imshow("LuckfoxCam ChArUco Calibration",frame)
-        if cv2.waitKey(1)&255==27: break
+        if not a.headless:
+            cv2.putText(frame,f"AUTO {len(corners)}/{a.samples}  ESC cancel",(20,35),0,0.8,(0,255,0),2)
+            cv2.imshow("LuckfoxCam ChArUco Calibration",frame)
+            if cv2.waitKey(1)&255==27: break
+        elif a.wait_for_stop and len(corners)>=a.samples:
+            while not stopping: time.sleep(0.1)
     # Never release VideoCapture while another thread is inside cap.read();
     # doing so can corrupt FFmpeg/OpenCV allocator state.
     latest["stop"]=True; reader.join(timeout=3)
     if reader.is_alive():
         sys.exit("Camera reader did not stop within 3 seconds")
-    cap.release(); cv2.destroyAllWindows()
+    cap.release()
+    if not a.headless: cv2.destroyAllWindows()
     if len(corners)<12: sys.exit("Calibration rejected: fewer than 12 usable views")
     # Remove individual bad views and solve again instead of allowing one blurred
     # or reflection-corrupted capture to invalidate an otherwise good dataset.

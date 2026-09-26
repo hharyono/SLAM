@@ -1,0 +1,66 @@
+#!/bin/sh
+DAEMON=/root/LUCKFOX_CAM/build/rv1103/luckfox_cam_call
+LANDING_SERVICE=/etc/init.d/S99luckfox_landing
+PIDFILE=/var/run/luckfox_calibration.pid
+LOGFILE=/root/logs/precision-landing/calibration-stream.log
+
+running() {
+    [ -r "$PIDFILE" ] || return 1
+    read -r pid < "$PIDFILE"
+    case "$pid" in ''|*[!0-9]*) return 1;; esac
+    [ "$pid" -gt 1 ] && kill -0 "$pid" 2>/dev/null
+}
+stop_primary_camera() {
+    "$LANDING_SERVICE" stop || return 1
+    "$LANDING_SERVICE" status >/dev/null 2>&1 && {
+        echo "primary camera process is still running" >&2
+        return 1
+    }
+    return 0
+}
+start_primary_camera() {
+    "$LANDING_SERVICE" start || return 1
+    "$LANDING_SERVICE" status >/dev/null 2>&1 || {
+        echo "primary camera process failed to restart" >&2
+        return 1
+    }
+}
+start_calibration() {
+    running && { echo "calibration stream already running"; return 0; }
+    [ -x "$DAEMON" ] || { echo "Missing $DAEMON" >&2; return 1; }
+    stop_primary_camera || return 1
+    mkdir -p "$(dirname "$LOGFILE")"
+    : > "$LOGFILE"
+    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x /bin/sh -- -c \
+        "exec '$DAEMON' --width 1280 --height 720 --fps 10 --bitrate 2500 --port 8554 --path /cal >> '$LOGFILE' 2>&1" || {
+        start_primary_camera
+        return 1
+    }
+    sleep 2
+    running && { echo "calibration stream running: rtsp://0.0.0.0:8554/cal"; return 0; }
+    echo "calibration stream failed; see $LOGFILE" >&2
+    stop_calibration
+    start_primary_camera
+    return 1
+}
+stop_calibration() {
+    if running; then
+        kill -TERM "$pid"
+        remaining=8
+        while running && [ "$remaining" -gt 0 ]; do sleep 1; remaining=$((remaining-1)); done
+        running && { echo "calibration stream did not stop" >&2; return 1; }
+    fi
+    rm -f "$PIDFILE"
+    echo "calibration stream stopped"
+}
+case "$1" in
+    start) start_calibration;;
+    stop) stop_calibration && start_primary_camera;;
+    finalize) stop_calibration;;
+    landing) stop_calibration && start_primary_camera;;
+    apply) stop_calibration && [ -s /tmp/Camera.yaml.new ] && \
+        install -m 600 /tmp/Camera.yaml.new /root/LUCKFOX_CAM/Config/Camera.yaml && \
+        rm -f /tmp/Camera.yaml.new && start_primary_camera;;
+    status) running && echo running || { echo stopped; exit 1; };;
+    *) echo "Usage: $0 {start|stop|finalize|landing|apply|status}" >&2; exit 2;;
+esac

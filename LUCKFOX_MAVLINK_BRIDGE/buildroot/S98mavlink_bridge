@@ -2,13 +2,15 @@
 DAEMON=/usr/bin/mavlink_bridge
 CONFIG=/etc/default/mavlink_bridge
 PIDFILE=/var/run/mavlink_bridge.pid
-LOGFILE=/tmp/mavlink_bridge.log
+LOG_DIR=/root/logs/precision-landing
 ENABLED=1
 UART=/dev/ttyS5
 BAUD=115200
 BIND_ADDRESS=0.0.0.0
 TCP_PORT=5760
 UPLOAD_PORT=5761
+MISSION_PORT=5763
+LOG_CONTROL=/root/logs/precision-landing-sessions/active-session
 [ -r "$CONFIG" ] && . "$CONFIG"
 
 running() {
@@ -23,14 +25,19 @@ start() {
     [ "$ENABLED" = 1 ] || { echo "mavlink_bridge disabled in $CONFIG"; return 0; }
     running && { echo "mavlink_bridge already running (pid $bridge_pid)"; return 0; }
     [ -x "$DAEMON" ] || { echo "Missing $DAEMON"; return 1; }
+    mkdir -p "$LOG_DIR" || return 1
+    session_stamp=$(date '+%Y%m%dT%H%M%S')
+    LOGFILE="$LOG_DIR/mavlink-bridge-$session_stamp.log"
+    : > "$LOGFILE"
+    ln -sf "$LOGFILE" "$LOG_DIR/mavlink-bridge-latest.log"
     rm -f "$PIDFILE"
     # Bind-all works before DHCP; the application retries a missing UART itself.
-    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x "$DAEMON" -- \
-        --serial "$UART" --baud "$BAUD" --bind "$BIND_ADDRESS" --port "$TCP_PORT" \
-        --upload-port "$UPLOAD_PORT" \
-        >> "$LOGFILE" 2>&1 || return 1
+    # BusyBox start-stop-daemon -b redirects child stdio to /dev/null. Redirect
+    # in a shell first, then exec so the pidfile still identifies the daemon.
+    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x /bin/sh -- -c \
+        "exec '$DAEMON' --serial '$UART' --baud '$BAUD' --bind '$BIND_ADDRESS' --port '$TCP_PORT' --upload-port '$UPLOAD_PORT' --mission-port '$MISSION_PORT' --log-control '$LOG_CONTROL' >> '$LOGFILE' 2>&1" || return 1
     sleep 1
-    running && { echo "mavlink_bridge started on TCP $TCP_PORT (pid $bridge_pid)"; return 0; }
+    running && { echo "mavlink_bridge started on TCP $TCP_PORT/$UPLOAD_PORT/$MISSION_PORT (pid $bridge_pid), log=$LOGFILE"; return 0; }
     echo "mavlink_bridge failed; see $LOGFILE"
     return 1
 }
@@ -53,7 +60,7 @@ case "$1" in
     restart) stop && start ;;
     status)
         if running; then
-            echo "mavlink_bridge running (pid $bridge_pid), $UART <-> TCP $BIND_ADDRESS:$TCP_PORT"
+            echo "mavlink_bridge running (pid $bridge_pid), $UART <-> TCP $BIND_ADDRESS:$TCP_PORT/$UPLOAD_PORT/$MISSION_PORT"
         else
             echo "mavlink_bridge stopped"; exit 1
         fi ;;

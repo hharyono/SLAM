@@ -1,10 +1,25 @@
 #include "streaming_pipeline.hpp"
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 
-StreamingPipeline::StreamingPipeline(int w,int h,int fps,int bitrate,int gop,int port,const std::string&path,const std::string&iq,int rtsp_mode):width_(w),height_(h),transmit_(rtsp_mode!=0){
+extern "C" rk_aiq_sys_ctx_t* g_aiq_ctx[];
+
+StreamingPipeline::StreamingPipeline(int w,int h,int fps,int bitrate,int gop,int port,const std::string&path,const std::string&iq,int rtsp_mode,double exposure_min_us,double exposure_max_us,double exposure_gain_min,double exposure_gain_max):width_(w),height_(h),transmit_(rtsp_mode!=0){
  if(SAMPLE_COMM_ISP_Init(0,RK_AIQ_WORKING_MODE_NORMAL,RK_FALSE,iq.c_str())!=RK_SUCCESS||SAMPLE_COMM_ISP_Run(0)!=RK_SUCCESS)throw std::runtime_error("ISP init failed");isp_=true;
+ if(!g_aiq_ctx[0])throw std::runtime_error("ISP exposure context unavailable");
+ Uapi_ExpSwAttrV2_t exposure{};
+ if(rk_aiq_user_api2_ae_getExpSwAttr(g_aiq_ctx[0],&exposure)!=XCAM_RETURN_NO_ERROR)throw std::runtime_error("cannot read exposure configuration");
+ exposure.AecOpType=RK_AIQ_OP_MODE_AUTO;exposure.stAuto.stAntiFlicker.enable=false;exposure.stAuto.stFrmRate.isFpsFix=true;exposure.stAuto.stFrmRate.FpsValue=30;
+ exposure.stAdvanced.enable=true;exposure.stAdvanced.SetAeRangeEn=true;
+ exposure.stAdvanced.SetLinAeRange.stExpTimeRange.Min=exposure_min_us/1000000.0;exposure.stAdvanced.SetLinAeRange.stExpTimeRange.Max=exposure_max_us/1000000.0;
+ exposure.stAdvanced.SetLinAeRange.stGainRange.Min=exposure_gain_min;exposure.stAdvanced.SetLinAeRange.stGainRange.Max=exposure_gain_max;
+ if(rk_aiq_user_api2_ae_setExpSwAttr(g_aiq_ctx[0],exposure)!=XCAM_RETURN_NO_ERROR)throw std::runtime_error("fast exposure configuration failed");
+ Uapi_ExpSwAttrV2_t actual{};if(rk_aiq_user_api2_ae_getExpSwAttr(g_aiq_ctx[0],&actual)!=XCAM_RETURN_NO_ERROR)throw std::runtime_error("fast exposure verification failed");
+ const auto&range=actual.stAdvanced.SetLinAeRange;
+ if(!actual.stAdvanced.SetAeRangeEn||range.stExpTimeRange.Max>exposure_max_us/1000000.0+0.000001||range.stGainRange.Max>exposure_gain_max+.01)throw std::runtime_error("ISP rejected fast exposure limits");
+ std::cerr<<"Fast exposure: auto time_us="<<range.stExpTimeRange.Min*1000000.0<<'-'<<range.stExpTimeRange.Max*1000000.0<<" gain="<<range.stGainRange.Min<<'-'<<range.stGainRange.Max<<" anti_flicker=off sensor_fps=30\n";
  if(RK_MPI_SYS_Init()!=RK_SUCCESS)throw std::runtime_error("MPI init failed");sys_=true;
  vi_.u32Width=w;vi_.u32Height=h;vi_.s32DevId=0;vi_.u32PipeId=0;vi_.s32ChnId=0;vi_.stChnAttr.stIspOpt.stMaxSize.u32Width=w;vi_.stChnAttr.stIspOpt.stMaxSize.u32Height=h;vi_.stChnAttr.stIspOpt.u32BufCount=2;vi_.stChnAttr.stIspOpt.enMemoryType=VI_V4L2_MEMORY_TYPE_DMABUF;vi_.stChnAttr.u32Depth=1;vi_.stChnAttr.enPixelFormat=RK_FMT_YUV420SP;vi_.stChnAttr.enCompressMode=COMPRESS_MODE_NONE;vi_.stChnAttr.stFrameRate.s32SrcFrameRate=30;vi_.stChnAttr.stFrameRate.s32DstFrameRate=fps;if(SAMPLE_COMM_VI_CreateChn(&vi_)!=RK_SUCCESS)throw std::runtime_error("VI init failed");vi_ok_=true;
  if(!transmit_)return;
@@ -19,4 +34,5 @@ void StreamingPipeline::streamLoop(){while(streaming_){if(RK_MPI_VENC_GetStream(
 bool StreamingPipeline::acquire(Frame&f,int ms){if(f.held)release(f);if(RK_MPI_VI_GetChnFrame(0,0,&f.info,ms)!=RK_SUCCESS)return false;f.y=static_cast<uint8_t*>(RK_MPI_MB_Handle2VirAddr(f.info.stVFrame.pMbBlk));f.held=f.y;return f.held;}
 void StreamingPipeline::release(Frame&f){if(f.held)RK_MPI_VI_ReleaseChnFrame(0,0,&f.info);f={};}
 bool StreamingPipeline::publish(Frame&f,int ms){if(!f.held)return false;if(!transmit_){release(f);return true;}bool ok=RK_MPI_VENC_SendFrame(venc_.s32ChnId,&f.info,ms)==RK_SUCCESS;release(f);return ok;}
+bool StreamingPipeline::exposure(double&time_us,double&gain,double&mean_luma,bool&converged)const{if(!isp_||!g_aiq_ctx[0])return false;Uapi_ExpQueryInfo_t info{};if(rk_aiq_user_api2_ae_queryExpResInfo(g_aiq_ctx[0],&info)!=XCAM_RETURN_NO_ERROR)return false;time_us=info.LinAeInfo.LinearExp.integration_time*1000000.0;gain=info.LinAeInfo.LinearExp.analog_gain*info.LinAeInfo.LinearExp.digital_gain*info.LinAeInfo.LinearExp.isp_dgain;mean_luma=info.LinAeInfo.MeanLuma;converged=info.IsConverged;return true;}
 void StreamingPipeline::cleanup(){streaming_=false;if(venc_ok_&&venc_.getStreamThread)pthread_join(venc_.getStreamThread,nullptr);if(bound_)SAMPLE_COMM_UnBind(&source_,&destination_);if(venc_ok_)SAMPLE_COMM_VENC_DestroyChn(&venc_);if(vi_ok_)SAMPLE_COMM_VI_DestroyChn(&vi_);if(rtsp_)rtsp_del_demo(rtsp_);if(sys_)RK_MPI_SYS_Exit();if(isp_)SAMPLE_COMM_ISP_Stop(0);}

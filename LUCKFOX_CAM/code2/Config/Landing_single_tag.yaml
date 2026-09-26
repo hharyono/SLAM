@@ -1,0 +1,99 @@
+camera_device: /dev/video11
+uart_device: /dev/ttyS5
+uart_baud: 115200
+mavlink_bridge_host: 127.0.0.1
+mavlink_bridge_port: 5761
+
+# Flight profile: keep auto exposure but cap shutter at 1/500 s to suppress
+# propeller/vibration and translational motion blur. AE compensates with gain.
+exposure_min_us: 100
+exposure_max_us: 2000
+exposure_gain_min: 1.0
+exposure_gain_max: 64.0
+
+# Alternate experiment: one AprilTag 36h11, ID 0, outer black square 200 mm.
+# Print Calibration/AprilTag36h11_ID0_200mm_A4.pdf at Actual size / 100%.
+single_tag_mode: 1
+
+# Hold XY relative to AprilTag ID 0 while ArduCopter is armed in
+# GUIDED_NOGPS (custom mode 20).  GUID_OPTIONS bit 3 must remain clear so
+# SET_ATTITUDE_TARGET thrust=0.5 means zero climb rate, not raw motor thrust.
+guided_nogps_tag_hold: 1
+guided_nogps_custom_mode: 20
+guided_target_system: 1
+guided_target_component: 1
+guided_heartbeat_timeout_ms: 2000
+guided_attitude_timeout_ms: 1000
+guided_hold_kp_rad_per_m: 0.20
+guided_hold_deadband_m: 0.03
+guided_hold_max_tilt_deg: 8
+guided_hold_climb_neutral: 0.50
+
+# Vehicle position comes from the real GPS. Do not publish the camera-derived
+# vehicle pose as MAVLink VISION_POSITION_ESTIMATE.
+vision_position_estimate_enabled: 0
+vision_attitude_timeout_ms: 500
+vision_position_sigma_m: 0.10
+vision_attitude_sigma_rad: 0.10
+# About 30% fewer pixels than 512x288. The latest flight log measured the tag
+# at 80-100 px, so it remains about 67-83 px here: comfortably detectable.
+width: 432
+height: 240
+large_tag_id: 0
+large_tag_x_m: 0.0
+large_tag_y_m: 0.0
+large_tag_size_m: 0.200
+landing_target_x_m: 0.100
+landing_target_y_m: 0.100
+
+# No multi-tag handoff is performed in single-tag mode. These validated values
+# remain present only because the shared realtime engine validates its schema.
+medium_tag_id: 1
+medium_tag_x_m: 0.0
+medium_tag_y_m: 0.0
+medium_tag_size_m: 0.076
+small_tag_id: 2
+small_tag_x_m: 0.0
+small_tag_y_m: 0.0
+small_tag_size_m: 0.054
+tag_switch_confirm_frames: 3
+tag_handoff_tolerance_m: 0.10
+medium_tag_select_below_m: 1.50
+small_tag_select_below_m: 0.75
+small_tag_fast_handoff_max_alt_m: 0.75
+tag_tier_reset_ms: 5000
+
+landing_filter_alpha: 0.75
+min_tag_size_px: 10.0
+min_detection_confidence: 0.30
+max_center_jump_m: 0.18
+max_range_jump_m: 0.30
+max_center_speed_mps: 1.0
+max_range_speed_mps: 1.5
+camera_offset_x_m: 0.0
+camera_offset_y_m: 0.0
+camera_offset_z_m: 0.0
+max_reprojection_error_px: 2.0
+min_decision_margin: 25.0
+max_hamming: 1
+lost_timeout_ms: 1200
+# Bridge only one isolated miss at the measured ~5 Hz rate. This avoids
+# steering on stale coordinates while preserving continuity for one frame.
+target_holdover_ms: 250
+vision_range_min_m: 0.10
+vision_range_max_m: 4.50
+
+# RV1103 has one CPU core. One AprilTag worker avoids two workers contending on
+# that core. Request 12 Hz so capture never throttles the faster detector.
+inference_hz: 12
+min_inference_hz: 6.0
+apriltag_threads: 1
+quad_decimate: 1.0
+
+# During an active Start Log session, save a small luma image every two seconds.
+# Maximum storage is about 0.9 MB/session (60 x 160 x 90 bytes).
+diagnostic_snapshots: 1
+diagnostic_snapshot_interval_ms: 2000
+diagnostic_snapshot_limit: 60
+diagnostic_snapshot_width: 160
+diagnostic_snapshot_height: 90

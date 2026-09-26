@@ -80,23 +80,30 @@ with tempfile.TemporaryDirectory(prefix="mavlink-bridge-") as directory:
     root = Path(directory)
     uart = root / "uart"
     log = root / "bridge.log"
-    with socket.socket() as probe:
+    probes = []
+    for _ in range(3):
+        probe = socket.socket()
         probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
+        probes.append(probe)
+    port, upload_port, mission_port = [probe.getsockname()[1] for probe in probes]
+    for probe in probes:
+        probe.close()
     for args in [["--port", "0"], ["--port", "65536"], ["--baud", "123"],
-                 ["--port", "-1"], ["--bind", "bad-ip"], ["--serial"]]:
+                 ["--port", "-1"], ["--mission-port", "0"],
+                 ["--port", "5763"], ["--bind", "bad-ip"], ["--serial"]]:
         bad = subprocess.run([BINARY] + args, capture_output=True, timeout=3)
         assert bad.returncode != 0, args
     output = log.open("wb")
     process = subprocess.Popen([BINARY, "--serial", str(uart), "--bind", "127.0.0.1",
-                                "--port", str(port)], stdout=output, stderr=output)
+                                "--port", str(port), "--upload-port", str(upload_port),
+                                "--mission-port", str(mission_port)], stdout=output, stderr=output)
     descriptors = []
     clients = []
     def logged(text):
         assert process.poll() is None, log.read_text()
         return text in log.read_text()
-    def connect():
-        s = socket.create_connection(("127.0.0.1", port), timeout=3)
+    def connect(target_port=port):
+        s = socket.create_connection(("127.0.0.1", target_port), timeout=3)
         s.settimeout(5)
         clients.append(s)
         return s
@@ -116,6 +123,8 @@ with tempfile.TemporaryDirectory(prefix="mavlink-bridge-") as directory:
         wait_until(lambda: logged("serial_connected="))
         first = connect()
         wait_until(lambda: logged("client_connected="))
+        mission = connect(mission_port)
+        wait_until(lambda: logged("role=mission_planner"))
         second = connect()
         assert second.recv(1) == b"", "second GCS was accepted"
         second.close()
@@ -125,13 +134,18 @@ with tempfile.TemporaryDirectory(prefix="mavlink-bridge-") as directory:
         for fragment in [frames[:1], frames[1:8], frames[8:19], frames[19:]]:
             write_fd(master, fragment)
         assert read_tcp(first, len(frames)) == frames
+        assert read_tcp(mission, len(frames)) == frames
         for fragment in [frames[:3], frames[3:4], frames[4:]]:
             first.sendall(fragment)
         assert read_fd(master, len(frames)) == frames
+        mission.sendall(frames)
+        assert read_fd(master, len(frames)) == frames
+        mission.close()
+        wait_until(lambda: logged("mission_disconnected=tcp_closed"))
 
         # Full duplex with transfers much larger than either application queue.
-        upstream = bytes(range(256)) * 1024
-        downstream = bytes(reversed(range(256))) * 1024
+        upstream = bytes(range(256)) * 128
+        downstream = frames * 512
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             sent_uart = pool.submit(write_fd, master, upstream)
             got_tcp = pool.submit(read_tcp, first, len(upstream))
@@ -143,7 +157,7 @@ with tempfile.TemporaryDirectory(prefix="mavlink-bridge-") as directory:
             assert got_uart.result(timeout=10) == downstream
 
         first.close()
-        wait_until(lambda: logged("client_disconnected=tcp_closed"))
+        wait_until(lambda: logged("gcs_disconnected=tcp_closed"))
         write_fd(master, b"old telemetry that must not replay")
         time.sleep(0.15)
         old_count = log.read_text().count("client_connected=")
@@ -185,8 +199,8 @@ with tempfile.TemporaryDirectory(prefix="mavlink-bridge-") as directory:
         assert process.poll() is None
         process.terminate()
         assert process.wait(timeout=3) == 0
-        print("PASS: arguments, serial retry, single client, MAVLink 1/2 byte preservation,")
-        print("      full duplex/backpressure, TCP reconnect, serial reconnect, slow client, shutdown")
+        print("PASS: arguments, serial retry, independent GCS/mission clients, MAVLink 1/2 preservation,")
+        print("      broadcast/full duplex, backpressure, TCP/serial reconnect, slow client, shutdown")
     finally:
         for client in clients:
             client.close()

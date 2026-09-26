@@ -15,6 +15,9 @@ unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CMAKE_ARGS CMAKE_PREFIX_PATH \
   CONDA_BUILD_SYSROOT CONDA_TOOLCHAIN_BUILD CONDA_TOOLCHAIN_HOST \
   CC CXX CPP AR AS LD NM OBJCOPY RANLIB STRIP
 mkdir -p "$BUILD_DIR"
+SAMPLE_COMM_EXPOSURE="$BUILD_DIR/libsample_comm_exposure.a"
+cp "$MEDIA_DIR/samples/example/common/lib/libsample_comm.a" "$SAMPLE_COMM_EXPOSURE"
+"$TOOLCHAIN_DIR/arm-rockchip830-linux-uclibcgnueabihf-objcopy" --globalize-symbol=g_aiq_ctx "$SAMPLE_COMM_EXPOSURE"
 # Low-latency AprilTag landing target application. AprilTag is compiled locally;
 # OpenCV is intentionally not linked into the realtime target.
 APRILTAG_DIR="$APP_DIR/third_party/apriltag"
@@ -43,7 +46,7 @@ done
   -I"$MEDIA_DIR/out/include/rkaiq/iq_parser_v2" \
   "$APP_DIR/src/landing_main.cpp" "$APP_DIR/src/streaming_pipeline.cpp" \
   "$APRILTAG_BUILD/libapriltag.a" -Wl,--start-group \
-  "$MEDIA_DIR/samples/example/common/lib/libsample_comm.a" \
+  "$SAMPLE_COMM_EXPOSURE" \
   "$MEDIA_DIR/out/lib/librockit_full.a" "$MEDIA_DIR/out/lib/librockchip_mpp.a" \
   "$MEDIA_DIR/out/lib/librkaiq.a" "$MEDIA_DIR/out/lib/librtsp.a" \
   "$MEDIA_DIR/out/lib/librga.a" -Wl,--end-group \
@@ -61,7 +64,7 @@ echo "Landing binary ARM: $BUILD_DIR/luckfox_landing"
   -I"$MEDIA_DIR/out/include/rkaiq/xcore" -I"$MEDIA_DIR/out/include/rkaiq/algos" \
   -I"$MEDIA_DIR/out/include/rkaiq/iq_parser" -I"$MEDIA_DIR/out/include/rkaiq/iq_parser_v2" \
   "$APP_DIR/src/calibration_stream_main.cpp" "$APP_DIR/src/streaming_pipeline.cpp" \
-  -Wl,--start-group "$MEDIA_DIR/samples/example/common/lib/libsample_comm.a" \
+  -Wl,--start-group "$SAMPLE_COMM_EXPOSURE" \
   "$MEDIA_DIR/out/lib/librockit_full.a" "$MEDIA_DIR/out/lib/librockchip_mpp.a" \
   "$MEDIA_DIR/out/lib/librkaiq.a" "$MEDIA_DIR/out/lib/librtsp.a" \
   "$MEDIA_DIR/out/lib/librga.a" -Wl,--end-group \

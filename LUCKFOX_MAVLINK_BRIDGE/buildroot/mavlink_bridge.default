@@ -5,3 +5,6 @@ BAUD=115200
 BIND_ADDRESS=0.0.0.0
 TCP_PORT=5760
 UPLOAD_PORT=5761
+MISSION_PORT=5763
+LOG_DIR=/root/logs/precision-landing
+LOG_CONTROL=/root/logs/precision-landing-sessions/active-session
