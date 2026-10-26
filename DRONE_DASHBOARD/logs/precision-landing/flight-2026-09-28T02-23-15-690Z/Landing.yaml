@@ -1,0 +1,110 @@
+camera_device: /dev/video11
+uart_device: /dev/ttyS5
+uart_baud: 115200
+mavlink_bridge_host: 127.0.0.1
+mavlink_bridge_port: 5761
+# Keep the camera/detector profile that was validated with the single-tag pad.
+exposure_min_us: 100
+exposure_max_us: 2000
+exposure_gain_min: 1.0
+exposure_gain_max: 64.0
+width: 432
+height: 240
+single_tag_mode: 0
+# Keep the validated GUIDED_NOGPS correction path; only the pad observation is
+# extended from one tag to three tags sharing the same landing centre.
+guided_nogps_tag_hold: 1
+guided_nogps_custom_mode: 20
+guided_target_system: 1
+guided_target_component: 1
+guided_heartbeat_timeout_ms: 2000
+guided_attitude_timeout_ms: 1000
+guided_hold_kp_rad_per_m: 0.20
+guided_hold_deadband_m: 0.03
+guided_hold_max_tilt_deg: 8
+guided_hold_climb_neutral: 0.50
+vision_position_estimate_enabled: 0
+vision_attitude_timeout_ms: 500
+vision_position_sigma_m: 0.10
+vision_attitude_sigma_rad: 0.10
+# A4 landing pad geometry. Positions are metres from the paper's top-left.
+# Matches a4_three_tag_landing_pad_ids_0_1_2.pdf printed at Actual size / 100%.
+large_tag_id: 0
+large_tag_x_m: 0.005
+large_tag_y_m: 0.005
+large_tag_size_m: 0.200
+medium_tag_id: 1
+medium_tag_x_m: 0.005
+medium_tag_y_m: 0.215
+medium_tag_size_m: 0.076
+small_tag_id: 2
+small_tag_x_m: 0.089
+small_tag_y_m: 0.215
+small_tag_size_m: 0.054
+# Controller target: centred on the small tag, 10 mm above its top edge.
+# This is a pose target only; do not mark or modify the PDF.
+landing_target_x_m: 0.116
+landing_target_y_m: 0.205
+# At the measured 5-6 Hz inference rate, three agreeing observations confirm a
+# normal handoff in about half a second.
+tag_switch_confirm_frames: 3
+# Weight the newest pose strongly enough to reduce correction latency. The
+# remaining smoothing rejects frame noise, while ArduPilot's velocity D term
+# provides braking near the landing centre.
+landing_filter_alpha: 0.85
+tag_handoff_tolerance_m: 0.10
+# Reject weak/tiny detections and discontinuous pose estimates before MAVLink.
+min_tag_size_px: 10.0
+min_detection_confidence: 0.30
+max_center_jump_m: 0.18
+max_range_jump_m: 0.30
+# Expand jump/handoff gates by elapsed time, so a new tag is compared against
+# where a moving drone can physically be rather than a stale pose.
+max_center_speed_mps: 1.0
+max_range_speed_mps: 1.5
+# Very near touchdown the small unique tag may only appear once. It may take
+# over immediately only when its confidence/reprojection and motion gates pass.
+small_tag_fast_handoff_max_alt_m: 0.75
+# Select by camera-to-pad visual Z. During one approach the active tier may only
+# advance large -> medium -> small; it cannot jump back to a larger tag.
+medium_tag_select_below_m: 1.50
+small_tag_select_below_m: 0.75
+# Separate ascent thresholds prevent tier chatter and allow Loiter climbs to
+# return small -> medium -> large after LAND releases the descent lock.
+medium_tag_release_above_m: 1.80
+small_tag_release_above_m: 0.95
+# Each scale is accepted only in the range where its pose is useful. Adjacent
+# ranges deliberately overlap so simultaneous detections can validate/fuse.
+large_tag_min_range_m: 0.60
+large_tag_max_range_m: 4.50
+medium_tag_min_range_m: 0.40
+medium_tag_max_range_m: 3.00
+small_tag_min_range_m: 0.20
+small_tag_max_range_m: 2.00
+tag_tier_reset_ms: 5000
+camera_offset_x_m: 0.0
+camera_offset_y_m: 0.0
+camera_offset_z_m: 0.0
+max_reprojection_error_px: 2.0
+min_decision_margin: 25.0
+# AprilTag 36h11 safely corrects a single bit; pose, confidence and reprojection
+# gates still have to pass before this observation can reach MAVLink.
+max_hamming: 1
+# At 5-6 Hz, tolerate several missed frames without discarding the active tag,
+# median history and an in-progress handoff.
+lost_timeout_ms: 1200
+# Bridge only one isolated miss at the measured inference rate.
+target_holdover_ms: 250
+# These are AprilTag pose-Z limits, not physical LiDAR/rangefinder limits.
+vision_range_min_m: 0.10
+vision_range_max_m: 4.5
+inference_hz: 12
+min_inference_hz: 6.0
+apriltag_threads: 1
+quad_decimate: 1.0
+# Preserve the single-tag diagnostic capture behavior.
+diagnostic_snapshots: 1
+diagnostic_snapshot_interval_ms: 2000
+diagnostic_snapshot_limit: 60
+diagnostic_snapshot_width: 160
+diagnostic_snapshot_height: 90

@@ -1,0 +1,23 @@
+{
+  "applied_at": "2026-09-28",
+  "vehicle": "ArduCopter",
+  "target_system": 1,
+  "safety_state": "DISARMED",
+  "purpose": "Increase precision-land response while reducing integral windup and overshoot",
+  "parameters": {
+    "PSC_POSXY_P": { "before": 1.55, "after": 1.65 },
+    "PSC_VELXY_P": { "before": 2.50, "after": 2.60 },
+    "PSC_VELXY_I": { "before": 0.70, "after": 0.55 },
+    "PSC_VELXY_D": { "before": 0.85, "after": 0.95 },
+    "PSC_VELXY_IMAX": { "before": 450.0, "after": 350.0 }
+  },
+  "unchanged": {
+    "PSC_VELXY_FLTE": 5.0,
+    "PSC_VELXY_FLTD": 5.0,
+    "PLND_LAG": 0.15,
+    "WPNAV_SPEED": 300.0,
+    "WPNAV_ACCEL": 250.0,
+    "ANGLE_MAX": 3000.0
+  },
+  "verification": "Every PARAM_SET was acknowledged and independently read back; Luckfox landing_filter_alpha=0.85 and landing service running"
+}

@@ -48,9 +48,10 @@ landing_target_y_m: 0.205
 # At the measured 5-6 Hz inference rate, three agreeing observations confirm a
 # normal handoff in about half a second.
 tag_switch_confirm_frames: 3
-# Keep pose smoothing, but allow calibration/detection noise around the common
-# landing centre while the independent jump and range gates remain active.
-landing_filter_alpha: 0.75
+# Weight the newest pose strongly enough to reduce correction latency. The
+# remaining smoothing rejects frame noise, while ArduPilot's velocity D term
+# provides braking near the landing centre.
+landing_filter_alpha: 0.92
 tag_handoff_tolerance_m: 0.10
 # Reject weak/tiny detections and discontinuous pose estimates before MAVLink.
 min_tag_size_px: 10.0
@@ -68,6 +69,18 @@ small_tag_fast_handoff_max_alt_m: 0.75
 # advance large -> medium -> small; it cannot jump back to a larger tag.
 medium_tag_select_below_m: 1.50
 small_tag_select_below_m: 0.75
+# Separate ascent thresholds prevent tier chatter and allow Loiter climbs to
+# return small -> medium -> large after LAND releases the descent lock.
+medium_tag_release_above_m: 1.80
+small_tag_release_above_m: 0.95
+# Each scale is accepted only in the range where its pose is useful. Adjacent
+# ranges deliberately overlap so simultaneous detections can validate/fuse.
+large_tag_min_range_m: 0.60
+large_tag_max_range_m: 4.50
+medium_tag_min_range_m: 0.40
+medium_tag_max_range_m: 3.00
+small_tag_min_range_m: 0.20
+small_tag_max_range_m: 2.00
 tag_tier_reset_ms: 5000
 camera_offset_x_m: 0.0
 camera_offset_y_m: 0.0

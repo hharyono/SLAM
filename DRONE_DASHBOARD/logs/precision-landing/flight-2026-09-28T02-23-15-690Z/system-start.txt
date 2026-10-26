@@ -1,0 +1,80 @@
+Mon Sep 28 02:23:16 UTC 2026
+ 02:23:16 up 24 min,  load average: 11.30, 11.21, 8.99
+              total        used        free      shared  buff/cache   available
+Mem:             32          21           1           1          10           8
+Swap:             0           0           0
+Filesystem                Size      Used Available Use% Mounted on
+ubi0:rootfs              71.6M     62.6M      9.0M  87% /
+PID   USER     COMMAND
+    1 root     init
+    2 root     [kthreadd]
+    4 root     [kworker/0:0H-kb]
+    6 root     [mm_percpu_wq]
+    7 root     [ksoftirqd/0]
+    8 root     [kdevtmpfs]
+    9 root     [oom_reaper]
+   10 root     [writeback]
+   11 root     [kcompactd0]
+   12 root     [ksmd]
+   29 root     [kblockd]
+   30 root     [kconsole]
+   31 root     [devfreq_wq]
+   32 root     [watchdogd]
+   34 root     [rpciod]
+   35 root     [kworker/u3:0]
+   36 root     [xprtiod]
+   37 root     [irq/23-rockchip]
+   46 root     [kswapd0]
+   47 root     [nfsiod]
+   48 root     [irq/60-rockchip]
+   50 root     [hwrng]
+   60 root     [ipv6_addrconf]
+   62 root     [ubi_bgt0d]
+   65 root     [ubifs_bgt0_0]
+   81 root     /sbin/syslogd -n
+   85 root     /sbin/klogd -n
+   96 root     /sbin/udevd -d
+  136 root     [ubi_bgt4d]
+  141 root     [ubifs_bgt4_0]
+  150 root     [ubi_bgt5d]
+  155 root     [ubifs_bgt5_0]
+  194 root     [cfg80211]
+  202 root     [RTW_CMD_THREAD]
+  207 root     /usr/bin/wpa_supplicant -B -D wext -i wlan0 -c /etc/wpa_supplicant.conf
+  230 dhcpcd   dhcpcd: [manager] [ip4] [ip6]
+  231 root     dhcpcd: [privileged proxy]
+  232 dhcpcd   dhcpcd: [network proxy]
+  233 dhcpcd   dhcpcd: [control proxy]
+  240 dhcpcd   dhcpcd: [BPF ARP] wlan0 192.168.1.55
+  272 root     sshd: /usr/sbin/sshd [listener] 0 of 10-100 startups
+  277 root     /usr/sbin/telnetd -F
+  287 root     /usr/bin/mavlink_bridge --serial /dev/ttyS5 --baud 115200 --bind 0.0.0.0 --port 5760 --upload-port 5761 --mission-port 5763 --log-control /root/logs/precision-landing-sessions/active-session
+  323 root     [irq/50-ffa70000]
+  387 root     [irq/39-rga2]
+  393 root     [queue_work0]
+  394 root     [queue_work1]
+  395 root     [irq/49-ffa60000]
+  396 root     [vcodec_thread_0]
+  399 root     [vlog]
+  400 root     [valloc]
+  401 root     [vsys]
+  402 root     [vrga_0]
+  403 root     [vrga_1]
+  404 root     [venc]
+  405 root     [rkisp-vir0]
+  406 root     [vpss]
+  407 root     [vrgn]
+  408 root     [vmcu]
+  446 root     [kworker/0:1H]
+  697 root     /sbin/getty -L console 0 vt100
+  753 root     [kworker/u2:3-ev]
+ 1054 root     [kworker/0:0-eve]
+ 1231 root     [kworker/0:3-eve]
+ 1271 root     [kworker/u2:1-ev]
+ 1359 root     /root/LUCKFOX_CAM/build/rv1103/luckfox_landing --camera /root/LUCKFOX_CAM/Config/Camera.yaml --config /root/LUCKFOX_CAM/Config/Landing.yaml -rtsp 0
+ 1439 root     [kworker/0:2-eve]
+ 1557 root     [kworker/u2:0-ev]
+ 1597 root     [kworker/0:1-eve]
+ 1721 root     sshd: root@notty
+ 1723 root     {precision_landi} /bin/sh /usr/bin/precision_landing_log start flight-2026-09-28T02-23-15-690Z
+ 1737 root     ps w

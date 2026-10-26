@@ -1,0 +1,20 @@
+{
+  "applied_at": "2026-09-27",
+  "vehicle": "ArduCopter",
+  "target_system": 1,
+  "safety_state": "DISARMED",
+  "purpose": "Stronger precision-land tag convergence with less overshoot and oscillation",
+  "parameters": {
+    "PSC_POSXY_P": { "original": 1.1, "stage_1": 1.3, "stage_2": 1.45, "after": 1.55 },
+    "PSC_VELXY_P": { "original": 2.0, "stage_1": 2.2, "stage_2": 2.35, "after": 2.5 },
+    "PSC_VELXY_I": { "original": 1.0, "stage_1": 0.8, "after": 0.7 },
+    "PSC_VELXY_D": { "original": 0.55, "stage_1": 0.65, "stage_2": 0.72, "after": 0.85 },
+    "PSC_VELXY_IMAX": { "original": 1000.0, "stage_1": 600.0, "stage_2": 500.0, "after": 450.0 }
+  },
+  "unchanged_limits": {
+    "WPNAV_SPEED": 300.0,
+    "WPNAV_ACCEL": 250.0,
+    "ANGLE_MAX": 3000.0
+  },
+  "verification": "Each PARAM_SET was acknowledged with the requested PARAM_VALUE"
+}

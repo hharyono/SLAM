@@ -1,0 +1,25 @@
+{
+  "applied_at": "2026-09-28",
+  "vehicle": "ArduCopter",
+  "target_system": 1,
+  "safety_state": "DISARMED",
+  "purpose": "Small stage-3 precision-land response and braking increment",
+  "parameters": {
+    "PSC_POSXY_P": { "before": 1.72, "after": 1.76 },
+    "PSC_VELXY_P": { "before": 2.70, "after": 2.75 },
+    "PSC_VELXY_I": { "before": 0.45, "after": 0.42 },
+    "PSC_VELXY_D": { "before": 1.05, "after": 1.10 },
+    "PSC_VELXY_IMAX": { "before": 300.0, "after": 280.0 }
+  },
+  "vision_filter": {
+    "landing_filter_alpha_before": 0.90,
+    "landing_filter_alpha_after": 0.92
+  },
+  "unchanged": {
+    "PLND_LAG": 0.15,
+    "WPNAV_SPEED": 300.0,
+    "WPNAV_ACCEL": 250.0,
+    "ANGLE_MAX": 3000.0
+  },
+  "verification": "Every PARAM_SET was acknowledged and independently read back; RV configuration reports landing_filter_alpha=0.92 and landing service running"
+}

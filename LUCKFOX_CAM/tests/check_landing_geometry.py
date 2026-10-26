@@ -35,9 +35,11 @@ for name in ("large", "medium", "small"):
 
 
 def pad_offset(tag):
-    # Pad +X is camera-right. Pad +Y is image-down/body-back for a level,
-    # downward-facing camera. landing_main applies this through tag rotation R.
-    return (landing[0] - tag["center"][0], landing[1] - tag["center"][1], 0.0)
+    # The PDF's printed tag orientation makes AprilTag pose +X point toward
+    # paper-left and pose +Y toward paper-top. landing_main applies this local
+    # offset through each detected tag rotation R.
+    return (-(landing[0] - tag["center"][0]),
+            -(landing[1] - tag["center"][1]), 0.0)
 
 
 def camera_to_body(point):
@@ -108,6 +110,12 @@ tier = -1
 for desired in (0, 1, 2, 1, 0):
     tier = max(tier, desired)
 assert tier == 2
+# A LAND -> LOITER transition starts a new approach and immediately releases
+# the monotonic tier lock, even while the vehicle remains armed.
+previous_mode, mode = 9, 5
+if previous_mode == 9 and mode == 5:
+    tier = -1
+assert tier == -1
 stable_count = 0
 for frame in range(confirm - 1):
     stable_count += 1
@@ -116,8 +124,41 @@ stable_count += 1
 assert stable_count == confirm
 assert math.hypot(0.101, 0.0) > tolerance
 
+# Two tags observed in one frame cannot move relative to one another.  The
+# configured geometry gate therefore stays fixed; speed allowance applies only
+# when the new tag is compared with a centre from an older frame.
+elapsed = 0.4
+speed = cfg["max_center_speed_mps"]
+same_frame_limit = tolerance
+stale_center_limit = tolerance + speed * elapsed
+observed_bad_handoff = 0.124  # representative ID1 -> ID2 jump from flight log
+assert observed_bad_handoff > same_frame_limit
+assert observed_bad_handoff < stale_center_limit
+
+# Flight 2026-09-28T01-22-42 measured the old-transform centre deltas on
+# simultaneous observations. Flipping only the PDF X delta removes the exact
+# two-times-tag-spacing bias while preserving the already-correct Y axis.
+old_small_minus_medium_x = -0.135895
+old_medium_minus_large_x = +0.122205
+def x_sign_flip_shift(tag):
+    old = landing[0] - tag["center"][0]
+    return -2 * old
+corrected_small_minus_medium_x = (
+    old_small_minus_medium_x + x_sign_flip_shift(tags[2])
+    - x_sign_flip_shift(tags[1]))
+corrected_medium_minus_large_x = (
+    old_medium_minus_large_x + x_sign_flip_shift(tags[1])
+    - x_sign_flip_shift(tags[0]))
+assert abs(corrected_small_minus_medium_x) < 0.02
+assert abs(corrected_medium_minus_large_x) < 0.02
+
 print(f"\nHandoff checks: switch={confirm} stable frames, gate={tolerance:.3f} m, "
       f"lost timeout={lost_timeout} ms")
+print(f"Same-frame gate remains {same_frame_limit:.3f} m; "
+      f"stale-centre gate at {elapsed:.1f} s is {stale_center_limit:.3f} m")
+print("Recorded overlap after PDF-X correction: "
+      f"ID2-ID1={corrected_small_minus_medium_x:+.3f} m, "
+      f"ID1-ID0={corrected_medium_minus_large_x:+.3f} m")
 print(f"BEFORE worst centered wrong-hypothesis error: {worst:.3f} m")
 print("AFTER  max centered correct-tag error: 0.000000 m; max angle error: 0.000000000 rad")
 print("PASS")

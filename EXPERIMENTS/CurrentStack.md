@@ -305,6 +305,9 @@ Gateway/AP:         192.168.1.1
 Windows Wi-Fi:      192.168.1.230
 WSL2 eth0:          172.26.30.46
 ```
+New AP
+RV1106 wlan0:       192.168.1.124, ssh root pw luckfox
+Windows Wi-Fi:      192.168.1.133
 
 ### Port forwarding
 

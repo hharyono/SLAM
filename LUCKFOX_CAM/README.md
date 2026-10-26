@@ -91,7 +91,9 @@ ArduPilot akan membersihkan estimator melalui timeout PrecLand internal dan
 melaporkan `PrecLand: Target Lost`.
 
 Geometri multi-tag memakai rantai koordinat eksplisit: posisi pusat tag pada
-bidang pad (meter) → offset pusat landing pada frame tag → rotasi pose tag ke
+bidang pad (meter) → offset pusat landing `(116, 205) mm` yang didefinisikan
+layout PDF → konversi sumbu cetak (pose tag +X ke kiri kertas, +Y ke atas
+kertas) → rotasi pose tag ke
 frame kamera OpenCV (+X kanan, +Y bawah, +Z optik) → frame body FRD (+X maju,
 +Y kanan, +Z bawah). Offset pad tidak pernah ditambahkan ke piksel atau sudut.
 

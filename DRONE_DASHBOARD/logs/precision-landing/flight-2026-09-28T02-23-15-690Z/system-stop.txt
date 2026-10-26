@@ -1,0 +1,180 @@
+Mon Sep 28 02:26:34 UTC 2026
+ 02:26:34 up 27 min,  load average: 10.52, 10.75, 9.24
+              total        used        free      shared  buff/cache   available
+Mem:             32          17           3           1          12          11
+Swap:             0           0           0
+Filesystem                Size      Used Available Use% Mounted on
+ubi0:rootfs              71.6M     62.4M      9.2M  87% /
+PID   USER     COMMAND
+    1 root     init
+    2 root     [kthreadd]
+    4 root     [kworker/0:0H-kb]
+    6 root     [mm_percpu_wq]
+    7 root     [ksoftirqd/0]
+    8 root     [kdevtmpfs]
+    9 root     [oom_reaper]
+   10 root     [writeback]
+   11 root     [kcompactd0]
+   12 root     [ksmd]
+   29 root     [kblockd]
+   30 root     [kconsole]
+   31 root     [devfreq_wq]
+   32 root     [watchdogd]
+   34 root     [rpciod]
+   35 root     [kworker/u3:0]
+   36 root     [xprtiod]
+   37 root     [irq/23-rockchip]
+   46 root     [kswapd0]
+   47 root     [nfsiod]
+   48 root     [irq/60-rockchip]
+   50 root     [hwrng]
+   60 root     [ipv6_addrconf]
+   62 root     [ubi_bgt0d]
+   65 root     [ubifs_bgt0_0]
+   81 root     /sbin/syslogd -n
+   85 root     /sbin/klogd -n
+   96 root     /sbin/udevd -d
+  136 root     [ubi_bgt4d]
+  141 root     [ubifs_bgt4_0]
+  150 root     [ubi_bgt5d]
+  155 root     [ubifs_bgt5_0]
+  194 root     [cfg80211]
+  202 root     [RTW_CMD_THREAD]
+  207 root     /usr/bin/wpa_supplicant -B -D wext -i wlan0 -c /etc/wpa_supplicant.conf
+  230 dhcpcd   dhcpcd: [manager] [ip4] [ip6]
+  231 root     dhcpcd: [privileged proxy]
+  232 dhcpcd   dhcpcd: [network proxy]
+  233 dhcpcd   dhcpcd: [control proxy]
+  240 dhcpcd   dhcpcd: [BPF ARP] wlan0 192.168.1.55
+  272 root     sshd: /usr/sbin/sshd [listener] 0 of 10-100 startups
+  277 root     /usr/sbin/telnetd -F
+  323 root     [irq/50-ffa70000]
+  387 root     [irq/39-rga2]
+  393 root     [queue_work0]
+  394 root     [queue_work1]
+  395 root     [irq/49-ffa60000]
+  396 root     [vcodec_thread_0]
+  399 root     [vlog]
+  400 root     [valloc]
+  401 root     [vsys]
+  402 root     [vrga_0]
+  403 root     [vrga_1]
+  404 root     [venc]
+  405 root     [rkisp-vir0]
+  406 root     [vpss]
+  407 root     [vrgn]
+  408 root     [vmcu]
+  446 root     [kworker/0:1H]
+  697 root     /sbin/getty -L console 0 vt100
+ 1231 root     [kworker/0:3-eve]
+ 1271 root     [kworker/u2:1-ev]
+ 1439 root     [kworker/0:2-eve]
+ 1557 root     [kworker/u2:0-ev]
+ 1597 root     [kworker/0:1-eve]
+ 1748 root     /usr/bin/mavlink_bridge --serial /dev/ttyS5 --baud 115200 --bind 0.0.0.0 --port 5760 --upload-port 5761 --mission-port 5763 --log-control /root/logs/precision-landing-sessions/active-session
+ 1752 root     [tail]
+ 1832 root     [kworker/0:0-eve]
+ 1872 root     [kworker/u2:2-ev]
+ 1873 root     sshd: root@notty
+ 1875 root     {precision_landi} /bin/sh /usr/bin/precision_landing_log stop
+ 1887 root     ps w
+[  280.822697] [  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name
+[  280.822728] [     81]     0    81      399       15     6144        0             0 syslogd
+[  280.822749] [     85]     0    85      398       14     6144        0             0 klogd
+[  280.822769] [     96]     0    96      359       63     6144        0         -1000 udevd
+[  280.822791] [    207]     0   207      308       20     6144        0             0 wpa_supplicant
+[  280.822813] [    230]   100   230      311       70     8192        0             0 dhcpcd
+[  280.822835] [    231]     0   231      299       49     8192        0             0 dhcpcd
+[  280.822855] [    232]   100   232      294       46     8192        0             0 dhcpcd
+[  280.822876] [    233]   100   233      294       45     6144        0             0 dhcpcd
+[  280.822897] [    240]   100   240      299       49     8192        0             0 dhcpcd
+[  280.822918] [    266]     0   266     1611      114    10240        0             0 ntpd
+[  280.822939] [    272]     0   272     1241       80     8192        0         -1000 sshd
+[  280.822960] [    277]     0   277      399       15     6144        0             0 telnetd
+[  280.822983] [    287]     0   287      515       40     6144        0             0 mavlink_bridge
+[  280.823009] [    697]     0   697      400       17     6144        0             0 getty
+[  280.823032] [    935]     0   935      400       16     6144        0             0 sh
+[  280.823053] [    939]     0   939      398       14     6144        0             0 cp
+[  280.823071] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),task=ntpd,pid=266,uid=0
+[  280.823122] Out of memory: Killed process 266 (ntpd) total-vm:6444kB, anon-rss:456kB, file-rss:0kB, shmem-rss:0kB, UID:0 pgtables:10kB oom_score_adj:0
+[  280.823822] oom_reaper: reaped process 266 (ntpd), now anon-rss:0kB, file-rss:0kB, shmem-rss:0kB
+[  299.778711] rkcif rkcif-mipi-lvds: clear unready subdev num: 0
+[  299.779018] rkisp rkisp-vir0: clear unready subdev num: 0
+[  299.934779] stream_cif_mipi_id0: s_power 1, entity use_count 1
+[  299.935331] stream_cif_mipi_id0: s_power 0, entity use_count 0
+[  299.982494] stream_cif_mipi_id0: s_power 1, entity use_count 1
+[  299.983805] stream_cif_mipi_id0: open video, entity use_countt 2
+[  299.983940] stream_cif_mipi_id1: open video, entity use_countt 1
+[  300.024967] rkisp rkisp-vir0: first params buf queue
+[  300.047739] vsys dev open 27
+[  300.066674] stream_cif_mipi_id0: open video, entity use_countt 3
+[  300.066882] stream_cif_mipi_id0: close video, entity use_count 2
+[  300.072500] stream_cif_mipi_id0: open video, entity use_countt 3
+[  300.074094] stream_cif_mipi_id0: close video, entity use_count 2
+[  300.091110] stream_cif_mipi_id0: open video, entity use_countt 3
+[  300.091209] stream_cif_mipi_id0: close video, entity use_count 2
+[  300.101941] stream_cif_mipi_id0: open video, entity use_countt 3
+[  300.102044] stream_cif_mipi_id0: close video, entity use_count 2
+[  300.108173] rkisp queue buf done
+[  300.108485] rkisp_hw ffa00000.rkisp: set isp clk = 198000000Hz
+[  300.110414] rkcif-mipi-lvds: stream[0] start streaming
+[  300.110580] rockchip-mipi-csi2 mipi0-csi2: stream on, src_sd: 103ed988, sd_name:rockchip-csi2-dphy0
+[  300.110597] rockchip-mipi-csi2 mipi0-csi2: stream ON
+[  300.110662] rockchip-csi2-dphy0: dphy0, data_rate_mbps 510
+[  300.110699] rockchip-csi2-dphy csi2-dphy0: csi2_dphy_s_stream stream on:1, dphy0, ret 0
+[  888.491015] rockit isp stream off
+[  888.505767] rkcif-mipi-lvds: stream[0] start stopping, total mode 0x2, cur 0x2
+[  888.537625] rockchip-mipi-csi2 mipi0-csi2: stream off, src_sd: 103ed988, sd_name:rockchip-csi2-dphy0
+[  888.537680] rockchip-mipi-csi2 mipi0-csi2: stream OFF
+[  888.537730] rockchip-csi2-dphy csi2-dphy0: csi2_dphy_s_stream_stop stream stop, dphy0
+[  888.537763] rockchip-csi2-dphy csi2-dphy0: csi2_dphy_s_stream stream on:0, dphy0, ret 0
+[  888.538033] rkcif-mipi-lvds: stream[0] stopping finished, dma_en 0x0
+[  888.538062] rkcif-mipi-lvds: stream[0] start stopping, total mode 0x0, cur 0x2
+[  888.538079] rkcif-mipi-lvds: stream[0] stopping finished, dma_en 0x0
+[  888.543881] vsys_release, 27
+[  888.543906] vrgn_release, 123
+[  888.543964] vi_release 99
+[  888.544067] venc_release 51
+[  889.713360] stream_cif_mipi_id1: close video, entity use_count 0
+[  889.713517] stream_cif_mipi_id0: close video, entity use_count 1
+[  889.713769] stream_cif_mipi_id0: s_power 0, entity use_count 0
+[  890.543284] rkcif rkcif-mipi-lvds: clear unready subdev num: 0
+[  890.543566] rkisp rkisp-vir0: clear unready subdev num: 0
+[  890.666705] stream_cif_mipi_id0: s_power 1, entity use_count 1
+[  890.667269] stream_cif_mipi_id0: s_power 0, entity use_count 0
+[  890.724012] stream_cif_mipi_id0: s_power 1, entity use_count 1
+[  890.725125] stream_cif_mipi_id0: open video, entity use_countt 2
+[  890.725258] stream_cif_mipi_id1: open video, entity use_countt 1
+[  890.739476] rkisp rkisp-vir0: first params buf queue
+[  890.745698] vsys dev open 27
+[  890.752534] stream_cif_mipi_id0: open video, entity use_countt 3
+[  890.752723] stream_cif_mipi_id0: close video, entity use_count 2
+[  890.753895] stream_cif_mipi_id0: open video, entity use_countt 3
+[  890.754416] stream_cif_mipi_id0: close video, entity use_count 2
+[  890.758063] stream_cif_mipi_id0: open video, entity use_countt 3
+[  890.758289] stream_cif_mipi_id0: close video, entity use_count 2
+[  890.763010] stream_cif_mipi_id0: open video, entity use_countt 3
+[  890.763105] stream_cif_mipi_id0: close video, entity use_count 2
+[  890.764896] rkisp queue buf done
+[  890.765158] rkisp_hw ffa00000.rkisp: set isp clk = 198000000Hz
+[  890.767123] rkcif-mipi-lvds: stream[0] start streaming
+[  890.767289] rockchip-mipi-csi2 mipi0-csi2: stream on, src_sd: 103ed988, sd_name:rockchip-csi2-dphy0
+[  890.767304] rockchip-mipi-csi2 mipi0-csi2: stream ON
+[  890.767366] rockchip-csi2-dphy0: dphy0, data_rate_mbps 510
+[  890.767404] rockchip-csi2-dphy csi2-dphy0: csi2_dphy_s_stream stream on:1, dphy0, ret 0
+[ 1452.893616] rockit isp stream off
+[ 1452.922994] rkcif-mipi-lvds: stream[0] start stopping, total mode 0x2, cur 0x2
+[ 1452.953218] rockchip-mipi-csi2 mipi0-csi2: stream off, src_sd: 103ed988, sd_name:rockchip-csi2-dphy0
+[ 1452.953268] rockchip-mipi-csi2 mipi0-csi2: stream OFF
+[ 1452.953317] rockchip-csi2-dphy csi2-dphy0: csi2_dphy_s_stream_stop stream stop, dphy0
+[ 1452.953350] rockchip-csi2-dphy csi2-dphy0: csi2_dphy_s_stream stream on:0, dphy0, ret 0
+[ 1452.953618] rkcif-mipi-lvds: stream[0] stopping finished, dma_en 0x0
+[ 1452.953644] rkcif-mipi-lvds: stream[0] start stopping, total mode 0x0, cur 0x2
+[ 1452.953661] rkcif-mipi-lvds: stream[0] stopping finished, dma_en 0x0
+[ 1452.974690] vsys_release, 27
+[ 1452.974715] vrgn_release, 123
+[ 1452.974777] vi_release 99
+[ 1452.974878] venc_release 51
+[ 1454.368572] stream_cif_mipi_id1: close video, entity use_count 0
+[ 1454.368728] stream_cif_mipi_id0: close video, entity use_count 1
+[ 1454.368990] stream_cif_mipi_id0: s_power 0, entity use_count 0

@@ -1,12 +1,19 @@
 #!/bin/sh
 ROOT=/root/logs/precision-landing-sessions
 CONTROL=$ROOT/active-session
-BRIDGE_LOG=/root/logs/precision-landing/mavlink-bridge-latest.log
+RUNTIME_LOG_ROOT=/root/logs/precision-landing
+CAMERA_LOG=$RUNTIME_LOG_ROOT/multi-tag.log
+BRIDGE_LOG=$RUNTIME_LOG_ROOT/mavlink-bridge-latest.log
+
+ensure_log_roots() {
+    mkdir -p "$ROOT" "$RUNTIME_LOG_ROOT"
+}
 
 active_dir() { [ -r "$CONTROL" ] && { read -r value < "$CONTROL"; printf '%s' "$value"; }; }
 valid_dir() { case "$1" in "$ROOT"/*) return 0;; *) return 1;; esac; }
 
 start_log() {
+    ensure_log_roots || return 1
     [ -z "$(active_dir)" ] || { echo "logging already active" >&2; return 1; }
     session=${1:-flight-$(date '+%Y%m%dT%H%M%S')}
     case "$session" in ''|*[!A-Za-z0-9._-]*) echo "invalid session id" >&2; return 1;; esac
@@ -18,7 +25,7 @@ start_log() {
     }
     mkdir -p "$dir" || return 1
     mode=multi-tag-ids-0-1-2
-    camera_log=/root/logs/precision-landing/multi-tag.log
+    camera_log=$CAMERA_LOG
     landing_config=/root/LUCKFOX_CAM/Config/Landing.yaml
     landing_pdf=/root/LUCKFOX_CAM/Calibration/a4_three_tag_landing_pad_ids_0_1_2.pdf
     landing_binary=/root/LUCKFOX_CAM/build/rv1103/luckfox_landing
@@ -29,6 +36,38 @@ start_log() {
     printf '%s\n' "$landing_pdf" > "$dir/landing-pad.path"
     { sha256sum /root/LUCKFOX_CAM/Config/Camera.yaml "$landing_config" "$landing_pdf" "$landing_binary" 2>/dev/null || true; } > "$dir/checksums.sha256"
     { date; uptime; free -m 2>/dev/null || true; df -h /; ps w; } > "$dir/system-start.txt" 2>&1
+    # Recover the bridge output as well. Its "latest" path must be a live
+    # symlink created by the bridge service, not a regular placeholder or a
+    # dangling link left after the runtime log directory was removed. Recover
+    # the bridge before the camera because a bridge disconnect terminates the
+    # landing process.
+    if [ ! -e "$BRIDGE_LOG" ] || [ ! -L "$BRIDGE_LOG" ]; then
+        /etc/init.d/S98mavlink_bridge restart >/dev/null 2>&1 || {
+            echo "failed to recreate bridge log: $BRIDGE_LOG" >&2
+            rm -rf "$dir"
+            return 1
+        }
+    fi
+    [ -f "$BRIDGE_LOG" ] && [ -r "$BRIDGE_LOG" ] || {
+        echo "bridge log is unavailable: $BRIDGE_LOG" >&2
+        rm -rf "$dir"
+        return 1
+    }
+    # A running service may predate creation of the logging directory. Restart
+    # it once when its stdout file is absent, otherwise touching the pathname
+    # would leave the process writing to an unrelated/deleted inode.
+    if [ ! -e "$camera_log" ]; then
+        /etc/init.d/S99luckfox_landing restart >/dev/null 2>&1 || {
+            echo "failed to recreate camera log: $camera_log" >&2
+            rm -rf "$dir"
+            return 1
+        }
+    fi
+    [ -f "$camera_log" ] && [ -w "$camera_log" ] || {
+        echo "camera log is unavailable: $camera_log" >&2
+        rm -rf "$dir"
+        return 1
+    }
     printf '%s\n' "$camera_log" > "$dir/camera-source.path"
     wc -c < "$camera_log" > "$dir/camera-source.offset" 2>/dev/null || printf '0\n' > "$dir/camera-source.offset"
     tail -n 0 -F "$camera_log" > "$dir/precision-landing.log" 2>&1 & echo $! > "$dir/camera-tail.pid"
@@ -71,6 +110,6 @@ case "$1" in
     start) start_log "$2";;
     stop) stop_log;;
     status) dir=$(active_dir); if valid_dir "$dir"; then echo "$dir"; else echo inactive; fi;;
-    clear) [ -z "$(active_dir)" ] || { echo "stop logging first" >&2; exit 1; }; find "$ROOT" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +;;
+    clear) ensure_log_roots || exit 1; [ -z "$(active_dir)" ] || { echo "stop logging first" >&2; exit 1; }; find "$ROOT" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +;;
     *) echo "Usage: $0 {start [SESSION_ID]|stop|status|clear}" >&2; exit 2;;
 esac
