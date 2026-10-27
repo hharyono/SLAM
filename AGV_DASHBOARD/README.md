@@ -145,9 +145,17 @@ powershell -ExecutionPolicy Bypass -File \
 ```
 
 Script mendeteksi IP WSL dan alamat adapter Windows yang memiliki rute ke board
-(`BOARD_SSH_TARGET`, default `192.168.1.50`), kemudian membuat port forwarding
+(`BOARD_SSH_TARGET`, default `192.168.1.124`), kemudian membuat port forwarding
 TCP `42000` (status/command) dan `42010` (ScanFrame). Saat rule belum sehat,
 backend meminta izin Administrator melalui UAC dan menunggu hasil aktivasi.
 Gunakan IP Windows yang dicetak script sebagai `LUCKFOX_BACKEND_HOST` pada
 robot. `BOARD_ADDRESS` dapat dipakai bila alamat koneksi board berbeda dari
 host pada `BOARD_SSH_TARGET`.
+
+Konfigurasi jaringan saat ini menggunakan RV1106 `wlan0` di `192.168.1.124`
+dan endpoint dashboard pada Wi-Fi Windows di `192.168.1.133`. Pada board,
+`LUCKFOX_BACKEND_HOST` dan `LUCKFOX_SCAN_STREAM_HOST` harus menunjuk ke endpoint
+Windows tersebut.
+
+Operasi tulis ArduPilot (EKF origin dan mission) menggunakan MAVLink upload
+endpoint RV1106 `192.168.1.124:5761`; port `5760` tetap untuk monitor dashboard.

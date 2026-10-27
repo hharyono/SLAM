@@ -351,7 +351,7 @@ export class ExperimentManager {
     this.BoardSshKey = options.boardSshKey;
     this.AblationBoardTargets = {
       rv1103: options.ablationBoardTargets?.rv1103 || options.boardSshTarget,
-      rv1106: options.ablationBoardTargets?.rv1106 || 'root@192.168.1.231',
+      rv1106: options.ablationBoardTargets?.rv1106 || 'root@192.168.1.124',
     };
     this.Notify = options.notify;
     fs.mkdirSync(this.OutputRoot, { recursive: true });

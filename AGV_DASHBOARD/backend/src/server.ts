@@ -81,7 +81,7 @@ const windowsForwarderScript = path.join(
 const experimentOutputDir =
   process.env.EXPERIMENT_OUTPUT_DIR || path.join(root, 'EXPERIMENTS', 'Ouputs');
 const routeReferences = new RouteReferenceStore(experimentOutputDir);
-const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.50';
+const boardSshTarget = process.env.BOARD_SSH_TARGET || 'root@192.168.1.124';
 const rv1103SshTarget = process.env.RV1103_SSH_TARGET || boardSshTarget;
 const rv1106SshTarget = process.env.RV1106_SSH_TARGET || boardSshTarget;
 const boardSshKey = process.env.BOARD_SSH_KEY || '/root/.ssh/luckfox_experiment_ed25519';
@@ -89,7 +89,7 @@ const boardAddress = process.env.BOARD_ADDRESS || boardSshTarget.split('@').at(-
 const scanStreamPort = Number(process.env.SCAN_STREAM_TCP_PORT || 42010);
 const scanRelayPort = Number(process.env.SCAN_RELAY_TCP_PORT || 42011);
 const ardupilotHost = process.env.ARDUPILOT_BRIDGE_HOST || boardAddress;
-const ardupilotPort = Number(process.env.ARDUPILOT_BRIDGE_PORT || 5760);
+const ardupilotPort = Number(process.env.ARDUPILOT_BRIDGE_PORT || 5761);
 const mavlinkMapHeading = Number(process.env.MAVLINK_MAP_HEADING_RAD || 0);
 const missionUploader = path.join(here, '../scripts/upload_mavlink_mission.py');
 const missionReader = path.join(here, '../scripts/read_mavlink_mission.py');

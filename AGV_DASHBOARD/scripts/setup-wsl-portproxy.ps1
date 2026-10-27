@@ -3,7 +3,7 @@
 
 param(
     [string]$WslDistro = 'Ubuntu',
-    [string]$BoardAddress = '192.168.1.50',
+    [string]$BoardAddress = '192.168.1.124',
     [string]$ListenAddress,
     [int]$RobotPort = 42000,
     [int]$ScanPort = 42010,
